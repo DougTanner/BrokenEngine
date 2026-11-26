@@ -1,25 +1,22 @@
 # Smoke Shaders - Sparse Camera-Following Simulation
 
-Smoke is a client-only 2D density field per flight plane; each plane's field
-follows the camera on its own held world rectangle and refreshes on its own
-frames. Objects deposit into the fields, two compute passes advect and diffuse
-each plane's field, and world shaders sample the planes, lowest first, through
-shared smoke helpers, lighting plane k's smoke with lighting layer k; Model
-(`../Model/AGENTS.md`) owns which planes a model samples. Only plane 0's smoke
-has its sun/moon and ambient base lighting multiplied by combined object-shadow
-R, covering both ground blur layers (channel layout: `../Shadow/AGENTS.md`
-`## Overview`); higher smoke planes receive no object shadow. Point-light and
-explosion lighting on smoke stays unshadowed.
-Terrain and water read that shadow at the base-height (plane-0) projection, and
-models at the fragment.
+Smoke is a single client-only 2D density field at the base flight-plane height;
+it follows the camera on a held world rectangle and refreshes on its own
+cadence. Objects deposit into the field, two compute passes advect and diffuse
+it, and world shaders sample it through shared smoke helpers, reusing the
+caller's single lighting-layer sample; Model (`../Model/AGENTS.md`) owns how a
+model fades smoke with height. Smoke has its sun/moon and ambient base lighting
+multiplied by object-shadow R (`../Shadow/AGENTS.md` `## Overview`).
+Point-light and explosion lighting on smoke stays unshadowed. Terrain and water
+read that shadow at the base-height projection, and models at the fragment.
 
-## Plane Controls
+## Controls
 
-Terrain and water smoke-shadow intensity and natural noise-map wind quantity
-each have bottom and top controls that Render lerps over normalized plane index;
-a single plane uses bottom. Intensity scales only its plane's shadow factor; the
-height-faded particle shadow helper ignores it. Quantity feeds both spread
-passes, independently of the simulated wind field.
+Terrain and water smoke-shadow intensity (`gSmokeShadowIntensity`) and natural
+noise-map wind quantity (`gSmokeWindNoiseQuantity`) each have a single control.
+Intensity scales terrain and water smoke shadows; particles pass
+`SmokeObjectHeightFade` instead. Quantity feeds both spread passes,
+independently of the simulated wind field.
 
 ## Frame and Remap Contract
 
@@ -28,9 +25,9 @@ refresh's pass-A output in previous-area coordinates without remapping. Pass A
 performs the single previous-area-to-current-area remap. Fresh deposits then
 enter pass A's output so consumers see them in the same frame.
 
-A frame between a plane's refreshes runs no spread for that plane, and every
-reader samples its texture where it lies; deposits keep landing in it. The
-refresh schedule and the area publication for those frames are owned by Render
+A frame between refreshes runs no spread, and every reader samples the texture
+where it lies; deposits keep landing in it. The refresh schedule and the area
+publication for those frames are owned by Render
 (`../../../Source/Graphics/Render/AGENTS.md` `## Precision and History`). The
 dilate radius stays 2 tiles at every step count, so smoke whose per-refresh
 gather offset passes that radius-2 halo has no active output tile and is
@@ -51,14 +48,13 @@ behind by camera movement are revisited and cleared.
   nonzero output, so residual values keep tiles active forever.
 - The two spread passes are not interchangeable. Both call the shared
   `SmokeSpread` helper, with different noise scales, but only pass B adds the
-  terms that kill off faint smoke: extra decay where terrain rises more than
-  the plane's height above the lowest plane, a fade
-  toward the edge of the simulation area, and the final step-down walk with
-  threshold zeroing that satisfies the exact-zero rule above. Copying those
-  terms into pass A for symmetry doubles the extinction rate and visibly
-  shortens every plume; dropping them from pass B leaves every touched tile
-  occupied forever and quietly turns the sparse dispatch back into a
-  full-texture one.
+  terms that kill off faint smoke: extra decay over terrain (cutoff in
+  `SmokeSpreadTwo.comp`), a fade toward the edge of the simulation area, and
+  the final step-down walk with threshold zeroing that satisfies the exact-zero
+  rule above. Copying those terms into pass A for symmetry doubles the
+  extinction rate and visibly shortens every plume; dropping them from pass B
+  leaves every touched tile occupied forever and quietly turns the sparse
+  dispatch back into a full-texture one.
 - Enable, disable, and recreation use indirect fullscreen clears. Texture
   occupancy then drains through the following spread frame.
 - Wind is sampled in its own area. The UV conversion deliberately negates
@@ -66,4 +62,4 @@ behind by camera movement are revisited and cleared.
   one sign independently reverses advection.
 
 Wind (`../Wind/AGENTS.md`) owns the velocity field and how it reads the smoke
-area arrays.
+area.

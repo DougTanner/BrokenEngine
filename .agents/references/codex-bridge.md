@@ -16,9 +16,8 @@ Dispatched per the Codex-bridge rule in
 
 ## Inputs
 
-- Prompt — fresh repo-relative `Temp/` file holding one task brief
-  (`subagent-reporting.md` `## Task brief`), filled as a native dispatch would
-  be.
+- Prompt — fresh repo-relative `Temp/` task brief (`subagent-reporting.md`
+  `## Task brief`) with scoped host evidence per step 2.
 - Worktree — this session's worktree.
 - `-Skill` — bare skill name from the `-ListRoutes` key (`$routes` and
   `$presets` own preset/sandbox selection and validation).
@@ -52,14 +51,31 @@ Dispatched per the Codex-bridge rule in
    Proceed after a passing receipt. On a non-zero exit, halt and report the
    receipt's diagnostics (see `Invoke-Codex.ps1` `.NOTES` for exit codes and
    receipt fields). Done when passed or reported.
-2. End the prompt with the verdict-line contract: the worker's last non-empty
-   response line must be `PASS`, `CHANGES-REQUIRED: <n>`, or
-   `BLOCKED: <reason>`, outside the skill's or lens's complete output — after
-   `Residuals` for the shared handoff
-   ([`subagent-handoff.md`](subagent-handoff.md) `## Handoffs`), or after a
-   lens's own output shape (e.g. `/external-architecture-review` Step 9) —
-   supplementing `Status` (without replacing it) where that shape declares it.
-   Done when the prompt states it.
+2. On the launch host, reuse complete evidence or produce only what the
+   read-only review requires. Skip Git for file-only briefs.
+   - For a required worktree comparison, use the skill's baseline, optional
+     committed head, and `git --literal-pathspecs diff --no-color --no-ext-diff
+     --no-textconv --find-renames` with `--` plus scoped literal paths. Preserve
+     rename endpoints, deletion sides, and binary metadata. For approved
+     untracked additions use `git diff --no-index` against `/dev/null` with the
+     same output options (exit 1 means differences). On re-review, keep only
+     hunks matching the findings and line selectors. Use the owning repository
+     and inventory revisions per `subagent-reporting.md`
+     `## Delegated execution context`.
+   - The reviewer reads accessible historical commits, refs, complete diffs,
+     contracts, and filtered worktree registration directly.
+   - Use the skill's `## Inputs` for inventory and Git-dependent helpers.
+     Supply native status and intact parsed results. Report producer failures
+     or coverage gaps before launch. The reviewer selects from official rows.
+   - For inaccessible transcript stores, supply only evidence the skill's
+     `## Inputs` admits.
+
+   Cite evidence under `Scope` as source material. Store large evidence in fresh,
+   worktree-readable `Temp/` files. Keep evidence and brief immutable on retries.
+
+   End the brief by requiring `PASS`, `CHANGES-REQUIRED: <n>`, or
+   `BLOCKED: <reason>` as the last non-empty line after the complete handoff or
+   lens output, including any required `Status`.
 3. Run the public launch once from the same worktree root and environment as
    step 1, with a fresh repo-relative `Temp/` `<out>`. For direct launch and
    wait, use a timeout `>= 600000` ms on blocking-shell hosts such as Claude
@@ -120,10 +136,11 @@ Dispatched per the Codex-bridge rule in
   `Invoke-StaticChecks.ps1`, concurrent writers, and any review reading C++ or
   dual-language headers — such as an overlapping `/glsl-review` during Step 6
   post-validator or post-round re-runs — until it terminates.
-- Verify launcher changes without Codex CLI from Bash with a stub `codex` first
-  on `PATH` (`PATH=<stub dir>:$PATH pwsh -NoProfile -File
-  .agents/scripts/Invoke-Codex.ps1 -Skill ...`; PowerShell has no inline prefix
-  form).
+- Verify launcher changes without Codex CLI from PowerShell 7 by running step
+  3's launch command with a stub `codex` first on `PATH`:
+  ```powershell
+  $p = $env:PATH; try { $env:PATH = "<stub dir>;$p"; <step 3 launch command> } finally { $env:PATH = $p }
+  ```
 
 ## References
 

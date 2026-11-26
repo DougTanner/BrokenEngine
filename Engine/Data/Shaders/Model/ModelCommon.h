@@ -21,7 +21,6 @@ layout (location = 5) out vec2 f2OutUV3;
 layout (location = 6) out vec2 f2OutUV4;
 layout (location = 7) out vec4 f4OutColorAdd;
 layout (location = 8) out float fOutHeightAboveBase;
-layout (location = 9) out flat int iOutLayer;
 layout (location = 10) out vec4 f4OutTangent;
 
 // Push constants
@@ -81,8 +80,6 @@ layout (scalar, set = 1, binding = kiModelBindingJointMatrix) buffer readonly jo
 	JointMatrix jointMatrices[];
 };
 
-layout (set = 1, binding = kiModelBindingTerrainElevation) uniform sampler2D elevationTextureSampler;
-
 void ModelVertexOutput(vec3 f3LocalPosition, vec3 f3LocalNormal, vec3 f3LocalTangent, ModelLayout model)
 {
 	vec3 f3WorldPosition = Transform(vec4(f3LocalPosition, 1.0f), model.f3x4Transform);
@@ -100,9 +97,8 @@ void ModelVertexOutput(vec3 f3LocalPosition, vec3 f3LocalNormal, vec3 f3LocalTan
 	// A tangent is a surface direction, so it takes the forward transform. Not normalized: all zero means the vertex carries no tangent and must stay zero.
 	f4OutTangent = vec4(Transform(vec4(f3LocalTangent, 0.0f), model.f3x4Transform), f4Tangent.w);
 	f4OutColorAdd = model.f4ColorAdd;
-	// The model centre, not the vertex, so every vertex of a ship on the lowest flight plane gets exactly 0.
-	fOutHeightAboveBase = max(model.f4PositionLayer.z - globalLayout.fBaseHeight, 0.0f);
-	iOutLayer = int(model.f4PositionLayer.w);
+	// The model centre, not the vertex, so every vertex of a ship at base height gets exactly 0.
+	fOutHeightAboveBase = max(model.f4Position.z - globalLayout.fBaseHeight, 0.0f);
 
 	int iRenderingMode = int(pushConstantsLayout.f4Pipeline.y);
 	if (iRenderingMode == kiModelRenderingModeCamera)
@@ -116,10 +112,7 @@ void ModelVertexOutput(vec3 f3LocalPosition, vec3 f3LocalNormal, vec3 f3LocalTan
 	}
 	else
 	{
-		// kiModelRenderingModeShadow: shadow projection. The object-shadow blur measures height from the ground under the model centre (sea level
-		// over water) rather than from sea level, so a ship over high terrain blurs like a low one.
-		gl_Position = ShadowStretchProjection(globalLayout, f3WorldPosition, model.f4PositionLayer.xyz, model.f2ShadowWorldXRange);
-		float fGroundHeight = max(textureLod(elevationTextureSampler, WorldToVisibleArea(model.f4PositionLayer.xyz, globalLayout.visibleAreaToUv), 0.0f).x, 0.0f);
-		fOutHeightAboveBase = max(model.f4PositionLayer.z - fGroundHeight - globalLayout.fBaseHeight, 0.0f);
+		// This branch handles kiModelRenderingModeShadow.
+		gl_Position = ShadowStretchProjection(globalLayout, f3WorldPosition, model.f4Position.xyz, model.f2ShadowWorldXRange);
 	}
 }

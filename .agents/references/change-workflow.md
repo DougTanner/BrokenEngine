@@ -164,15 +164,15 @@ Definitions:
   will be changed: landing a session's work, or executable Plan completion or
   rejection. Shared AgentTools promotion and Tier-3 integration always land
   through it.
-- Executable Plan — tracked `Documents/Plans/**/*.md` with byte-zero
-  `broken-engine-plan/v1` metadata; selection and marker rules:
-  `Documents/Plans/AGENTS.md`. `Documents/Features` is manual.
-- Wrapper session — session started through `.claude/claude-worktree.sh`,
-  `.codex/codex-worktree.ps1`, or `.antigravity/agy-worktree.ps1`, owning an
-  isolated worktree. A retained wrapper session reattaches only through the
-  same wrapper's reattach input, whose command `/eod` gives. If the user opens
-  a session directly on main, work in that checkout and do not use the
-  worktree flow.
+- Executable Plan — tracked `Documents/Plans/**/*.md` with the byte-zero
+  scheduler metadata marker (`Documents/Plans/AGENTS.md`
+  `## Git-backed scheduler`). `Documents/Features` is manual.
+- Wrapper session — session started through
+  `.agents/scripts/Start-AgentWorktreeSession.ps1`, owning an isolated
+  worktree. A retained wrapper session reattaches only through its
+  `-ReattachWorktree` input, whose command `/eod` gives. If the user opens a
+  session directly on main, work in that checkout and do not use the worktree
+  flow.
 - Primary — the shared main checkout and its main branch that finished session
   work lands into.
 - Step and stage — a step is one of the nine numbered Change Workflow steps

@@ -3,6 +3,7 @@
 #include "Game.h"
 #if defined(BT_CLIENT)
 #include "Graphics/Camera.h"
+#include "Input/GameKeybinds.h"
 #include "Network/Client/ClientSession.h"
 #endif
 #if defined(BT_SERVER)
@@ -14,10 +15,12 @@
 #endif
 #include "Frame/FrameBase.h"
 #include "Input/Input.h"
+#if defined(BT_CLIENT)
 #include "Ui/GameSettings.h"
 #include "Ui/GraphicsSettings.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
 #include "Ui/SoundSettings.h"
+#endif
 
 #include "Profile/ProfileRows.h"
 
@@ -51,14 +54,14 @@ GameBase::~GameBase()
 }
 
 #if defined(BT_CLIENT)
-// Fixed policy order: BeginPoll -> quit -> modal gate -> chat gate -> cursor -> pause/back-out -> engine toggles ->
-// game::gpGame->ProcessGameMenuInput -> previous-snapshot assignment. The modal and chat gates skip everything after
-// them except that assignment, so a gated frame still resolves quit and still advances the previous snapshot that the
-// next frame's edge detection needs.
+// Fixed policy order: InputPoll (BeginPoll) -> quit -> modal gate -> chat gate -> cursor -> pause/back-out -> engine toggles ->
+// game::gpGame->ProcessGameMenuInput -> ~InputPoll (EndPoll). The modal and chat gates skip everything after them except
+// ~InputPoll, so every return path still resolves quit and still advances the previous snapshot that the next frame's
+// edge detection needs.
 void GameBase::ProcessInput(bool bLostFocus)
 {
 	MenuInput menuInput {};
-	InputPoll inputPoll = gpInput->BeginPoll(bLostFocus, meUiState != UiState::kNone, menuInput);
+	InputPoll inputPoll(bLostFocus, meUiState != UiState::kNone, menuInput);
 
 	// Escape quits only from the basic main menu; with a settings sub-menu open it backs out to the menu below instead
 	if (menuInput.flags & MenuInputFlags::kQuit || (menuInput.flags & MenuInputFlags::kPauseMenu && (mGameFlags & GameFlags::kMainMenu) && meUiState == UiState::kPause))
@@ -68,19 +71,18 @@ void GameBase::ProcessInput(bool bLostFocus)
 
 	if (meUiState == UiState::kModal)
 	{
-		gpInput->mPreviousRawInput = gpRawInputManager->mRawInput;
 		return;
 	}
 
-	// The opening frame takes the gate too, so its Enter never reaches the engine toggles or ProcessGameMenuInput. The
+	// The opening frame takes the gate too, so its key never reaches the engine toggles or ProcessGameMenuInput. The
 	// box opens only while the Tweaks overlay is hidden, because ChatScreen renders only then.
-	if (menuInput.flags & MenuInputFlags::kOpenChat && !(mGameFlags & GameFlags::kMainMenu) && meUiState == UiState::kNone && !gbShowImGui)
+	if (!mChatLog.bInputOpen && inputPoll.Pressed(KeyAction::kOpenChat) && !(mGameFlags & GameFlags::kMainMenu) && meUiState == UiState::kNone && !gbShowImGui)
 	{
 		mChatLog.bInputOpen = true;
+		gpInput->mSuppressedChatOpenKey = KeybindFor(KeyAction::kOpenChat);
 	}
 	if (mChatLog.bInputOpen)
 	{
-		gpInput->mPreviousRawInput = gpRawInputManager->mRawInput;
 		return;
 	}
 
@@ -97,7 +99,7 @@ void GameBase::ProcessInput(bool bLostFocus)
 
 	if (menuInput.flags & MenuInputFlags::kPauseMenu) [[unlikely]]
 	{
-		if (meUiState == UiState::kGameSettings || meUiState == UiState::kGraphicsSettings || meUiState == UiState::kSound)
+		if (meUiState == UiState::kGameSettings || meUiState == UiState::kGraphicsSettings || meUiState == UiState::kKeybinds || meUiState == UiState::kSound)
 		{
 			LeaveSettingsScreen();
 		}
@@ -111,7 +113,7 @@ void GameBase::ProcessInput(bool bLostFocus)
 		}
 	}
 
-	if (menuInput.flags & MenuInputFlags::kToggleFullscreen)
+	if (inputPoll.Pressed(KeyAction::kToggleFullscreen))
 	{
 		gFullscreen.Toggle();
 	}
@@ -211,26 +213,21 @@ void GameBase::ProcessInput(bool bLostFocus)
 
 	if constexpr (kbScreenshots)
 	{
-		// F9 toggles continuous dev capture, queuing a default one-shot request each frame when the request slot is
-		// empty; an empty path uses the default %TEMP% location.
+		// Continuous dev capture queues one-shot requests each frame. An empty path uses the default %TEMP% location.
 		static bool sbContinuousScreenshots = false;
-		if (menuInput.flags & MenuInputFlags::kToggleScreenshots)
+		if (inputPoll.Pressed(KeyAction::kToggleScreenshots))
 		{
 			sbContinuousScreenshots = !sbContinuousScreenshots;
 		}
 		if (sbContinuousScreenshots && !gpGraphics->mOptionalScreenshotRequest)
 		{
-			// Fill only when empty so the per-frame F9 default request can't overwrite an agent-issued request's
+			// Fill only when empty so the per-frame default request can't overwrite an agent-issued request's
 			// parameters (path / maxWidth / iCaptureToken) before the capture site consumes it.
 			gpGraphics->mOptionalScreenshotRequest = ScreenshotRequest {};
 		}
 	}
 
 	game::gpGame->ProcessGameMenuInput(inputPoll);
-
-	// Runs after every edge consumer, including game::gpGame->ProcessGameMenuInput and the modal path that skips it;
-	// moving this earlier silently breaks edge detection for whatever still has to run.
-	gpInput->mPreviousRawInput = gpRawInputManager->mRawInput;
 }
 
 // The one writer of the PAUSED note; returning on no change keeps the server's echo of a SPACE pause from rewriting
@@ -767,7 +764,7 @@ void GameBase::Render()
 	GridCoord cameraCoordinate = mClientGridCoordinate;
 	bool bHaveRenderableCamera = false;
 	SelectRenderCamera(rActiveCoordinates, cameraCoordinate, bHaveRenderableCamera);
-	mRenderInterpolation.UpdateRenderInterpolation(*this, rActiveCoordinates, cameraCoordinate, bHaveRenderableCamera);
+	bool bHasRenderableWorldBasis = mRenderInterpolation.UpdateRenderInterpolation(*this, rActiveCoordinates, cameraCoordinate, bHaveRenderableCamera);
 
 	if (HandleDeferredSwapchain())
 	{
@@ -778,22 +775,45 @@ void GameBase::Render()
 		return;
 	}
 
-	// Island cells: confirmed cells and the local render camera, skipping empty-ring cells that have nothing rendered. The
-	// pointers use per-frame workbuffer storage that must stay open through the render call that writes them.
+	// Island cells: confirmed cells and the local render camera (Observer mode restricts to confirmed active
+	// subscriptions, matching panning), skipping empty-ring cells that have nothing rendered. The pointers use
+	// per-frame workbuffer storage that must stay open through the render call that writes them.
+	bool bObserverActive = gpCamera->meObserverState == CameraBase::ObserverState::kObserving && !(mGameFlags & GameFlags::kMainMenu);
 	common::ScopedWorkbufferArena islandCellsArena = common::gpThreadLocal->mWorkbuffer.Push();
 	for (const GridCoord& rCoordinate : rActiveCoordinates)
 	{
 		auto it = mCells.find(rCoordinate);
-		if (it != mCells.end() && (it->second.iConfirmedTick >= 0 || (bHaveRenderableCamera && rCoordinate == cameraCoordinate)) && it->second.iSnapshotCount != 0)
+		if (it == mCells.end() || it->second.iSnapshotCount == 0)
 		{
-			islandCellsArena.mBuffer.PushBack<const CellStaticData*>(&it->second.staticData);
+			continue;
 		}
+		if (bObserverActive)
+		{
+			if (it->second.iConfirmedTick < 0 || gpClient == nullptr)
+			{
+				continue;
+			}
+			bool bSubscribed = std::ranges::any_of(gpClient->mSubscriptions.mCoordinateSlots, [&](const ClientCoordSlot& rSlot)
+			{
+				return rSlot.eState == CoordSubscriptionState::kActive && rSlot.coordinate == rCoordinate;
+			});
+			if (!bSubscribed)
+			{
+				continue;
+			}
+		}
+		else if (it->second.iConfirmedTick < 0 && !(bHaveRenderableCamera && rCoordinate == cameraCoordinate))
+		{
+			continue;
+		}
+		islandCellsArena.mBuffer.PushBack<const CellStaticData*>(&it->second.staticData);
 	}
 	std::span<const CellStaticData* const> activeIslandCells = islandCellsArena.mBuffer.Span<const CellStaticData* const>();
 
-	// Behind an opaque map overlay no world pass is recorded or submitted; the frame still runs the game's world-hidden step and the
-	// residency step, then submits the acquire command buffer when recorded and the UI.
-	bool bWorldHidden = game::gpGame->MapOpacity() >= 1.0f;
+	// Behind an opaque map overlay, or while Observer mode awaits a renderable subscribed basis, no world pass is
+	// recorded or submitted; the frame still runs the game's world-hidden step and the residency step, then submits
+	// the acquire command buffer when recorded and the UI.
+	bool bWorldHidden = game::gpGame->MapOpacity() >= 1.0f || !bHasRenderableWorldBasis;
 	static bool sbWorldHidden = false;
 	if (bWorldHidden && !sbWorldHidden)
 	{
@@ -816,7 +836,7 @@ void GameBase::Render()
 
 	// Capture command buffer index before async launch to avoid re-reading in async thread
 	int64_t iCommandBuffer = gpSwapchainManager->miFramebufferIndex;
-	gpGraphics->RenderMainPresentAcquire(iCommandBuffer, mRenderInterpolation.mRenderInterpolates, rActiveCoordinates, cameraCoordinate, elapsedTime);
+	gpGraphics->RenderMainPresentAcquire(iCommandBuffer, mRenderInterpolation.mRenderInterpolates, rActiveCoordinates, gpCamera->mBasisCoordinate, elapsedTime);
 
 }
 
@@ -934,6 +954,11 @@ void GameBase::BuildMenuIslandPlacement(int64_t iIndex, std::vector<IslandPlacem
 
 void GameBase::ChangeFrameToMainMenu()
 {
+	if (meUiState == UiState::kKeybinds)
+	{
+		LeaveSettingsScreen();
+	}
+
 	game::gpClientSession->mpRuntime->Disconnect();
 
 	ASSERT(!(mGameFlags & GameFlags::kMainMenu));
@@ -949,6 +974,11 @@ void GameBase::ChangeFrameToMainMenu()
 
 void GameBase::ChangeFrameToGame()
 {
+	if (meUiState == UiState::kKeybinds)
+	{
+		LeaveSettingsScreen();
+	}
+
 	ASSERT(mGameFlags & GameFlags::kMainMenu);
 
 	game::gpGame->StartGameMusic();
@@ -986,6 +1016,12 @@ void GameBase::LeaveSettingsScreen()
 	else if (meUiState == UiState::kGraphicsSettings)
 	{
 		SaveGraphicsSettings();
+	}
+	else if (meUiState == UiState::kKeybinds)
+	{
+		gpInput->CancelKeybindCapture();
+		SaveEngineKeybinds();
+		game::SaveGameKeybinds();
 	}
 	else if (meUiState == UiState::kSound)
 	{

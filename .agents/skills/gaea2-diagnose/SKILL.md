@@ -10,7 +10,7 @@ description: >-
   Newtonsoft exception with JSON path, then cross-references the shipping
   Examples library to suggest the valid value or shape.
 argument-hint: [--latest-swarm | --blob <base64> | --log <path>]
-allowed-tools: [Read, Edit, Bash, PowerShell, Glob, Grep]
+allowed-tools: [Read, Edit, PowerShell, Glob, Grep]
 disable-model-invocation: true
 ---
 
@@ -29,49 +29,18 @@ value, and tell the user what to change.
   "Swarm failed to load".
 - A node loads as deactivated (dashed border).
 - Behavior is unexpected after a `/gaea2-save` round-trip.
-- This skill diagnoses; it does not edit the .terrain. Apply fixes via
-  `Temp/<basename>.md` + `/gaea2-save` (step 6 below); structural graph changes
-  chain to `/gaea2-modify`.
+- This skill diagnoses without editing `.terrain`: property fixes follow step 6
+  below; for structural graph changes, direct the user to run `/gaea2-modify`.
 - Runtime crashes in the Gaea binary itself go to QuadSpinner support, not this
   skill.
 
 ## Steps
 
-1. Set up the Python dispatch. Every Python script below runs through the shared
-   wrapper, which resolves the interpreter itself (via the shared
-   `.agents/scripts/Detect-Python.ps1` probe) and reports it as data. From the
-   session worktree root, each call takes the form below. Done when this
-   dispatch form is the one every later script call uses.
-
-   ```powershell
-   pwsh -NoProfile -Command "& '.agents/skills/gaea2-shared/scripts/Invoke-Gaea2Python.ps1' -Script <script.py> -Arguments '<arg>','<arg>'"
-   ```
-
-   - Never run that probe and parse its `OK`/`MISSING`/`STALE` line yourself,
-     and never call a script with a bare `python` or a captured interpreter
-     path.
-   - Use `-Command`, not `-File`: under `-File` an `-Arguments` list of more
-     than one value collapses into a single token.
-   - The wrapper runs the script from the repository root whatever the current
-     directory is, and passes the child's stderr through to yours — append your
-     shell's stderr redirect (`2>$null` in PowerShell, `2>/dev/null` in Bash)
-     when you only want the JSON.
-   - It prints one JSON object, `schemaVersion` `broken-engine-gaea2-python/v1`,
-     carrying `interpreter`, `pythonVersion`, the child's `exitCode`, its
-     `stdout` and `stderr` (each capped at 8192 characters, with `truncated` set
-     when cut), plus `status`, `code`, `message`:
-     - `ok` (exit 0) — read the script's output from `stdout`.
-     - `python.missing` / `python.stale` (exit 2) — no usable x64 CPython 3.12+
-       interpreter, and nothing ran. Do not install anything: report to the user
-       that Python is missing or too old, quoting `message`/`probeLine`, and —
-       for `python.missing` — the `installCommand` the envelope carries as the
-       suggested command for them to run (`installCommand` is null for a stale
-       interpreter, which the user resolves by upgrading). Stop until they say
-       it's installed.
-     - `python.script-failed` (exit 1) — the script ran and failed; its own code
-       is in `exitCode` and its diagnostics in `stderr`.
-     - `script.not-found`, `probe.not-found`, `python.probe-failed`,
-       `internal.error` (exit 1) — the dispatch itself failed; report `message`.
+1. Set up Python dispatch via `Invoke-Gaea2Python.ps1` per
+   [wrapper-contract.md](../gaea2-shared/references/wrapper-contract.md#python-wrapper-dispatch)
+   and
+   [wrapper-contract.md](../gaea2-shared/references/wrapper-contract.md#no-inline-reconstruction).
+   Done when every later script call uses that dispatch form.
 
 2. Pick the log stream by how Gaea was invoked. Done when one log stream and its
    reader are chosen.
@@ -85,10 +54,13 @@ value, and tell the user what to change.
    | Caller pasted a base64 `ERR` payload | inline | `decode_gaea_err.py --blob <text>` |
 
 3. Decode the log. For the QuadSpinner log streams, dispatch the decoder through
-   the step 1 wrapper. Done when one decoded ERR is in hand.
+   the step 1 wrapper. If a node loads dashed/deactivated with no `ERR` line in
+   the log, skip to `../gaea2-shared/references/node-conventions.md` (see
+   `### Common error patterns` below). Done when one decoded `ERR` is in hand,
+   or the no-`ERR` dashed-node case has been routed to `node-conventions.md`.
 
    ```powershell
-   pwsh -NoProfile -Command "& '.agents/skills/gaea2-shared/scripts/Invoke-Gaea2Python.ps1' -Script decode_gaea_err.py -Arguments '--latest'"
+   pwsh -NoProfile -NonInteractive -Command "& '.agents/skills/gaea2-shared/scripts/Invoke-Gaea2Python.ps1' -Script decode_gaea_err.py -Arguments '--latest'"
    ```
 
    - The decoder's output arrives in the envelope's `stdout` field: each ERR
@@ -124,13 +96,13 @@ value, and tell the user what to change.
 
    ```powershell
    # What values does this enum actually accept?
-   pwsh -NoProfile -Command "& '.agents/skills/gaea2-shared/scripts/Invoke-Gaea2Python.ps1' -Script inspect_samples.py -Arguments '--enum','SatMap.Library'"
+   pwsh -NoProfile -NonInteractive -Command "& '.agents/skills/gaea2-shared/scripts/Invoke-Gaea2Python.ps1' -Script inspect_samples.py -Arguments '--enum','SatMap.Library'"
 
    # What does a working node of this type look like?
-   pwsh -NoProfile -Command "& '.agents/skills/gaea2-shared/scripts/Invoke-Gaea2Python.ps1' -Script inspect_samples.py -Arguments '--type','Erosion2'"
+   pwsh -NoProfile -NonInteractive -Command "& '.agents/skills/gaea2-shared/scripts/Invoke-Gaea2Python.ps1' -Script inspect_samples.py -Arguments '--type','Erosion2'"
 
    # What ports does this node have? (for wiring questions)
-   pwsh -NoProfile -Command "& '.agents/skills/gaea2-shared/scripts/Invoke-Gaea2Python.ps1' -Script inspect_samples.py -Arguments '--ports','Combine'"
+   pwsh -NoProfile -NonInteractive -Command "& '.agents/skills/gaea2-shared/scripts/Invoke-Gaea2Python.ps1' -Script inspect_samples.py -Arguments '--ports','Combine'"
    ```
 
    Other useful queries when the error is less specific — same command,
@@ -144,8 +116,8 @@ value, and tell the user what to change.
    -Arguments '--list-types'
    ```
 
-6. Apply the fix and re-save. Once you know the valid value, edit
-   `Temp/<basename>.md` and re-run `/gaea2-save`. Then have the user retry the
+6. Apply the fix and hand off to save. Once you know the valid value, edit
+   `Temp/<basename>.md`, then ask the user to run `/gaea2-save` and retry the
    load in Gaea 2. If a second error appears, repeat from step 3 — Gaea fails
    fast on the first error, so subsequent issues only surface after the first is
    fixed. Done when the load succeeds in Gaea 2, or a second error has sent you

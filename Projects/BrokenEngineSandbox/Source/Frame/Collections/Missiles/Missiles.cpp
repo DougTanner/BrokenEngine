@@ -189,6 +189,7 @@ void MissilesInterpolate::Register()
 		.pVisibleIntensityWrapper = &gMissileExhaustVisibleIntensity,
 		.pLightingSizeWrapper = &gMissileExhaustLightingArea,
 		.pLightingIntensityWrapper = &gMissileExhaustLightingIntensity,
+		.expandSides = {engine::AreaLightExpandSides::kBottom, engine::AreaLightExpandSides::kLeft, engine::AreaLightExpandSides::kRight},
 	});
 
 	engine::SmokeTrailsInterpolate::RegisterType(siSmokeTrailTypeIndex,

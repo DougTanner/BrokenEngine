@@ -1,5 +1,7 @@
 #pragma once
 
+#if defined(BT_CLIENT)
+
 #include "WrapperBase.h"
 
 namespace engine
@@ -19,11 +21,9 @@ inline Wrapper gSmokeNoiseScaleOne(3.0f, 0.1f, 8.0f);
 inline Wrapper gSmokeNoiseScaleTwo(0.2f, 0.01f, 1.0f);
 inline Wrapper gSmokeWindNoiseScale(0.015f, 0.001f, 0.1f);
 inline Wrapper gSmokeNoiseQuantity(0.00003f, 0.00001f, 0.0002f);
-inline Wrapper gSmokeWindNoiseQuantityBottom(0.00005f, 0.0f, 0.001f);
-inline Wrapper gSmokeWindNoiseQuantityTop(0.0001f, 0.0f, 0.001f);
-// Each strength is the curl offset in smoke texels per step (SmokeCurlOffset blends between them). The per-refresh offset
-// is the strength times the step count, which reaches the flight-plane count times Smoke Update Cadence with the stagger
-// on (8 at cadence 4); once that passes the radius-2 tile (16 texel) dilate halo, strong-wind plume fronts thin.
+inline Wrapper gSmokeWindNoiseQuantity(0.00005f, 0.0f, 0.001f);
+// SmokeCurlOffset blends the strengths in smoke texels per step. The blended strength times the unpaused frames
+// since the last refresh can exceed the two-tile (16-texel) dilate halo and thin strong-wind plume fronts.
 inline Wrapper gSmokeCurlStrengthLow(0.05f, 0.0f, 0.5f);
 inline Wrapper gSmokeCurlStrengthHigh(2.0f, 0.0f, 5.0f);
 inline Wrapper gSmokeCurlScale(0.005f, 0.0001f, 0.01f);
@@ -49,3 +49,5 @@ inline Wrapper gSmokeTrailsSideJitter(3.0f, 0.0f, 6.0f);
 inline Wrapper gSmokeIntensityFalloff(3.0f, 0.1f, 10.0f);
 
 } // namespace engine
+
+#endif // BT_CLIENT

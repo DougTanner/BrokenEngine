@@ -48,6 +48,16 @@ enum class StandardString : uint8_t
 	kStringAudio,
 	kStringQuit,
 	kStringPaused,
+	kStringKeybinds,
+	kStringFullscreen,
+	kStringOpenChat,
+	kStringScreenshot,
+	kStringCameraForward,
+	kStringCameraBack,
+	kStringCameraLeft,
+	kStringCameraRight,
+	kStringUnbound,
+	kStringPressKey,
 
 	kCount,
 };

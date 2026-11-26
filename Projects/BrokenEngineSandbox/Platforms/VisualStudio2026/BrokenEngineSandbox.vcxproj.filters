@@ -211,6 +211,9 @@
     <Filter Include="Game\Ui\Screens\TweaksScreen">
       <UniqueIdentifier>{c6f9c4a8-4aa3-46fe-969d-6ef9398ec1be}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Game\Input">
+      <UniqueIdentifier>{a736ede6-f271-4ec7-9e8d-e9752d47acf3}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Debug\DebugRender.h">
@@ -933,6 +936,15 @@
     <ClInclude Include="..\..\..\..\Common\DebugDefines.h">
       <Filter>Common</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Input\Keybinds.h">
+      <Filter>Engine\Input</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\Screens\KeybindsScreen.h">
+      <Filter>Engine\Ui\Screens</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Input\GameKeybinds.h">
+      <Filter>Game\Input</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\..\Engine\Source\File\FileManager.cpp">
@@ -1607,6 +1619,15 @@
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Profile\GpuStallTimeline.cpp">
       <Filter>Engine\Profile</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Input\Keybinds.cpp">
+      <Filter>Engine\Input</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\KeybindsScreen.cpp">
+      <Filter>Engine\Ui\Screens</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Input\GameKeybinds.cpp">
+      <Filter>Game\Input</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

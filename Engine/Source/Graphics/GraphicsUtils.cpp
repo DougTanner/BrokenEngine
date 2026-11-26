@@ -76,25 +76,6 @@ bool IsPointVisible(XMVECTOR vecPosition, XMFLOAT4A& rf4OutPosition)
 	return rf4OutPosition.x >= engine::gpCamera->mf4RenderVisibleArea.x && rf4OutPosition.x <= engine::gpCamera->mf4RenderVisibleArea.z && rf4OutPosition.y <= engine::gpCamera->mf4RenderVisibleArea.y && rf4OutPosition.y >= engine::gpCamera->mf4RenderVisibleArea.w;
 }
 
-SmokePlaneWeights ComputeSmokePlaneWeights(float fZ)
-{
-	if (fZ < gpFlightPlanes->Lowest().fHeightMeters)
-	{
-		return {};
-	}
-
-	for (int64_t i = 0; i + 1 < gpFlightPlanes->Count(); ++i)
-	{
-		float fLowerHeight = gpFlightPlanes->Plane(i).fHeightMeters;
-		float fUpperHeight = gpFlightPlanes->Plane(i + 1).fHeightMeters;
-		if (fZ < fUpperHeight)
-		{
-			return {.iLowerPlane = i, .fUpperWeight = (fZ - fLowerHeight) / (fUpperHeight - fLowerHeight)};
-		}
-	}
-	return {.iLowerPlane = gpFlightPlanes->Count() - 1, .fUpperWeight = 0.0f};
-}
-
 void BuildAxisAlignedQuad(shaders::AxisAlignedQuadLayout& rLayout, const XMFLOAT4A& rf4Position, float fArea, const XMFLOAT4A& rf4Parameters, uint32_t uiColor)
 {
 	rLayout.f4VertexRect = {rf4Position.x - fArea, rf4Position.y + fArea, 2.0f * fArea, -2.0f * fArea};

@@ -84,6 +84,8 @@ public:
 #if defined(BT_CLIENT)
 	// Client owned-entity tracking (several per client)
 	engine::GlobalId ClientOwnedEntityIdentifier() const;
+	const engine::OwnedEntity* FindLiveFlagshipOwnedEntity() const;
+	engine::GlobalId ClientFlagshipIdentifier() const;
 	void AddClientOwnedEntity(engine::GlobalId identifier, engine::GridCoord coordinate);
 	void RemoveClientOwnedEntity(engine::GlobalId identifier);
 	std::optional<ShipLocator> ClientOwnedEntity(const Frame& rFrame) const;

@@ -31,7 +31,7 @@ void HudScreen::Render()
 		optionalTickScope.emplace(gpGame->miTickCounter);
 	}
 
-	if (gpGame->meUiState != engine::UiState::kNone)
+	if (gpGame->meUiState != engine::UiState::kNone || engine::gpCamera->meObserverState == engine::CameraBase::ObserverState::kObserving)
 	{
 		return;
 	}
@@ -111,7 +111,7 @@ void HudScreen::Render()
 
 	// Right panel content gate: the focused member id, because the render frame trails a newly focused member by
 	// several ticks.
-	bool bRightHasContent = gpGame->HasFocusedClientEntity();
+	bool bRightHasContent = gpGame->ClientOwnedEntityIdentifier().iValue != 0;
 
 	// With focused owned-entity content, mouse proximity to either anchor opens both panels together.
 	ImVec2 vLeftAnchor(rInputOutput.DisplaySize.x * kfHudEdgeMarginFraction, rInputOutput.DisplaySize.y * kfHudPanelTopFraction);

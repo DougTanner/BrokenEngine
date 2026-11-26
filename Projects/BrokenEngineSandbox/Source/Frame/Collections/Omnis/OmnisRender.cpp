@@ -155,8 +155,7 @@ static int64_t RenderPipeline(const OmnisInterpolate& __restrict rCurrent, const
 		auto matRotationAccelerationX = XMMatrixRotationY(rCurrent.pfRotationAccelerationXs[i]);
 		auto matRotationAccelerationY = XMMatrixRotationX(rCurrent.pfRotationAccelerationYs[i]);
 		auto matInstanceTransform = matScaling * matRotationZ * matRotationAccelerationX * matRotationAccelerationY * matTranslation;
-		int64_t iPlane = engine::gpFlightPlanes->NearestPlaneIndex(XMVectorGetZ(vecPosition));
-		engine::FillModelLayout(shadowBounds, matAlignment, matInstanceTransform, vecPosition, iPlane, pAnimationData, skinningReservation, iInstance, rCurrent.pAnimationTimes[i], pLayouts[iInstance]);
+		engine::FillModelLayout(shadowBounds, matAlignment, matInstanceTransform, vecPosition, pAnimationData, skinningReservation, iInstance, rCurrent.pAnimationTimes[i], pLayouts[iInstance]);
 
 		++iInstance;
 	}

@@ -124,12 +124,14 @@ runs rather than a review.
 ## Executable Plan check
 
 For the `Executable Plan check` row the landing receipt's `acceptanceSkeleton`
-emits, run `Tools/WorktreeCli/Platforms/VisualStudio2026/Output/WorktreeCli.exe
-plan validate --lint-only --repo '<absolute Git common directory>' --worktree
-'<adopted checkout>'` and require a valid result for the session worktree,
-recording its notices. `--lint-only` takes no scheduler guard, creates no
-storage, and heals nothing, so it reports `healedClaims` as an empty array and
-changes no scheduler state.
-A run that fails to execute the tool at all is a blocker: record the row
-`BLOCKED` with the exact failure, and never substitute other evidence for the
-missing run.
+emits, run `Tools/WorktreeCli/Platforms/VisualStudio2026/Output/WorktreeCli.exe`
+with `plan validate --lint-only --repo '<absolute Git common directory>'
+--worktree '<adopted checkout>'`, requiring JSON `status: valid` and recording
+notices. When the landing updates `WorktreeCli`'s Plan metadata schema before
+promotion, you must run the verified `Temp/AgentToolsCandidate/WorktreeCli.exe`
+candidate instead, and record the row `BLOCKED` if that candidate is
+unavailable. `--lint-only` takes no scheduler guard, creates no storage, and
+heals nothing, so it reports `healedClaims` as an empty array and changes no
+scheduler state. A run that fails to execute the tool at all is a blocker:
+record the row `BLOCKED` with the exact failure, and never substitute other
+evidence for the missing run.

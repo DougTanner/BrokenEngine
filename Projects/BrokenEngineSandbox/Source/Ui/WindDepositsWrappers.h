@@ -1,5 +1,7 @@
 #pragma once
 
+#if defined(BT_CLIENT)
+
 #include "Ui/WrapperBase.h"
 
 namespace game
@@ -18,3 +20,5 @@ inline engine::Wrapper gWindDepositExplosionsWidth(10.0f, 4.0f, 50.0f);
 inline engine::Wrapper gWindDepositExplosionsIntensity(0.003f, 0.0f, 0.005f);
 
 } // namespace game
+
+#endif // BT_CLIENT

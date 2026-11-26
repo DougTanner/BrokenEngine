@@ -9,13 +9,13 @@
 #include "Frame/Collections/Ships/ShipBehaviours.h"
 #include "Frame/Collections/Ships/ShipHitboxes.h"
 #include "Frame/HealthDamage.h"
-#include "Ui/WindDepositsWrappers.h"
 #if defined(BT_CLIENT)
 #include "Frame/Collections/PointLights/PointLights.h"
 #include "Frame/Collections/Puffs/Puffs.h"
 #include "Ui/LightingWrappers.h"
 #include "Ui/ParticleWrappers.h"
 #include "Ui/SmokeWrappers.h"
+#include "Ui/WindDepositsWrappers.h"
 #endif
 
 namespace engine
@@ -67,9 +67,11 @@ void OmnisInterpolate::Register()
 	{
 		.f2Size = {kfBlasterSizeX, kfBlasterSizeY},
 		.iAreaLightTypeIndex = siAreaLightTypeIndex,
+#if defined(BT_CLIENT)
 		.pWindTrailIntensityWrapper = &gWindDepositOmniBlastersIntensity,
 		.pWindTrailWidthWrapper = &gWindDepositOmniBlastersWidth,
 		.pWindTrailLengthMultiplierWrapper = &gWindDepositOmniBlastersLengthMultiplier,
+#endif
 	});
 
 #if defined(BT_CLIENT)
@@ -159,6 +161,7 @@ void OmnisInterpolate::Register()
 		.puiColors = {0x00FF00FF, 0x00FF00FF, 0x00FF00FF, 0x00FF00FF}, // Opaque green (RRGGBBAA)
 		.pf2TextureCoordinates = {{0.5f, 0.0f}, {0.5f, 1.0f}, {0.5f, 0.0f}, {0.5f, 1.0f}},
 		.fLightingIntensity = 200.0f,
+		.expandSides = {engine::AreaLightExpandSides::kLeft, engine::AreaLightExpandSides::kRight},
 	});
 #endif // BT_CLIENT
 }

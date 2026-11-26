@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-11-21T21:04:09.185Z","dependsOn":["Documents/Plans/Engine/CollapseZeroRadiusLightingSpread.md","Documents/Plans/Engine/SkipEmptyLightingSpread.md"]} -->
+<!-- broken-engine-plan/v2 {"createdUtc":"2026-11-21T21:04:09.185Z","dependsOn":["Documents/Plans/Engine/CollapseZeroRadiusLightingSpread.md","Documents/Plans/Engine/SkipEmptyLightingSpread.md"]} -->
 # Prepare lighting spread taps once per frame
 
 ## Context

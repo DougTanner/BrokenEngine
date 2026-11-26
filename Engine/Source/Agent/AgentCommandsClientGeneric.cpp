@@ -754,6 +754,14 @@ static int64_t ParseVirtualKey(std::string_view name)
 	{
 		return VK_RETURN;
 	}
+	if (name == "BACKSPACE")
+	{
+		return VK_BACK;
+	}
+	if (name == "DELETE")
+	{
+		return VK_DELETE;
+	}
 	if (name == "UP")
 	{
 		return VK_UP;
@@ -769,6 +777,10 @@ static int64_t ParseVirtualKey(std::string_view name)
 	if (name == "RIGHT")
 	{
 		return VK_RIGHT;
+	}
+	if (name == "`" || name == "GRAVE")
+	{
+		return VK_OEM_3;
 	}
 	if (name.size() >= 2 && (name[0] == 'F' || name[0] == 'f'))
 	{
@@ -1145,6 +1157,7 @@ static const char* UiStateName(UiState eState)
 		case UiState::kNone: return "kNone";
 		case UiState::kGameSettings: return "kGameSettings";
 		case UiState::kGraphicsSettings: return "kGraphicsSettings";
+		case UiState::kKeybinds: return "kKeybinds";
 		case UiState::kModal: return "kModal";
 		case UiState::kPause: return "kPause";
 		case UiState::kSound: return "kSound";

@@ -7,7 +7,7 @@
 namespace toolcli
 {
 
-inline constexpr std::string_view kMarkerPrefix = "<!-- broken-engine-plan/v1 ";
+inline constexpr std::string_view kMarkerPrefix = "<!-- broken-engine-plan/v2 ";
 inline constexpr std::string_view kMarkerSuffix = " -->";
 // A Coretide repository's Plans are keyed by their session path, under this prefix.
 inline constexpr std::wstring_view kCoretidePrefix = L"Projects/Coretide/";
@@ -18,12 +18,14 @@ struct Plan
 	std::filesystem::path diskPath;
 	std::string bytes;
 	std::string createdUtc;
+	std::string agentCli;
 	std::vector<std::wstring> dependencies;
 	bool bDependenciesKnown = false;
 	bool bValid = false;
 	std::string diagnostic;
 };
 
+bool IsValidAgentCli(std::string_view value);
 bool Utf8PathLess(std::wstring_view left, std::wstring_view right);
 bool ParseCanonicalUtcTimestamp(std::string_view value, int64_t& rTicks);
 bool ReadBytes(const std::filesystem::path& rPath, std::string& rBytes);

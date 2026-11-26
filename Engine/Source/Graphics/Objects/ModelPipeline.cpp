@@ -24,7 +24,7 @@ void ModelPipeline::Create(common::crc_t sceneCrc, const PipelineInfo& rPipeline
 		{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerBorderWhite}, .iExplicitBinding = shaders::kiModelBindingShadow, .pTexture = &gpTextureManager->mRenderTargetTextures.mShadowBlurTexture},
 
 		// The smoke sampler (kSamplerSmoke) uses LINEAR filtering for R16_SFLOAT smoke ping-pong textures. Same CLAMP_TO_BORDER + INT_TRANSPARENT_BLACK as the border sampler; aniso is a no-op at mipLevels = 1.
-		{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerSmoke}, .iCount = shaders::kiMaxFlightPlanes, .iExplicitBinding = shaders::kiModelBindingSmoke, .ppTextures = gpTextureManager->mRenderTargetTextures.mppSmokeTexturesOne},
+		{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerSmoke}, .iExplicitBinding = shaders::kiModelBindingSmoke, .pTexture = &gpTextureManager->mRenderTargetTextures.mSmokeTextureOne},
 
 		{.flags = DescriptorFlags::kCombinedSamplers, .iExplicitBinding = shaders::kiModelBindingObjectShadows, .pTexture = &gpTextureManager->mRenderTargetTextures.mObjectShadowsBlurTexture},
 
@@ -33,8 +33,6 @@ void ModelPipeline::Create(common::crc_t sceneCrc, const PipelineInfo& rPipeline
 
 		// Joint matrices (separate dynamically-sized buffer; MeshData stays fixed-size)
 		{.flags = DescriptorFlags::kPerCommandBufferStorageBuffers, .iExplicitBinding = shaders::kiModelBindingJointMatrix, .pBuffers = gpBufferManager->mJointMatrixStorageBuffers.data()},
-
-		{.flags = DescriptorFlags::kCombinedSamplers, .iExplicitBinding = shaders::kiModelBindingTerrainElevation, .pTexture = &gpTextureManager->mRenderTargetTextures.mTerrainElevationTexture},
 	});
 
 	// mMaterialsStorageBuffer is created below, before any material pipeline writes it.

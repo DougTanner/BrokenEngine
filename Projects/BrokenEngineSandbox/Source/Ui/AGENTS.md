@@ -31,12 +31,13 @@ lives in Screens (`Screens/AGENTS.md`).
 
 ## Wrapper Affinity
 
-- Wrappers read by shared Frame code compile into both client and server
-  projects even when only the client UI changes them.
-- Rendering-only settings and their consumers remain whole-file
-  `BT_CLIENT`-guarded and client-project-only.
-- A new Frame dependency on a game wrapper must either stay on a client-only
-  path or make that wrapper available to the server build.
+- Game wrapper headers are whole-file `BT_CLIENT`-guarded and
+  client-project-only; only `Ui/Localization.h` stays shared with the server
+  project.
+- Shared Frame code must guard any wrapper include or reference under
+  `#if defined(BT_CLIENT)` and never read a wrapper value on simulation paths
+  (`../../../../Engine/Source/Frame/AGENTS.md`
+  `## Simulation and Visual State`).
 - Game wrapper storage that mirrors engine Tweaks sliders keeps its declaration
   order matching the
   `../../../../Engine/Source/Ui/Screens/TweaksScreen/AGENTS.md` slider order.

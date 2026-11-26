@@ -1,13 +1,13 @@
 # Engine UI - Shared Wrapper and Screen Infrastructure
 
 Shared runtime settings, standard localization, player-facing menu helpers, the
-six standard menu screens, renderer quality levels, network-pending controls,
+seven standard menu screens, renderer quality levels, network-pending controls,
 and client-only curve/editor support. Screen composition and the standard-menu
 game contract live in Screens (`Screens/AGENTS.md`); engine Tweaks registration
 contracts live in TweaksScreen (`Screens/TweaksScreen/AGENTS.md`); the game-side
 localization facade lives in game UI (the game project's own
 `Source/Ui/AGENTS.md`). Tweaks, game, sound, and graphics settings persistence
-is engine-owned here.
+is engine-owned here; keybind persistence lives in `../Input/AGENTS.md`.
 
 ## Wrapper Contracts
 
@@ -97,7 +97,8 @@ is engine-owned here.
   Defaults restores them. Older versions fail the current-format gate and use
   defaults. Water Foam, Break Repetition and Orthographic Projection are
   validated Boolean bytes; any value other than zero or one rejects the whole
-  file before application.
+  file before application. Undefined bits in `GraphicsSettingsFlags` also reject
+  the file, so flag-bit changes must update `FindInvalidGraphicsSetting`.
 - The game, sound, and graphics loaders check every persisted language index,
   float, quality level, present mode, sample count, and UI theme before applying
   any. A non-finite or out-of-range value, or a discrete value (present mode,
@@ -153,14 +154,12 @@ Engine UI headers stay out of `Engine.h` and are included directly, or through
 the game facade for localization, so a tuning edit to a wrapper header's inline
 definitions recompiles only that header's includers, not the PCH. `ChatLog.h`
 is the one exception: `GameBase.h` stores `mChatLog` by value, so it includes
-`ChatLog.h` and carries it into the game PCH. Headers compiling into both builds
-carry no `BT_CLIENT`/`BT_SERVER` guard: localization, the wrapper storage that
-shared translation units name, though no simulation code reads a wrapper value
-(`../Frame/AGENTS.md` `## Simulation and Visual State`), and the shared menu
-helper that shared game UI code includes on both sides. Client-only
-ImPlot types and menu panel, font, and chrome state remain `BT_CLIENT`-guarded,
-and game screen headers guard their client-only members without hiding shared
-declarations needed by server-side screens.
+`ChatLog.h` and carries it into the game PCH. Only localization
+(`LocalizationBase.h`/`.cpp`) compiles into both builds without a
+`BT_CLIENT`/`BT_SERVER` guard; every other file under `Engine/Source/Ui/`
+(wrappers, settings, menu helpers, ImPlot types, and screens) is whole-file
+`BT_CLIENT`-guarded and excluded from the server project, and no simulation code
+reads a wrapper value (`../Frame/AGENTS.md` `## Simulation and Visual State`).
 
 ## See Also
 

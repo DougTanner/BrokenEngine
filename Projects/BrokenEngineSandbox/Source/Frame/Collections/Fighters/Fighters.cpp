@@ -5,7 +5,6 @@
 #include "Frame/Collections/Pushers/Pushers.h"
 #include "Frame/Collections/Collection.h"
 #include "Frame/CellStaticData.h"
-#include "Ui/WrapperBase.h"
 
 #include "Frame/Collections/Ships/FleetCoordination.h"
 #include "Frame/Collections/Ships/ShipBehaviours.h"
@@ -113,6 +112,7 @@ void FightersInterpolate::Register()
 		.pf2TextureCoordinates = {{0.5f, 0.0f}, {0.5f, 1.0f}, {0.5f, 0.0f}, {0.5f, 1.0f}},
 		.pLightingSizeWrapper = &gFighterBeamLightingArea,
 		.pLightingIntensityWrapper = &gFighterBeamLightingIntensity,
+		.expandSides = {engine::AreaLightExpandSides::kLeft, engine::AreaLightExpandSides::kRight},
 	});
 #endif
 }

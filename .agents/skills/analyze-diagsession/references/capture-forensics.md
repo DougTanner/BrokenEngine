@@ -84,12 +84,9 @@ and invoke the script with it (bare `python` may resolve to nothing). Exit 1
 prints `MISSING ...` or `STALE ...` — report that instead of guessing an
 interpreter.
 
-```text
-"<python-exe-path>" .agents/skills/analyze-diagsession/scripts/profile_shares.py <profile.txt> --process BrokenEngineSandbox [--top N]
+```powershell
+& "<python-exe-path>" .agents/skills/analyze-diagsession/scripts/profile_shares.py '<profile.txt>' --process BrokenEngineSandbox [--top N]
 ```
-
-From PowerShell, prefix the quoted path with the call operator
-(`& "<python-exe-path>" ...`); Git Bash runs the line as written.
 
 Weights approximate sampled microseconds. Use each process's own total, not the
 global percentage that includes Idle and other processes. xperf profile output

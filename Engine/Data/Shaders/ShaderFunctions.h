@@ -52,18 +52,12 @@ vec3 ToEyeLine(MainLayout mainLayout, vec3 f3Position)
 	return mainLayout.f4ToEyeNormal.w > 0.5f ? mainLayout.f4ToEyeNormal.xyz : mainLayout.f4EyePosition.xyz - f3Position;
 }
 
-// The fragment-to-eye ray's XY at flight plane iPlane's height; a fragment above the plane reads at its own XY.
-vec2 FlightPlanePosition(GlobalLayout globalLayout, MainLayout mainLayout, vec3 f3InPosition, int iPlane)
-{
-	vec3 f3ToEyeNormal = normalize(ToEyeLine(mainLayout, f3InPosition));
-	const float fPlaneHeight = globalLayout.pfFlightPlaneHeights[iPlane];
-	float fMult = (fPlaneHeight - f3InPosition.z) / f3ToEyeNormal.z;
-	return (f3InPosition + max(fMult, 0.0f) * f3ToEyeNormal).xy;
-}
-
+// The fragment-to-eye ray's XY at fBaseHeight; a fragment above the plane reads at its own XY.
 vec2 BaseHeightPosition(GlobalLayout globalLayout, MainLayout mainLayout, vec3 f3InPosition)
 {
-	return FlightPlanePosition(globalLayout, mainLayout, f3InPosition, 0);
+	vec3 f3ToEyeNormal = normalize(ToEyeLine(mainLayout, f3InPosition));
+	float fMult = (globalLayout.fBaseHeight - f3InPosition.z) / f3ToEyeNormal.z;
+	return (f3InPosition + max(fMult, 0.0f) * f3ToEyeNormal).xy;
 }
 
 vec3 SampleNormal(GlobalLayout globalLayout, sampler2D normalSampler, vec2 f2Position, float fSize, float fSpeed, vec2 f2Offset, vec2 f2PositionGradX, vec2 f2PositionGradY)
@@ -109,19 +103,18 @@ float IntensityLighting(vec4 f4Lighting)
 	return f4Lighting.x + f4Lighting.y + f4Lighting.z + f4Lighting.w;
 }
 
-// The transparent-black border sampler returns no lighting outside the footprint, so these are plain reads of lighting
-// layer iLayer. Explicit level 0 (every lighting target has one mip) keeps them valid inside the non-uniform branches
-// that skip a layer the height blend does not need.
-void ReadLighting(inout vec4 pf4Lighting[3], sampler2D pLightingSamplers[kiLightingLayers * 3], int iLayer, vec2 f2Texcoord)
+// The transparent-black border sampler returns no lighting outside the footprint, so these are plain reads at mip 0
+// (every lighting target has one mip).
+void ReadLighting(inout vec4 pf4Lighting[3], sampler2D pLightingSamplers[3], vec2 f2Texcoord)
 {
-	pf4Lighting[0] = textureLod(pLightingSamplers[3 * iLayer + 0], f2Texcoord, 0.0f);
-	pf4Lighting[1] = textureLod(pLightingSamplers[3 * iLayer + 1], f2Texcoord, 0.0f);
-	pf4Lighting[2] = textureLod(pLightingSamplers[3 * iLayer + 2], f2Texcoord, 0.0f);
+	pf4Lighting[0] = textureLod(pLightingSamplers[0], f2Texcoord, 0.0f);
+	pf4Lighting[1] = textureLod(pLightingSamplers[1], f2Texcoord, 0.0f);
+	pf4Lighting[2] = textureLod(pLightingSamplers[2], f2Texcoord, 0.0f);
 }
 
-vec3 ReadAmbientLighting(sampler2D ambientLightingSamplers[kiLightingLayers], int iLayer, vec2 f2Texcoord)
+vec3 ReadAmbientLighting(sampler2D ambientLightingSampler, vec2 f2Texcoord)
 {
-	return textureLod(ambientLightingSamplers[iLayer], f2Texcoord, 0.0f).xyz;
+	return textureLod(ambientLightingSampler, f2Texcoord, 0.0f).xyz;
 }
 
 vec3 DirectionalLighting(vec4 pf4Lighting[3], vec3 f3Normal, float fIntensity, float fPower, float fPowerMode)
@@ -185,7 +178,7 @@ vec3 WaterLighting(vec4 pf4Lighting[3], vec3 f3Normal, float fSoften, float fOne
 	return mix(f3LumResult, f3AvgResult, fPowerMode);
 }
 
-// Operates on a precomputed direction-averaged sum (e.g. an mpAmbientCombineTextures sample).
+// Operates on a precomputed direction-averaged sum (e.g. an mAmbientCombineTexture sample).
 vec3 AmbientLightingPrecomputed(vec3 f3Result, float fIntensity, float fPower, float fPowerMode)
 {
 	// Skip the pow for whichever branch the mode discards at its extremes (fPowerMode is a uniform, so the branch is warp-coherent)
@@ -223,57 +216,24 @@ float SampleTerrainShadow(sampler2D shadowTextureSampler, vec2 f2Uv)
 	return textureLod(shadowTextureSampler, f2Uv, 0.0f).x;
 }
 
-// Object shadow B and A hold only ships on flight planes 1 and 2: the darker lit factor of those above iPlane, or 1 when
-// no plane lies above.
-float ObjectShadowAbove(vec4 f4ObjectShadows, int iPlane)
+// Model.frag uses the smoke amount to gate AddSmoke.
+float ReadSmoke(GlobalLayout globalLayout, vec2 f2InPosition, sampler2D smokeSampler)
 {
-	vec2 f2ObjectShadowsAbove = mix(vec2(1.0f), f4ObjectShadows.zw, lessThan(ivec2(iPlane), ivec2(1, 2)));
-	return min(f2ObjectShadowsAbove.x, f2ObjectShadowsAbove.y);
-}
-
-// Vertical, sun-independent attenuation at the fragment XY: the product of every flight plane's factor, each in
-// [0, 1], so overlapping planes never shade lighter than either alone and an empty plane multiplies by exactly 1.
-float SmokeShadow(GlobalLayout globalLayout, vec3 f3InPosition, sampler2D pSmokeSamplers[kiMaxFlightPlanes], float pfIntensities[kiMaxFlightPlanes])
-{
-	float fShadow = 1.0f;
-	for (int iPlane = 0; iPlane < int(globalLayout.uiFlightPlaneCount); ++iPlane)
-	{
-		vec2 f2SmokeTexcoord = WorldToSmokeTexcoord(globalLayout.pf4SmokeAreas[iPlane], f3InPosition.xy);
-		float fSmokeShadow = globalLayout.fSmokeMax * texture(pSmokeSamplers[iPlane], f2SmokeTexcoord).x;
-		fSmokeShadow = clamp(pow(fSmokeShadow, globalLayout.fSmokePower), 0.0f, 1.0f);
-		fShadow *= 1.0f - pfIntensities[iPlane] * fSmokeShadow;
-	}
-	return fShadow;
-}
-
-float SmokeObjectHeightFade(GlobalLayout globalLayout, float fHeight, int iPlane)
-{
-	float fHeightFraction = clamp((fHeight - globalLayout.pfFlightPlaneHeights[iPlane]) * globalLayout.fSmokeObjectHeightInverse, 0.0f, 1.0f);
-	return 1.0f - pow(fHeightFraction, globalLayout.fSmokeObjectHeightPower);
-}
-
-// SmokeShadow with each plane's factor faded by the fragment's height above that plane: full for planes above the
-// fragment, zero once the fragment is 1 / fSmokeObjectHeightInverse above the plane.
-float SmokeShadowFaded(GlobalLayout globalLayout, vec3 f3InPosition, sampler2D pSmokeSamplers[kiMaxFlightPlanes])
-{
-	float fShadow = 1.0f;
-	for (int iPlane = 0; iPlane < int(globalLayout.uiFlightPlaneCount); ++iPlane)
-	{
-		vec2 f2SmokeTexcoord = WorldToSmokeTexcoord(globalLayout.pf4SmokeAreas[iPlane], f3InPosition.xy);
-		float fSmokeFade = SmokeObjectHeightFade(globalLayout, f3InPosition.z, iPlane);
-		float fSmokeShadow = globalLayout.fSmokeMax * texture(pSmokeSamplers[iPlane], f2SmokeTexcoord).x;
-		fSmokeShadow = clamp(pow(fSmokeShadow, globalLayout.fSmokePower), 0.0f, 1.0f);
-		fShadow *= 1.0f - fSmokeFade * fSmokeShadow;
-	}
-	return fShadow;
-}
-
-// Plane iPlane's smoke amount at f2InPosition, read before AddSmoke so a caller can skip the lighting read where it is zero.
-float ReadSmoke(GlobalLayout globalLayout, vec2 f2InPosition, sampler2D smokeSampler, int iPlane)
-{
-	vec2 f2SmokeTexcoord = WorldToSmokeTexcoord(globalLayout.pf4SmokeAreas[iPlane], f2InPosition);
+	vec2 f2SmokeTexcoord = WorldToSmokeTexcoord(globalLayout.f4SmokeArea, f2InPosition);
 	float fSmoke = globalLayout.fSmokeMax * texture(smokeSampler, f2SmokeTexcoord).x;
 	return clamp(pow(fSmoke, globalLayout.fSmokePower), 0.0f, 1.0f);
+}
+
+// Vertical, sun-independent attenuation at the fragment XY, scaled by fIntensity.
+float SmokeShadow(GlobalLayout globalLayout, vec3 f3InPosition, sampler2D smokeSampler, float fIntensity)
+{
+	return 1.0f - fIntensity * ReadSmoke(globalLayout, f3InPosition.xy, smokeSampler);
+}
+
+float SmokeObjectHeightFade(GlobalLayout globalLayout, float fHeight)
+{
+	float fHeightFraction = clamp((fHeight - globalLayout.fBaseHeight) * globalLayout.fSmokeObjectHeightInverse, 0.0f, 1.0f);
+	return 1.0f - pow(fHeightFraction, globalLayout.fSmokeObjectHeightPower);
 }
 
 // fObjectShadow darkens only the sun/moon and ambient base lighting; the EWNS light deposits stay unshadowed.
@@ -294,7 +254,7 @@ vec3 AddSmoke(GlobalLayout globalLayout, vec3 f3InColor, float fSmoke, float fIn
 	return (1.0f - fSmoke) * f3InColor + fSmoke * f3Final * min(vec3(1.25f, 1.25f, 1.25f), vec3(fDensity, fDensity, fDensity));
 }
 
-// Caller passes 4.0 * an mpAmbientCombineTextures sample (recovers IntensityLighting magnitude — the texture stores 0.25*sum).
+// Caller passes 4.0 * an mAmbientCombineTexture sample (recovers IntensityLighting magnitude — the texture stores 0.25*sum).
 // fObjectShadow darkens only the base lighting, as in AddSmoke.
 vec3 BlendSmokePrecomputed(vec3 f3Color, float fSmokePow, vec3 f3LightingSum, GlobalLayout globalLayout, float fObjectShadow)
 {

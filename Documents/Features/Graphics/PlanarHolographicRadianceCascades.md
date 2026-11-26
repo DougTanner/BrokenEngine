@@ -19,13 +19,15 @@ picked up.
 
 ## Recorded choices
 
-- The user's own picks when this was planned (2026-11-12): approach "Option 5" (HRC swapped in at
-  the spread step inside the existing lighting chain, with the existing deposit as emission, the
-  existing elevation texture for layer-0 terrain extinction, and combine, temporal and receivers
-  unchanged; packed convex-hull/vertical-bound ship blockers; an independent sampled reference
+- The user's own picks when this was planned (2026-11-12): approach "Option 5"
+  (HRC swapped in at the spread step inside the existing lighting chain, with
+  the existing deposit as emission, the existing elevation texture for terrain
+  extinction, and combine, temporal and receivers unchanged; packed
+  convex-hull/vertical-bound ship blockers; an independent sampled reference
   ray-march as a third mode in the same slot); two stages (`## Stage 1` and
-  `## Stage 2`); GPU memory evidence through a new `query_profile` field; on ship hull lighting,
-  the question quoted in `### Hull blocking (open design question)`; and moving this work,
+  `## Stage 2`); GPU memory evidence through a new `query_profile` field; on
+  ship hull lighting, the question quoted in
+  `### Hull blocking (open design question)`; and moving this work,
   unimplemented, to Features.
 - Recorded by the earlier planning agent (its record, not the user's words): Option 5 carries three
   trade-offs, presented to the user as its cons before they picked it: soft pre-blurred deposit
@@ -38,26 +40,32 @@ picked up.
 
 ## Approach
 
-One client-only developer tunable `gLightingTransport` (`Lighting Transport`: Baseline default, HRC,
-Reference) in the lighting Tweaks; changing it recreates the lighting textures, pipelines and
-command buffers. Baseline records exactly today's chain. In HRC and Reference the Main recording
-omits the spread passes and, inside the existing `kGpuTimerLightingSpread` bracket on the refreshing
-layer, prepares a transport medium from the existing deposit targets and the elevation texture, runs
-HRC (or the reference ray-march), and writes RGB-separated EWNS fluence into the pass-0 spread-only
-targets (`mpSpreadOnlyTextures[0][0..2]`). LightCombine reads them with a published pass count of 1
-and total scale of 1, so combine, temporal, history, area latch, border sampling and every receiver
-shader are unchanged and all three modes reach the screen through identical code.
+One client-only developer tunable `gLightingTransport` (`Lighting Transport`:
+Baseline default, HRC, Reference) in the lighting Tweaks; changing it recreates
+the lighting textures, pipelines and command buffers. World lighting now runs
+single-layer planar transport at the base flight plane height (`fBaseHeight`).
+Baseline records exactly today's chain. In HRC and Reference the Main recording
+omits the spread passes and, inside the existing `kGpuTimerLightingSpread`
+bracket on a lighting refresh, prepares a transport medium from the existing
+deposit targets and the elevation texture, runs HRC (or the reference
+ray-march), and writes RGB-separated EWNS fluence into the pass-0 spread-only
+targets (`mpSpreadOnlyTextures[0][0..2]`). LightCombine reads them with a
+published pass count of 1 and total scale of 1, so combine, temporal, history,
+area latch, border sampling and every receiver shader are unchanged and all
+three modes reach the screen through identical code.
 
 ## Design
 
 ### Grid and domain
 
-- Transport grid: the pass-0 spread-only extent W x H, covering the refreshing layer's
-  `f4LightingArea` (`LightingUniforms.cpp`). It is neither square nor a power of two
-  (`TextureManager.cpp`), so the dispatch domain is the square N = bit_ceil(max(W, H)) anchored at
-  texel (0,0); texels at or past W or H are padding with zero emission and unit transmittance
-  (incoming light 0, T = 1 at the boundary). Output is written only over [0,W) x [0,H), 1:1 with no
-  resampling. Lighting-texture +y is south (`LightingSpread.frag`); quadrant rotation follows that.
+- Transport grid: the pass-0 spread-only extent W x H, covering
+  `f4LightingArea` (`LightingUniforms.cpp`). It is neither square nor a power
+  of two (`TextureManager.cpp`), so the dispatch domain is the square
+  N = bit_ceil(max(W, H)) anchored at texel (0,0); texels at or past W or H are
+  padding with zero emission and unit transmittance (incoming light 0, T = 1 at
+  the boundary). Output is written only over [0,W) x [0,H), 1:1 with no
+  resampling. Lighting-texture +y is south (`LightingSpread.frag`); quadrant
+  rotation follows that.
 - Path lengths use the per-axis world texel size derived in the shader as 1 /
   (reciprocal extent * imageSize of the target), the reciprocal extent being
   `lightingAreaToUv.f4ScaleOffset` x and the negated y, as in
@@ -73,12 +81,14 @@ shader are unchanged and all three modes reach the screen through identical code
   phi(tau), phi(tau) = (1 - exp(-tau)) / tau with the stable small-tau series 1 - tau/2 + tau^2/6
   and phi(0) = 1. Compose near/far as (Ln + Tn * Lf, Tn * Tf). Never substitute texel distance or
   upstream (1 - T) * emission units. No bounce, ambient injection or scene color enters transport.
-- Layer 0 terrain: h from the elevation texture sampled exactly as `LightingSpread.frag` does (same
-  visible-area mapping, same `globalLayout` profile fields `fBaseHeight`,
-  `fSpreadHeightEndHeightInverse`, `fSpreadHeightPower`, `fSpreadHeightMultiplier`),
-  sigma0 = ln(2) * h / D, where D is a new fixed experiment constant set to the island-chain
-  water-span scale `kfWaterSpanMeters` (`IslandChainPlacement.cpp`): the half-transmittance
-  distance at h = 1. Layer 1: sigma = 0. Terrain never hard-masks emission or receiving.
+- Terrain: h from the elevation texture sampled exactly as
+  `LightingSpread.frag` does (same visible-area mapping, same `globalLayout`
+  profile fields `fBaseHeight`, `fSpreadHeightEndHeightInverse`,
+  `fSpreadHeightPower`, `fSpreadHeightMultiplier`), sigma0 = ln(2) * h / D,
+  where D is a new fixed experiment constant set to the island-chain water-span
+  scale `kfWaterSpanMeters` (`IslandChainPlacement.cpp`): the
+  half-transmittance distance at h = 1. Terrain never hard-masks emission or
+  receiving.
 
 ### Medium preparation (`HrcPrepare.comp`, one dispatch over N x N)
 
@@ -126,14 +136,17 @@ at P, so HRC's shifted-base error is charged to HRC.
 
 ### Gate, publication, recording and lifetime
 
-- Gate: every transport compute pipeline carries `kIndirectHostVisible` and is recorded with
-  `RecordComputeIndirect`; outside Baseline `RenderLightingSpreadIndirect` writes each one's group
-  counts when `giLightingRefreshLayer` >= 0 and zero otherwise (combine precedent,
-  `LightingUniforms.cpp`). All dispatches of one pipeline share its per-framebuffer slot
-  (`Pipeline.cpp`), so a pipeline whose dispatches differ in size publishes its largest and its
-  shader returns for invocations past the current level's extent (level in push constants). A frame
-  with no refresh therefore publishes zero compute work (`Engine/Source/Graphics/Render/AGENTS.md`
-  `## Ordering and Publication`). No GlobalLayout field is added.
+- Gate: every transport compute pipeline carries `kIndirectHostVisible` and is
+  recorded with `RecordComputeIndirect`; outside Baseline
+  `RenderLightingSpreadIndirect` writes each one's group counts when
+  `gbLightingRefreshFrame` is true and zero otherwise (combine precedent,
+  `LightingUniforms.cpp`). All dispatches of one pipeline share its
+  per-framebuffer slot (`Pipeline.cpp`), so a pipeline whose dispatches differ
+  in size publishes its largest and its shader returns for invocations past the
+  current level's extent (level in push constants). A frame with no refresh
+  therefore publishes zero compute work
+  (`Engine/Source/Graphics/Render/AGENTS.md` `## Ordering and Publication`). No
+  GlobalLayout field is added.
 - `RenderLightingGlobal`: outside Baseline publish `fSpreadPassCount` = 1 and
   `fCombinePassTotalScale` = 1 (LightCombine sums pass 0 alone at unit gain and applies its existing
   presentation mapping). Spread instance counts are left alone: only the spread loop reads them, and
@@ -143,11 +156,13 @@ at P, so HRC's shifted-base error is charged to HRC.
   dependent dispatch and between quadrants; spread-only images transitioned shader-read -> general
   before the first write (which also orders the previous frame's combine reads) and back after the
   last; the existing final barrier to combine stays.
-- `CreateLightingTextures` adds STORAGE usage to the pass-0 spread-only textures and, outside
-  Baseline only, creates the medium, interval, two reconstruction and three Reference accumulator
-  images; `DestroyLightingTextures` destroys them. A transport change joins the lighting-texture
-  recreation block in `Graphics.cpp`, so `CreateLightingTextures` zero-clears every layer's combine
-  outputs and re-arms `gbLightingTemporalReset` (`RenderTargetTexturesLighting.cpp`): no mode shows
+- `CreateLightingTextures` adds STORAGE usage to the pass-0 spread-only
+  textures and, outside Baseline only, creates the medium, interval, two
+  reconstruction and three Reference accumulator images;
+  `DestroyLightingTextures` destroys them. A transport change joins the
+  lighting-texture recreation block in `Graphics.cpp`, so
+  `CreateLightingTextures` zero-clears the combine outputs and re-arms
+  `gbLightingTemporalReset` (`RenderTargetTexturesLighting.cpp`): no mode shows
   another mode's held output, with no extra edge detector.
 - Transport compute pipelines are created in `WorldLightingShadowPipelines.cpp`
   `CreateLightingPipelines`, outside Baseline only.
@@ -156,21 +171,25 @@ at P, so HRC's shifted-base error is charged to HRC.
 
 ### Ship occupancy (Stage 2)
 
-- Fighters, Omnis and Battleships, at the site that already computes `matInstanceTransform` for the
-  ModelLayout, write one `LightingBlockerLayout` per drawn non-wreck instance only when the
-  transport is not Baseline and the instance's `NearestPlaneIndex` (the value `f4PositionLayer.w`
-  carries) equals `giLightingRefreshLayer`; a frame with no refresh (-1) writes none. The record
-  holds that instance transform (authored alignment excluded: the packed hull already contains it)
-  and the packed `ModelOutline` hull (`pf2HullVertices`, count, `fMinimumZ`, `fMaximumZ`, reached
-  through `OutlineOffset` as `ComputeModelShadowBounds` does, `Render.h`). `RenderFrameGlobal` sets
-  `giLightingRefreshLayer` before `RenderFrameMain` runs these sites (`Graphics.cpp`).
-- `HrcBlocker.vert` emits each instance's prism faces (caps as fans, side quads) projected
-  orthographically into the refreshing layer's `f4LightingArea`; the union of a convex prism's
-  projected faces is its projected convex hull, so no CPU hull building. Vertices past the hull
-  count collapse to degenerate triangles. `HrcBlocker.frag` writes into an R8_UNORM W x H target
-  cleared by its render pass. Instance count = blocker cursor, published in
-  `RenderLightingSpreadIndirect` after `EndFrameInterpolateRender` in both `RenderFrameMain`
-  branches; the cursor resets in `BeginFrameInterpolateRender` (`MainUniforms.cpp`).
+- Fighters, Omnis and Battleships, at the site that already computes
+  `matInstanceTransform` for the ModelLayout, write one `LightingBlockerLayout`
+  per drawn non-wreck instance only when the transport is not Baseline and
+  `gbLightingRefreshFrame` is true; a frame with no refresh writes none. The
+  record holds that instance transform (authored alignment excluded: the packed
+  hull already contains it) and the packed `ModelOutline` hull
+  (`pf2HullVertices`, count, `fMinimumZ`, `fMaximumZ`, reached through
+  `OutlineOffset` as `ComputeModelShadowBounds` does, `Render.h`).
+  `RenderFrameGlobal` sets `gbLightingRefreshFrame` before `RenderFrameMain`
+  runs these sites (`Graphics.cpp`).
+- `HrcBlocker.vert` emits each instance's prism faces (caps as fans, side
+  quads) projected orthographically into `f4LightingArea`; the union of a
+  convex prism's projected faces is its projected convex hull, so no CPU hull
+  building. Vertices past the hull count collapse to degenerate triangles.
+  `HrcBlocker.frag` writes into an R8_UNORM W x H target cleared by its render
+  pass. Instance count = blocker cursor, published in
+  `RenderLightingSpreadIndirect` after `EndFrameInterpolateRender` in both
+  `RenderFrameMain` branches; the cursor resets in
+  `BeginFrameInterpolateRender` (`MainUniforms.cpp`).
 - The blocker storage buffer is created in `CreateLightingPipelines` through
   `gpBufferManager->CreateDynamicBuffer` (idempotent) with a file-local
   `kiDynamicBufferInitialCapacity`, following the `CreateDebugRenderPipelines` precedent (fixed
@@ -192,34 +211,35 @@ rather than a fully dark hull or a copy-fill step.
 
 What the code allows:
 
-- Light-source height does not survive into the transport. The deposit reduces each light's height
-  to a layer index and projects its position onto that plane (`PointLightsRender.cpp:118-120`,
-  `AreaLightsRender.cpp:145-151`); all four channels of the three RGBA16F deposit targets already
-  hold EWNS per color (`PointLight.frag:89-93`), and overlapping deposits combine by per-channel MAX
-  blending (`DynamicPipelines.cpp:189`, `PipelineCreator.cpp:449-450`), so a texel cannot carry
-  per-source heights.
-- HRC composes intervals over one medium per layer: a texel's transmittance is shared by every
-  source and direction, so a blocking fraction that differs per source cannot be represented. Adding
-  a deposit height channel (a fourth MAX-blended target giving the highest source per texel) would
-  not change that; per-source height would need one transport per height band, which is the excluded
-  vertical/extra-layer transport.
+- Light-source height does not survive into the transport. Deposit textures
+  discard source height: all four channels of the three RGBA16F deposit targets
+  already hold EWNS per color (`PointLight.frag:89-93`), and overlapping
+  deposits combine by per-channel MAX blending (`DynamicPipelines.cpp:189`,
+  `PipelineCreator.cpp:449-450`), so a texel cannot carry per-source heights.
+- HRC composes intervals over one planar medium: a texel's transmittance is
+  shared by every source and direction, so a blocking fraction that differs per
+  source cannot be represented. Adding a deposit height channel (a fourth
+  MAX-blended target giving the highest source per texel) would not change
+  that; per-source height would need one transport per height band, which is
+  the excluded vertical/extra-layer transport.
 - Hulls do carry vertical bounds (`ModelOutline::fMinimumZ`/`fMaximumZ`,
-  `Common/DataFile.h:388-389`), and the flight-plane heights and their spacing are already
-  GlobalLayout fields (`pfFlightPlaneHeights`, `fLightingLayerHeightInverse`,
-  `ShaderGlobalLayout.h:23,160`). Every source on a layer is deposited at that layer's plane height,
-  or on the terrain where that is higher (`GraphicsUtils.h:51-53`).
+  `Common/DataFile.h:388-389`), and the base flight-plane height is a
+  GlobalLayout field (`fBaseHeight`, `ShaderGlobalLayout.h`). Point and area
+  deposits project onto `fBaseHeight`, or onto terrain where terrain elevation
+  is higher (`ProjectToBaseHeight`, `FlightPlaneProjection.cpp`), while hex
+  shields project directly to `fBaseHeight` (`HexShield.vert`).
 
 Candidates, none decided:
 
-- (A) Per-layer partial opacity (feasible, smallest): the blocker shader writes a fraction instead
-  of 1 — the share of the layer's height band (the plane height plus or minus half the plane
-  spacing) covered by the instance's transformed [minZ, maxZ] — with MAX blending for overlapping
-  ships; Prepare converts it to finite extinction over the texel width, and the cross filter treats
-  it like terrain rather than a hard tap. Adds a blend flag and a few shader lines; under-hull
-  texels are then partly lit. It is height relative to the sources' common plane, not to each
-  source; ships on a layer straddle its plane, so the fraction is roughly hull height over plane
-  spacing and may block little (not measured). A hull spanning both bands blocks in each by its
-  overlap only when written for both layers, which the refresh-layer gating above does not do.
+- (A) Partial opacity (feasible, smallest): the blocker shader writes a
+  fraction instead of 1 — the share of a height band about `fBaseHeight`
+  covered by the instance's transformed [minZ, maxZ] — with MAX blending for
+  overlapping ships; Prepare converts it to finite extinction over the texel
+  width, and the cross filter treats it like terrain rather than a hard tap.
+  Adds a blend flag and a few shader lines; under-hull texels are then partly
+  lit. It is height relative to the sources' common plane, not to each source;
+  ships straddle that plane, so the fraction depends on the chosen band
+  thickness and may block little (not measured).
 - (B) Hard blocking, accepted as a recorded limitation (under-hull texels and ships stay dark in HRC
   and Reference).
 - (C) Hard blocking plus `HrcFill.comp` after Resolve/Reference: each occupied texel copies channel
@@ -286,26 +306,29 @@ Builds and passes its own checks without ship blockers.
 
 ## Out of scope
 
-Production selection or removal of Baseline; changes to deposit producers and shaders,
-`LightingSpread.frag`, `LightCombine.comp`, `LightingTemporal.comp`, `LightingHistoryCopy.comp`,
-terrain/water/model receiver shaders, `ModelLayout`, `ModelPipeline` and Missiles/ModelViewer
-producers; separate or square world grids; separate emission, raw-elevation or extinction
-rasterization; true-XY receiver sampling; completed-frame timing cohorts and ProfileManager or
-`Graphics.cpp` profiling changes; new render-target dump names; shield gating checkboxes;
-`Common/Math/ConvexHull.h`; conventional radiance cascades, distance fields, 3D/vertical or
-cross-layer transport, extra layers, multibounce, glossy transport, exact mesh silhouettes; asset or
-pack format changes; simulation edits; subscription expansion; async compute; renderer refactoring;
-Baseline tuning or cadence changes; ThirdParty edits; unit tests.
+Production selection or removal of Baseline; changes to deposit producers and
+shaders, `LightingSpread.frag`, `LightCombine.comp`, `LightingTemporal.comp`,
+`LightingHistoryCopy.comp`, terrain/water/model receiver shaders, `ModelLayout`,
+`ModelPipeline` and Missiles/ModelViewer producers; separate or square world
+grids; separate emission, raw-elevation or extinction rasterization; true-XY
+receiver sampling; completed-frame timing cohorts and ProfileManager or
+`Graphics.cpp` profiling changes; new render-target dump names; shield gating
+checkboxes; `Common/Math/ConvexHull.h`; conventional radiance cascades, distance
+fields, 3D/vertical transport, extra layers, multibounce, glossy transport,
+exact mesh silhouettes; asset or pack format changes; simulation edits;
+subscription expansion; async compute; renderer refactoring; Baseline tuning or
+cadence changes; ThirdParty edits; unit tests.
 
 ## Invariants
 
-- EWNS slot order east, west, north, south with texel +y south; two independent layers, no
-  cross-layer transport; layer-0 finite terrain sigma, layer-1 none; transport writes only
+- EWNS slot order east, west, north, south with texel +y south; single layer at
+  the base flight height with finite terrain sigma; transport writes only
   `mpSpreadOnlyTextures[0]`, inside the spread timer.
-- Baseline recording and results identical to the unedited tree; combine, temporal, history, area
-  latch and border sampling unchanged.
-- Every transport dispatch is indirect with zero groups when `giLightingRefreshLayer` is -1; no
-  GlobalLayout field added and no GlobalLayout write from Main.
+- Baseline recording and results identical to the unedited tree; combine,
+  temporal, history, area latch and border sampling unchanged.
+- Every transport dispatch is indirect with zero groups when
+  `gbLightingRefreshFrame` is false; no GlobalLayout field added and no
+  GlobalLayout write from Main.
 - Stage 2: blocker counts finalized after `EndFrameInterpolateRender` in both `RenderFrameMain`
   branches, zero on the no-camera path.
 - Client-only state outside CRC, network, save and replay; no main-loop heap allocation; record-once
@@ -322,32 +345,35 @@ are unavailable there.
 
 ### Stage 1
 
-- P0, before the first edit, on the unedited tree: empty ocean, a single source, an island/cliff
-  placement from `cell_coordinate_probe`, a high-plane source; screenshots with Lighting off and on,
-  and `query_profile` snapshots; record GPU, driver, resolution and build configuration.
+- P0, before the first edit, on the unedited tree: empty ocean, a single source,
+  an island/cliff placement from `cell_coordinate_probe`; screenshots with
+  Lighting off and on, and `query_profile` snapshots; record GPU, driver,
+  resolution and build configuration.
 - Builds: DataPacker Release|x64, BrokenEngineSandbox client and server Debug|x64 and Release|x64,
   ModelViewer Release|x64; zero errors and zero new warnings.
-- Mode switching: each Lighting Transport value, then resize, minimize/restore and Lighting off/on,
-  with `presentation_continuity_probe {}`; no validation errors and black local light with Lighting
-  off in every mode. No stale output: code read of the recreation path (combine zero-clear plus
-  temporal reset), and on a paused static fixture, `Combine` raw dumps of both layers right after
-  each switch versus after at least ten further refreshes: each early dump all zero or within 1/255
+- Mode switching: each Lighting Transport value, then resize, minimize/restore
+  and Lighting off/on, with `presentation_continuity_probe {}`; no validation
+  errors and black local light with Lighting off in every mode. No stale output:
+  code read of the recreation path (combine zero-clear plus temporal reset), and
+  on a paused static fixture, `Combine` raw dumps right after each switch versus
+  after at least ten further refreshes: each early dump all zero or within 1/255
   per channel of the settled one.
 - Zero and directions: with no local sources, HRC and Reference `SpreadOnly` index 0 raw dumps are
   exactly zero and finite; with one source east, west, north, then south of a probe region, the
   matching EWNS channel dominates there in both modes.
-- Transport accuracy: paused fixtures (single source, island/cliff on layer 0, high-plane source on
-  layer 1), `Combine` raw dumps per layer in HRC and Reference; normalized RMS at most 10% of the
-  Reference peak over visible-area texels whose Reference value is at least 1% of peak, with counts
-  and worst error reported; Reference refreshes complete with no device loss or validation error. A
-  miss is a valid negative verdict.
-- Terrain layers: layer-0 output behind high terrain is attenuated relative to the same point with
-  terrain below base height; layer 1 shows no terrain attenuation.
-- Removal: paused fixture with one source and no other emitter, Lighting Update Cadence 1, in HRC
-  and Reference; remove the source and step until both layers refresh; raw dumps of `SpreadOnly`
-  index 0 channels 0-2 are exactly zero. (Combine and screenshots keep a decaying temporal residual,
-  and the transport branch records no spread clear, so `SpreadOnly` index 0 holds the last refreshed
-  layer's output.)
+- Transport accuracy: paused fixtures (single source, island/cliff), `Combine`
+  raw dumps in HRC and Reference; normalized RMS at most 10% of the Reference
+  peak over visible-area texels whose Reference value is at least 1% of peak,
+  with counts and worst error reported; Reference refreshes complete with no
+  device loss or validation error. A miss is a valid negative verdict.
+- Terrain: output behind high terrain is attenuated relative to the same point
+  with terrain below base height.
+- Removal: paused fixture with one source and no other emitter, Lighting Update
+  Cadence 1, in HRC and Reference; remove the source and step until lighting
+  refreshes; raw dumps of `SpreadOnly` index 0 channels 0-2 are exactly zero.
+  (Combine and screenshots keep a decaying temporal residual, and the transport
+  branch records no spread clear, so `SpreadOnly` index 0 holds the last
+  refresh's output.)
 - Preserved lighting: Lighting-off screenshots in Baseline, HRC and Reference within 1/255 per
   channel of the P0 Lighting-off screenshot away from animated content. Baseline unchanged by diff
   read: the Baseline branch of `RecordLightingSpreadPipeline`, Baseline
@@ -355,13 +381,15 @@ are unavailable there.
   spread, combine, temporal and history writes are unchanged, every added line in a non-Baseline
   branch. (A Lighting-on Baseline screenshot cannot match across processes: the spread jitter seed
   is time-seeded once per process, `LightingUniforms.cpp`.)
-- Cost: per scene (empty, single source, island), five alternating cohorts per mode (Baseline, HRC)
-  of equal sample count in one process, Lighting Update Cadence 1 in both modes (every rendered
-  frame refreshes one layer), a warm-up cohort discarded after every mode switch; metric the sum of
-  the `LightingDeposit`, `LightingSpread`, `LightingCombine` and `LightingTemporal` `averageUs` rows
-  under the `query_profile` caveat in the harness command reference; Reference excluded. HRC median
-  at most 2x Baseline median in every scene, with medians, ranges and FPS reported; a miss is a
-  valid negative verdict.
+- Cost: per scene (empty, single source, island), five alternating cohorts per
+  mode (Baseline, HRC) of equal sample count in one process, Lighting Update
+  Cadence 1 in both modes (every rendered frame refreshes lighting), a warm-up
+  cohort discarded after every mode switch; metric the sum of the
+  `LightingDeposit`, `LightingSpread`, `LightingCombine` and `LightingTemporal`
+  `averageUs` rows under the `query_profile` caveat in the harness command
+  reference; Reference excluded. HRC median at most 2x Baseline median in every
+  scene, with medians, ranges and FPS reported; a miss is a valid negative
+  verdict.
 - Allocation: the new `query_profile` VMA allocation field read in Baseline and in HRC; the
   difference is reported beside `## Feasibility estimate` (no ceiling).
 - License: diff read of `Hrc.LICENSE.txt` names the pinned commit, carries that commit's full root
@@ -387,13 +415,15 @@ are unavailable there.
 - Emission is the existing pre-blurred deposit, box-averaged, so sources are soft; overlapping
   deposits combine by MAX, not by adding emission. Shields emit through the shared deposit in every
   mode.
-- Cost is compared per lighting refresh under the existing one-layer-per-frame cadence, not as an
-  every-frame both-layer refresh.
-- The verdict is seen through the existing combine and temporal chain; receivers are unchanged, so
-  receivers above or below a plane sample the field as they do today.
-- Blockers are visible-area ships on their nearest plane only, with standard raster coverage (point
-  deposits and ships are already culled to the visible area, `IsPointVisible`, `GraphicsUtils.cpp`,
-  so emitters and blockers share one visible set).
+- Cost is compared per lighting refresh under the existing cadence.
+- The verdict is seen through the existing combine and temporal chain;
+  receivers are unchanged, so receivers above or below the base plane sample
+  the field as they do today.
+- Blockers are visible-area ships (`CameraBase::InVisibleArea` with model radii
+  in `FightersRender.cpp`, `OmnisRender.cpp`, and `BattleshipsRender.cpp`), with
+  standard raster coverage, whereas point and area deposits bypass that cull
+  (`PointLightsRender.cpp`, `AreaLightsRender.cpp`) and can write offscreen
+  emitters into the padded lighting area (`f4LightingArea`).
 - The Reference is a fixed direction set over the same medium, not an analytic oracle;
   HRC-versus-Reference and the four-side direction check replace analytic fixtures.
 

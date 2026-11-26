@@ -16,10 +16,10 @@ artifacts.
 
 Both use `$(ProjectName)` in `IntDir`, so client and server builds can run
 simultaneously without trampling each other's intermediates. The server vcxproj
-contains no engine `Graphics/`, `Audio/`, or input `.cpp` files; it still
-compiles the shared Frame collections, terrain/collision/nav (`IslandTerrain`,
-`Collision`, `NavBuild`, `NavQuery`), and the Tweaks `*WrappersBase` layer
-(tweak values participate in the deterministic sim) — it is not a minimal
+contains no engine `Graphics/`, `Audio/`, or input `.cpp` files and no UI
+wrapper, menu, or screen files (only localization stays shared under `Ui/`); it
+still compiles the shared Frame collections and terrain/collision/nav
+(`IslandTerrain`, `Collision`, `NavBuild`, `NavQuery`) — it is not a minimal
 physics binary.
 
 ## Build Configuration

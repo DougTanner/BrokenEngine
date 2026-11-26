@@ -40,7 +40,7 @@ strength Low/High, so retuning the thresholds also changes smoke swirl.
   world velocity and texture UV flips Y, including advection and radial
   deposits.
 
-Smoke populates its per-plane current and previous area arrays before wind reads
-plane 0's slot of each. Record-once command buffers submit both ping-pong
-variants; runtime texture selection, occupancy, and GPU-written active lists
-determine which work executes.
+Smoke populates its current and previous areas before wind reads them.
+Record-once command buffers submit both ping-pong variants; runtime texture
+selection, occupancy, and GPU-written active lists determine which work
+executes.

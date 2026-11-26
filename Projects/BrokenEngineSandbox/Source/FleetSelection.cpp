@@ -2,10 +2,35 @@
 
 #if defined(BT_CLIENT)
 
+#include "Graphics/Camera.h"
+#include "Network/Client/ClientSession.h"
 #include "Game.h"
 
 namespace game
 {
+
+static void InvalidateFlagshipSubscriptionIfChanged(engine::GlobalId previousFlagshipIdentifier)
+{
+	if (gpGame->ClientFlagshipIdentifier() != previousFlagshipIdentifier)
+	{
+		static_cast<Camera&>(*engine::gpCamera).ClearSubscriptionAnchor();
+		gpClientSession->mpRuntime->miVisibleNeighborCount = 0;
+	}
+}
+
+static void AnchorClientGridCoordinateToFlagship()
+{
+	engine::GlobalId flagshipGlobalIdentifier = gpGame->ClientFlagshipIdentifier();
+	if (flagshipGlobalIdentifier.iValue != 0)
+	{
+		auto ownedIt = std::ranges::find(gpGame->mClientOwnedEntities, flagshipGlobalIdentifier, &engine::OwnedEntity::globalId);
+		gpGame->SetClientGridCoordinate(ownedIt->coord);
+	}
+	else
+	{
+		gpGame->SetClientGridCoordinate({});
+	}
+}
 
 void FleetSelection::AutoSelectFirstAliveMember()
 {
@@ -29,8 +54,10 @@ void FleetSelection::FocusNextFleet()
 {
 	if (miFocusedFleetIndex < std::ssize(mClientFleets) - 1)
 	{
+		engine::GlobalId previousFlagshipIdentifier = gpGame->ClientFlagshipIdentifier();
 		++miFocusedFleetIndex;
 		AutoSelectFirstAliveMember();
+		InvalidateFlagshipSubscriptionIfChanged(previousFlagshipIdentifier);
 		gpGame->CaptureClientState();
 	}
 }
@@ -39,8 +66,10 @@ void FleetSelection::FocusPreviousFleet()
 {
 	if (miFocusedFleetIndex > 0)
 	{
+		engine::GlobalId previousFlagshipIdentifier = gpGame->ClientFlagshipIdentifier();
 		--miFocusedFleetIndex;
 		AutoSelectFirstAliveMember();
+		InvalidateFlagshipSubscriptionIfChanged(previousFlagshipIdentifier);
 		gpGame->CaptureClientState();
 	}
 }
@@ -72,15 +101,7 @@ void FleetSelection::SelectOwnedEntityInFleet(engine::GlobalId memberGlobalId)
 	mFocusedMemberGlobalId = memberGlobalId;
 	mPendingFocusMemberGlobalId = {};
 
-	const FleetMember& rMember = *memberIt;
-	if (!(rMember.flags & FleetMemberFlags::kIsDead))
-	{
-		auto ownedIt = std::ranges::find(gpGame->mClientOwnedEntities, rMember.globalId, &engine::OwnedEntity::globalId);
-		if (ownedIt != gpGame->mClientOwnedEntities.end())
-		{
-			gpGame->SetClientGridCoordinate(ownedIt->coord);
-		}
-	}
+	AnchorClientGridCoordinateToFlagship();
 
 	gpGame->CaptureClientState();
 }
@@ -95,6 +116,7 @@ void FleetSelection::SynchronizeFleets(std::vector<Fleet>&& rFleets)
 	LOG(kNetwork, kVerbose, "SyncFleets Fleets: {} Members: {} FocusedFleet: {} FocusedMember: {}", std::ssize(rFleets), !rFleets.empty() ? std::ssize(rFleets.at(0).members) : 0, miFocusedFleetIndex, mFocusedMemberGlobalId.iValue);
 
 	int64_t iPreviousFleetCount = std::ssize(mClientFleets);
+	engine::GlobalId previousFlagshipIdentifier = gpGame->ClientFlagshipIdentifier();
 	int64_t iPreviousFocusedFleetMemberCount = 0;
 	FleetGuid previousFocusedFleetGuid {};
 	if (miFocusedFleetIndex >= 0 && miFocusedFleetIndex < iPreviousFleetCount)
@@ -216,17 +238,8 @@ void FleetSelection::SynchronizeFleets(std::vector<Fleet>&& rFleets)
 		mSquadronOrdersToggle.Reset();
 	}
 
-	engine::GlobalId focusedId = gpGame->ClientOwnedEntityIdentifier();
-	auto focusedOwnedIt = std::ranges::find(gpGame->mClientOwnedEntities, focusedId, &engine::OwnedEntity::globalId);
-	if ((focusedId.iValue != 0) && focusedOwnedIt != gpGame->mClientOwnedEntities.end())
-	{
-		gpGame->SetClientGridCoordinate(focusedOwnedIt->coord);
-	}
-	else
-	{
-		// No valid selection — camera to origin
-		gpGame->SetClientGridCoordinate({});
-	}
+	AnchorClientGridCoordinateToFlagship();
+	InvalidateFlagshipSubscriptionIfChanged(previousFlagshipIdentifier);
 
 	// Capture the final focus for client-state persistence, including server-driven changes.
 	gpGame->CaptureClientState();

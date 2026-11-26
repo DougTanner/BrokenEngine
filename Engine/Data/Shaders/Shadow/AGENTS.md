@@ -6,16 +6,10 @@ Two independent compute chains post-process top-down (orthographic,
 world-XY-mapped) shadow data for the RTS camera. The terrain chain ray-marches
 sun occlusion, runs horizontal and vertical Gaussian blur, temporally resolves
 the final result, then refreshes distinct history storage. The object chain
-blurs its top-down object-coverage raster separately, merged by MAX blending. R
-and G split each ship's ground coverage as `1 - t` and `t`, where `t` is its
-centre's height above the ground directly below it (terrain elevation, or sea
-level over water) minus the lowest flight-plane height, as a fraction of the
-lowest-to-highest plane span, clamped to `[0, 1]`, so a ship over high terrain
-trends back toward Sigma Low. B and A hold coverage by ships on flight planes 1
-and 2 only. Vertical blur recombines R and G into R, capped at full coverage, so
-terrain and water read object-shadow R for their own shading; models consume
-both final textures as `../Model/AGENTS.md` describes, and smoke blending uses R
-as `../Smoke/AGENTS.md` describes.
+separately blurs its `kVkFormatObjectShadows` top-down object-coverage raster,
+whose coverage is combined by MAX blending during rasterization. Terrain and
+water read object-shadow R for their own shading, and smoke blending uses it as
+`../Smoke/AGENTS.md` describes.
 
 When the object chain refreshes is owned by Render
 (`../../../Source/Graphics/Render/AGENTS.md` `## Ordering and Publication`).
@@ -55,16 +49,13 @@ outside the held area reads the clamped edge texels until the next refresh.
   limits low-beach noise at dawn and dusk, while the moon multiplier fades
   terrain shadow with the lighting envelope.
 - Terrain and object blur differ: terrain radius is a compile-time constant,
-  while object blur receives its radius and a per-channel weight half-kernel
-  built from runtime settings: R blurs with Sigma Low and G with Sigma High, so
-  the ground blur follows ship height smoothly, and B and A interpolate Low to
-  High by their plane height's fraction of the lowest-to-highest span. A
-  per-channel sigma rules out bilinear tap pairing, so both object passes use
-  discrete output-grid taps. Both object inputs remain linear, clamp-to-edge;
-  both passes blur every channel, the horizontal pass on raw coverage, and
-  vertical blur converts it to multiply-with-lighting form. Each object pass
-  runs one 1-D workgroup per strip of `kiObjectShadowsBlurStripLength` texels
-  along its blur axis: the workgroup fetches the strip plus the radius on each
-  side once into a shared tap cache, then every texel blurs from that cache.
-  The cache must fit the Vulkan minimum shared-memory size, which the
-  `static_assert` beside that constant in `ShaderLayoutsBase.h` enforces.
+  while object blur receives its runtime radius and `pfObjectShadowsBlurWeights`
+  built from `gObjectShadowsBlurSigma`. Both object inputs remain linear,
+  clamp-to-edge; both passes use discrete output-grid taps, the horizontal pass
+  on raw coverage, and vertical blur converts it to multiply-with-lighting form.
+  Each object pass runs one 1-D workgroup per strip of
+  `kiObjectShadowsBlurStripLength` texels along its blur axis: the workgroup
+  fetches the strip plus the radius on each side once into a shared tap cache,
+  then every texel blurs from that cache. The cache must fit the Vulkan minimum
+  shared-memory size, which the `static_assert` beside that constant in
+  `ShaderLayoutsBase.h` enforces.

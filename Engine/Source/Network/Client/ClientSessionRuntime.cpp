@@ -52,6 +52,10 @@ static void PersistClientGuidToDisk(const ClientGuid& rGuid)
 
 static void ShowConnectionMessage(const char* pcMessage)
 {
+	if (game::gpGame->meUiState == UiState::kKeybinds)
+	{
+		game::gpGame->LeaveSettingsScreen();
+	}
 	std::snprintf(game::gpGame->mpcModalMessage, sizeof(game::gpGame->mpcModalMessage), "%s", pcMessage);
 	game::gpGame->meUiState = UiState::kModal;
 }

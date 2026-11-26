@@ -57,7 +57,7 @@ void Camera::ResetMenuPose()
 	mfMenuFraming = kfMenuCameraFraming;
 }
 
-engine::CameraTarget Camera::PullTarget(const engine::FrameInterpolateBase& rFrameInterpolate)
+engine::CameraTarget Camera::PullTarget(const engine::FrameInterpolateBase& rFrameInterpolate, const std::unordered_map<engine::GridCoord, FrameInterpolate>& rRenderInterpolates)
 {
 	const FrameInterpolate& rGameInterpolate = static_cast<const FrameInterpolate&>(rFrameInterpolate);
 
@@ -67,39 +67,49 @@ engine::CameraTarget Camera::PullTarget(const engine::FrameInterpolateBase& rFra
 		return engine::CameraTarget::Direct(XMVectorAdd(kVecMenuIslandCenter, kVecMenuCameraOffset));
 	}
 
-	if (!(gpGame->ClientOwnedEntityIdentifier().iValue != 0))
+	engine::GlobalId focusedOwnedEntityIdentifier = gpGame->ClientOwnedEntityIdentifier();
+	if (focusedOwnedEntityIdentifier.iValue == 0)
 	{
 		return engine::CameraTarget::Direct(XMVectorAdd(kVecMenuIslandCenter, kVecMenuCameraOffset));
 	}
 
-	// The interpolate's own cell, not the client cell: its positions are local to that cell, and the camera works in
-	// that same frame, so a target taken from it needs no conversion.
+	// Resolve the focused ship in its own cell (which may be a subscribed neighbor when a non-flagship is selected),
+	// falling back to the interpolate's cell if not yet in mClientOwnedEntities, and rebase into the camera cell's frame.
 	engine::GridCoord coordinate = rGameInterpolate.renderBasis.coordinate;
-	auto it = gpGame->mCells.find(coordinate);
-	bool bHasCoordinate = it != gpGame->mCells.end() && it->second.iSnapshotCount > 0;
-	std::optional<ShipLocator> optionalOwnedEntity = bHasCoordinate ? gpGame->ClientOwnedEntity(gpGame->RenderFrame(coordinate)) : std::nullopt;
-	if (optionalOwnedEntity)
+	auto ownedIt = std::ranges::find(gpGame->mClientOwnedEntities, focusedOwnedEntityIdentifier, &engine::OwnedEntity::globalId);
+	if (ownedIt != gpGame->mClientOwnedEntities.end())
 	{
-		engine::GlobalId focusedOwnedEntityIdentifier = gpGame->ClientOwnedEntityIdentifier();
-		XMVECTOR vecOwnedEntityPosition = ShipPosition(rGameInterpolate, *optionalOwnedEntity);
+		coordinate = ownedIt->coord;
+	}
 
-		if (focusedOwnedEntityIdentifier != mLastTrackedOwnedEntityIdentifier)
+	auto interpolateIt = rRenderInterpolates.find(coordinate);
+	const FrameInterpolate* pShipInterpolate = interpolateIt != rRenderInterpolates.end() ? &interpolateIt->second : nullptr;
+	if (pShipInterpolate != nullptr)
+	{
+		std::optional<ShipLocator> optionalOwnedEntity = FindShipByGlobalId(gpGame->RenderFrame(coordinate), focusedOwnedEntityIdentifier);
+		if (optionalOwnedEntity)
 		{
-			LOG(kGraphics, kVerbose, "Camera NowTracking GlobalId: {} Coord: ({},{}) Type: {} Row: {}", focusedOwnedEntityIdentifier, coordinate.iQ, coordinate.iR, ShipTypeName(optionalOwnedEntity->eType), optionalOwnedEntity->iRow);
-			mLastTrackedOwnedEntityIdentifier = focusedOwnedEntityIdentifier;
-		}
+			XMVECTOR vecLocalPosition = ShipPosition(*pShipInterpolate, *optionalOwnedEntity);
+			XMVECTOR vecOwnedEntityPosition = engine::Rebase(pShipInterpolate->renderBasis, vecLocalPosition);
 
-		return engine::CameraTarget::Tracked(vecOwnedEntityPosition, mVecVisualErrorOffset);
+			if (focusedOwnedEntityIdentifier != mLastTrackedOwnedEntityIdentifier)
+			{
+				LOG(kGraphics, kVerbose, "Camera NowTracking GlobalId: {} Coord: ({},{}) Type: {} Row: {}", focusedOwnedEntityIdentifier, coordinate.iQ, coordinate.iR, ShipTypeName(optionalOwnedEntity->eType), optionalOwnedEntity->iRow);
+				mLastTrackedOwnedEntityIdentifier = focusedOwnedEntityIdentifier;
+			}
+
+			return engine::CameraTarget::Tracked(vecOwnedEntityPosition, mVecVisualErrorOffset);
+		}
 	}
 
 	static std::chrono::duration<float> sLastLogTime(-1.0f);
 	if (std::chrono::duration<float>(mfTime) - sLastLogTime >= 1s)
 	{
 		sLastLogTime = std::chrono::duration<float>(mfTime);
-		if (bHasCoordinate)
+		if (pShipInterpolate != nullptr)
 		{
-			LOG(kGraphics, kVerbose, "Camera OwnedEntityNotFound FocusedGlobalId: {} Coord: ({},{})", gpGame->ClientOwnedEntityIdentifier(), coordinate.iQ, coordinate.iR);
-			ForEachShipType(rGameInterpolate, gpGame->RenderFrame(coordinate).postRender, [](ShipType eType, const auto& rInterpolate, const auto& rPostRender)
+			LOG(kGraphics, kVerbose, "Camera OwnedEntityNotFound FocusedGlobalId: {} Coord: ({},{})", focusedOwnedEntityIdentifier, coordinate.iQ, coordinate.iR);
+			ForEachShipType(*pShipInterpolate, gpGame->RenderFrame(coordinate).postRender, [](ShipType eType, const auto& rInterpolate, const auto& rPostRender)
 			{
 				LOG(kGraphics, kVerbose, "  {} PostRenderCount: {} InterpolateCount: {}", ShipTypeName(eType), rPostRender.iCount, rInterpolate.iCount);
 				for (int64_t i = 0; i < rPostRender.iCount; ++i)
@@ -110,12 +120,55 @@ engine::CameraTarget Camera::PullTarget(const engine::FrameInterpolateBase& rFra
 		}
 		else
 		{
-			LOG(kGraphics, kVerbose, "Camera CoordNotFound FocusedGlobalId: {} Coord: ({},{})", gpGame->ClientOwnedEntityIdentifier(), coordinate.iQ, coordinate.iR);
+			LOG(kGraphics, kVerbose, "Camera CoordNotFound FocusedGlobalId: {} Coord: ({},{})", focusedOwnedEntityIdentifier, coordinate.iQ, coordinate.iR);
 		}
 	}
 
 	// Owned entity not found — extrapolate from last known position and velocity
 	return engine::CameraTarget::Extrapolate();
+}
+
+void Camera::ClearSubscriptionAnchor()
+{
+	mRetainedSubscriptionAnchorGlobalId = {};
+	mRetainedSubscriptionAnchorCoordinate = {};
+	mVecRetainedSubscriptionAnchorLocal = {};
+	ClearCellLoadedArea();
+}
+
+std::optional<XMVECTOR> Camera::PullSubscriptionCenter(const std::unordered_map<engine::GridCoord, FrameInterpolate>& rRenderInterpolates, engine::GridCoord basisCoordinate)
+{
+	const engine::OwnedEntity* pFlagship = gpGame->FindLiveFlagshipOwnedEntity();
+	if (pFlagship == nullptr)
+	{
+		ClearSubscriptionAnchor();
+		return std::nullopt;
+	}
+
+	if (pFlagship->globalId != mRetainedSubscriptionAnchorGlobalId)
+	{
+		ClearSubscriptionAnchor();
+	}
+
+	auto interpolateIt = rRenderInterpolates.find(pFlagship->coord);
+	if (interpolateIt != rRenderInterpolates.end())
+	{
+		std::optional<ShipLocator> optionalFlagship = FindShipByGlobalId(gpGame->RenderFrame(pFlagship->coord), pFlagship->globalId);
+		if (optionalFlagship)
+		{
+			XMVECTOR vecLocalPosition = ShipPosition(interpolateIt->second, *optionalFlagship);
+			mRetainedSubscriptionAnchorGlobalId = pFlagship->globalId;
+			mRetainedSubscriptionAnchorCoordinate = pFlagship->coord;
+			mVecRetainedSubscriptionAnchorLocal = vecLocalPosition;
+			return engine::Rebase(interpolateIt->second.renderBasis, vecLocalPosition);
+		}
+	}
+
+	if (mRetainedSubscriptionAnchorGlobalId == pFlagship->globalId)
+	{
+		return engine::Rebase(engine::MakeRenderBasis(mRetainedSubscriptionAnchorCoordinate, basisCoordinate), mVecRetainedSubscriptionAnchorLocal);
+	}
+	return std::nullopt;
 }
 
 // Return sun angle, applying the Sun Angle Override slider while the Graphics settings screen is up

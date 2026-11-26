@@ -1,5 +1,7 @@
 #pragma once
 
+#if defined(BT_CLIENT)
+
 namespace engine
 {
 
@@ -65,8 +67,6 @@ bool WrapperPlusMinus(std::string_view label, engine::Wrapper* pWrapper);
 // are the harness API and must stay stable; return true on the click frame.
 bool RadioRow(const char* pcHeader, engine::Wrapper* pWrapper, std::initializer_list<std::pair<const char*, float>> options);
 
-#if defined(BT_CLIENT)
-
 struct SlidePanelState
 {
 	float fOpenness = 0.0f;
@@ -108,6 +108,6 @@ void DrawPanelAccents(ImDrawList* pDrawList, const ImVec2& rvMinimum, const ImVe
 // heap). Pass rvSize x or y as 0.0f to auto-size that axis from the label.
 bool MenuButton(const char* pcLabel, const ImVec2& rvSize, float& rfHoverAnimation, bool bSelected = false);
 
-#endif // BT_CLIENT
-
 } // namespace engine
+
+#endif // BT_CLIENT

@@ -1,5 +1,7 @@
 #pragma once
 
+#if defined(BT_CLIENT)
+
 #include "WrapperBase.h"
 
 namespace engine
@@ -16,7 +18,7 @@ inline std::vector<int64_t> TextureIndices(int64_t iCount)
 // thresholds) at the CPU publication sites; depth and terrain lengths stay unscaled, and wave and normal-map scroll
 // speeds scale by its square root.
 inline Wrapper gWaterScale(1.0f, 0.3f, 4.0f);
-inline Wrapper gWaterWaveTimeScale(0.15f, 0.0f, 1.0f); // 1 is real deep-water speed
+inline Wrapper gWaterWaveTimeScale(0.205970f, 0.0f, 1.0f); // 1 is real deep-water speed
 
 // Specular - Normals (per-sample row layout: chevron | size | weight-min | weight-max | rotation | speed-min | speed-max | speed-direction | patch-blend)
 // Water normal map atlas: 3 weighted samples each indexed into TextureManager::kpWaterNormalCrcs.
@@ -136,21 +138,24 @@ inline Wrapper gLightingWaterSkyboxThreeBeachReduction(0.0f, 0.0f, 1.0f);
 
 // Foam
 inline Wrapper gWaterFoamEnabled(true); // checkbox, not slider-mapped
-inline Wrapper gWaterFoamEmissionRate(200.0f, 0.0f, 400.0f);
-inline Wrapper gWaterFoamJStart(0.7f, 0.01f, 1.0f);
-inline Wrapper gWaterFoamJFull(0.0f, -1.0f, 0.99f);
-inline Wrapper gWaterFoamHalfLife(1.5f, 0.1f, 2.0f);
-inline Wrapper gWaterFoamTextureIndex(0i64, TextureIndices(shaders::kiWaterFoamTextureCount));
-inline Wrapper gWaterFoamTextureTileSize(4.0f, 1.0f, 16.0f);
-inline Wrapper gWaterFoamTextureStrength(0.25f, 0.0f, 2.0f);
-inline Wrapper gWaterFoamTexturePatchBlend(1.0f, 0.0f, 1.0f);
-inline Wrapper gWaterFoamBreakupTextureIndex(1i64, TextureIndices(shaders::kiWaterFoamBreakupTextureCount));
-inline Wrapper gWaterFoamBreakupTileSize(10.0f, 1.0f, 16.0f);
-inline Wrapper gWaterFoamBreakupAmount(1.0f, 0.0f, 1.0f);
-inline Wrapper gWaterFoamBreakupPatchBlend(1.0f, 0.0f, 1.0f);
-inline Wrapper gWaterFoamSpawnNoiseAmount(0.2f, 0.0f, 1.0f);
-inline Wrapper gWaterFoamSpawnNoiseTileSize(30.0f, 1.0f, 128.0f);
-inline Wrapper gWaterFoamSpawnNoisePatchBlend(1.0f, 0.0f, 1.0f);
+inline Wrapper gWaterFoamEmissionRate(199.004974f, 0.0f, 400.0f);
+inline Wrapper gWaterFoamJStart(0.802203f, 0.01f, 1.0f);
+inline Wrapper gWaterFoamJFull(0.123705f, -1.0f, 0.99f);
+inline Wrapper gWaterFoamHalfLife(1.317040f, 0.1f, 2.0f);
+inline Wrapper gWaterFoamTextureIndex(3i64, TextureIndices(shaders::kiWaterFoamTextureCount));
+inline Wrapper gWaterFoamTextureTileSize(5.104477f, 1.0f, 16.0f);
+inline Wrapper gWaterFoamTextureStrength(1.101990f, 0.0f, 2.0f);
+inline Wrapper gWaterFoamTexturePatchBlend(0.873134f, 0.0f, 1.0f);
+inline Wrapper gWaterFoamEdgeSoftness(0.387948f, 0.005f, 0.5f); // Positive lower bound keeps Water.frag smoothstep edges strictly ordered.
+inline Wrapper gWaterFoamErosionCurve(2.069652f, 0.25f, 3.0f); // Positive lower bound keeps Water.frag pow(fCoverage, ...) defined at zero.
+inline Wrapper gWaterFoamDistanceSoften(1.009950f, 0.0f, 4.0f);
+inline Wrapper gWaterFoamBreakupTextureIndex(0i64, TextureIndices(shaders::kiWaterFoamBreakupTextureCount));
+inline Wrapper gWaterFoamBreakupTileSize(10.177860f, 1.0f, 32.0f);
+inline Wrapper gWaterFoamBreakupAmount(0.584576f, 0.0f, 1.0f);
+inline Wrapper gWaterFoamBreakupPatchBlend(0.712687f, 0.0f, 1.0f);
+inline Wrapper gWaterFoamSpawnNoiseAmount(0.0f, 0.0f, 1.0f);
+inline Wrapper gWaterFoamSpawnNoiseTileSize(158.130615f, 1.0f, 256.0f);
+inline Wrapper gWaterFoamSpawnNoisePatchBlend(0.706468f, 0.0f, 1.0f);
 
 // Break Repetition
 inline Wrapper gPatchWeightThreshold(0.4f, 0.0f, 1.0f); // MakePatchTriangle caps the subtracted threshold below the largest normalized cube, so the excess sum stays positive.
@@ -158,9 +163,11 @@ inline Wrapper gWaterNormalPatchBlendOneEnabled(true);
 inline Wrapper gWaterNormalPatchBlendTwoEnabled(false);
 inline Wrapper gWaterNormalPatchBlendThreeEnabled(false);
 inline Wrapper gWaterColorNoisePatchBlendEnabled(false);
-inline Wrapper gWaterFoamTexturePatchBlendEnabled(false);
-inline Wrapper gWaterFoamBreakupPatchBlendEnabled(false);
-inline Wrapper gWaterFoamSpawnNoisePatchBlendEnabled(false);
+inline Wrapper gWaterFoamTexturePatchBlendEnabled(true);
+inline Wrapper gWaterFoamBreakupPatchBlendEnabled(true);
+inline Wrapper gWaterFoamSpawnNoisePatchBlendEnabled(true);
 inline Wrapper gWaterNormalExtraSamplePatchBlendEnabled(true);
 
 } // namespace engine
+
+#endif // BT_CLIENT

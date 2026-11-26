@@ -3,7 +3,9 @@
 #include "Blasters.h"
 
 #include "Frame/CellStaticData.h"
+#if defined(BT_CLIENT)
 #include "Ui/WrapperBase.h"
+#endif
 
 namespace engine
 {

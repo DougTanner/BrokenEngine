@@ -6,6 +6,7 @@
 #include "Frame/Collections/Blasters/Blasters.h"
 #include "Frame/Collections/Fighters/Fighters.h"
 #include "Frame/Collections/Missiles/Missiles.h"
+#include "Graphics/Camera.h"
 #include "Network/Client/ClientReconciler.h"
 #include "Network/GamePacketType.h"
 #include "Fleet.h"
@@ -136,13 +137,21 @@ void ClientSession::ProcessReceivedGamePackets()
 	}, GameMessages::MapFleetMarkersRequestMessage {});
 }
 
-// Applying an owned-entity event to the client owned-entity list is game-agnostic apart from two steps, the
-// mFleetSelection pending-focus step and the client-cell move for the focused entity (ClientOwnedEntityIdentifier).
+// A spawn can fulfill pending fleet focus. An assignment for the focused flagship moves the client cell. A flagship
+// change clears the camera subscription anchor and cached neighbor count, and losing the flagship resets the client
+// cell to origin.
 void ClientSession::ApplyOwnedEntityEvent(const engine::ReceivedOwnedEntityEvent& rEvent)
 {
+	engine::GlobalId previousFlagshipIdentifier = gpGame->ClientFlagshipIdentifier();
 	if (rEvent.eState == engine::OwnedEntityState::kDied)
 	{
 		gpGame->RemoveClientOwnedEntity(rEvent.globalId);
+		if (gpGame->ClientFlagshipIdentifier() != previousFlagshipIdentifier)
+		{
+			gpGame->SetClientGridCoordinate(engine::kOriginCoordinate);
+			static_cast<Camera&>(*engine::gpCamera).ClearSubscriptionAnchor();
+			mpRuntime->miVisibleNeighborCount = 0;
+		}
 		mpRuntime->UpdateDesiredCoordinates(ToString(SubscriptionChangeReason::kDied));
 		return;
 	}
@@ -158,6 +167,11 @@ void ClientSession::ApplyOwnedEntityEvent(const engine::ReceivedOwnedEntityEvent
 	{
 		it->coord = rEvent.coordinate;
 	}
+	if (gpGame->ClientFlagshipIdentifier() != previousFlagshipIdentifier)
+	{
+		static_cast<Camera&>(*engine::gpCamera).ClearSubscriptionAnchor();
+		mpRuntime->miVisibleNeighborCount = 0;
+	}
 	mpRuntime->UpdateDesiredCoordinates(ToString(SubscriptionChangeReason::kAssigned));
 
 	// Not at the fleet sync that clears the member's kIsDead: that sync shares this event's reliable flush, and the client
@@ -166,7 +180,7 @@ void ClientSession::ApplyOwnedEntityEvent(const engine::ReceivedOwnedEntityEvent
 	{
 		gpGame->mFleetSelection.SelectOwnedEntityInFleet(rEvent.globalId);
 	}
-	if (rEvent.globalId == gpGame->ClientOwnedEntityIdentifier())
+	if (rEvent.globalId == gpGame->ClientFlagshipIdentifier())
 	{
 		gpGame->SetClientGridCoordinate(rEvent.coordinate);
 	}
@@ -182,6 +196,7 @@ void ClientSession::OnServerLoad()
 	gpGame->SetClientGridCoordinate({});
 	gpGame->mfPreviousClientArmor = 0.0f;
 	engine::gpCamera->mVecVisualErrorOffset = {};
+	static_cast<Camera&>(*engine::gpCamera).ClearSubscriptionAnchor();
 
 	// Clear fleet state — server will re-sync
 	gpGame->mFleetSelection.Clear();

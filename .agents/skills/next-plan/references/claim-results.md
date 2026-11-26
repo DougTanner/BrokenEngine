@@ -115,19 +115,19 @@ headings) counts in the count row but is not a touch and gets no per-path row.
 
 ## Reading the queue listing
 
-`Get-NextPlanList.ps1` reports a bounded projection: per-state counts, then the
-first Plans in selection order (`-Top` default) as `path`/`state` rows, with
-`blockedBy` on a blocked row and `diagnostic` on an excluded one, and `claim`
-(`session`, `worktree`, `expiresAt`) on any row with a live claim. It never
-emits the whole tree, so a large Plan queue cannot flood the session. It
-deliberately reads the session worktree's own tree and never moves it, so a Plan
-landed on primary after this session started shows up only after the claim
-script fast-forwards the session. Its eligible and claimed states are likewise
-an unguarded point-in-time snapshot of the machine-local claim store, so a bare
-claim run moments later can skip Plans the listing showed as eligible because
-concurrent sessions claimed them in between. That is normal scheduler behavior
-rather than a selection defect, and the claim result does not name the
-passed-over Plans.
+`Get-NextPlanList.ps1` reports a bounded projection: per-state counts across all
+rows, then — hiding other-CLI Plans — the first Plans in selection order
+(`-Top` default) as `path`/`state` rows, with optional `agentCli`, `blockedBy`
+on a blocked row, `diagnostic` on an excluded one, and `claim` (`session`,
+`worktree`, `expiresAt`) on any row with a live claim. It never emits the whole
+tree, so a large Plan queue cannot flood the session. It deliberately reads the
+session worktree's own tree and never moves it, so a Plan landed on primary
+after this session started shows up only after the claim script fast-forwards
+the session. Its eligible and claimed states are likewise an unguarded
+point-in-time snapshot of the machine-local claim store, so a bare claim run
+moments later can skip Plans the listing showed as eligible because concurrent
+sessions claimed them in between. That is normal scheduler behavior rather than
+a selection defect, and the claim result does not name the passed-over Plans.
 
 For a tier-constrained request, read the `Risk tier` prose of the top eligible
 candidates in that order until one matches, then claim that path.
@@ -135,24 +135,26 @@ candidates in that order until one matches, then claim that path.
 An exact `Documents/Plans/...` path that is absent, blocked, excluded, or
 claimed by another session yields `none-available`. Its message names that
 current cause: blocked results list at most 10 sorted prerequisite paths and an
-omitted count, excluded results carry the matching row or Plan diagnostic,
-claimed results name the holder's session, worktree, and claim expiry and
-carry them as the `holder` object (`session`, `worktree`, `expiresAt`), and
-absent results say the path is absent from the session tree. An exact or held
-Plan that the run's own fast-forward renamed instead yields `claim.plan-moved`,
-exit 2, with `status: blocked` and `nextAction: stop-report-to-user`, carrying
-the `moved` object (`from`, `to`) and a `message` naming the new path; no Plan
-is claimed. Reaching that result proves no claim is held. A
-`-UserAuthorizedTakeover` rerun of a claimed result releases that holder's
-claim and claims the Plan, returning the ordinary claim result with `holder`
-naming the released session; a release WorktreeCli refuses stops with
-`claim.takeover-failed` and `stop-report-to-user`, still carrying `holder`.
-Because the listing is an unguarded later snapshot, an eligible or otherwise
-unclassifiable result instead directs a retry. A bare `none-available` result
-skips this diagnosis unless the run targeted its held Plan, which it diagnoses
-the same way. A partial pattern matching several validated executable
-Plans yields `plan-name-ambiguous`, whose `message` names no match; the matching
-Plan paths are in the result's `candidates` array.
+omitted count, excluded results carry the matching row or Plan diagnostic (plus
+`agentCliLock` when CLI-locked), claimed results name the holder's session,
+worktree, and claim expiry and carry them as the `holder` object (`session`,
+`worktree`, `expiresAt`), and absent results say the path is absent from the
+session tree. An exact or held Plan that the run's own fast-forward renamed
+instead yields `claim.plan-moved`, exit 2, with `status: blocked` and
+`nextAction: stop-report-to-user`, carrying the `moved` object (`from`, `to`)
+and a `message` naming the new path; no Plan is claimed. Reaching that result
+proves no claim is held. A `-UserAuthorizedTakeover` rerun of a claimed result
+releases that holder's claim and claims the Plan (unless also CLI-locked — see
+[claim-exceptions.md](claim-exceptions.md) `## Agent CLI override`), returning
+the ordinary claim result with `holder` naming the released session; a release
+WorktreeCli refuses stops with `claim.takeover-failed` and
+`stop-report-to-user`, still carrying `holder`. Because the listing is an
+unguarded later snapshot, an eligible or otherwise unclassifiable result instead
+directs a retry. A bare `none-available` result skips this diagnosis unless the
+run targeted its held Plan, which it diagnoses the same way. A partial pattern
+matching several validated executable Plans yields `plan-name-ambiguous`, whose
+`message` names no match; the matching Plan paths are in the result's
+`candidates` array.
 
 If an exact or resolved request differs from the Plan the session already
 holds, the `/v10` claim envelope returns

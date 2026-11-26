@@ -84,8 +84,6 @@ public:
 
 	void CreateAreaLightingPipeline(DynamicPipelineType eType, common::crc_t crc, std::string_view name, common::crc_t vertexShaderCrc, common::crc_t fragmentShaderCrc);
 	void CreateDepositPipeline(DynamicPipelineType eType, common::crc_t crc, std::string_view name, common::crc_t vertexShaderCrc, common::crc_t fragmentShaderCrc, const Texture& rTargetTexture, const DescriptorInfo& rTextureDescriptor, VkBuffer* pVkOccupancyBuffer);
-	// Pipeline-map and dynamic-buffer key of one collection's deposit into flight plane (and lighting layer) iPlane.
-	static common::crc_t FlightPlaneDepositKey(common::crc_t crc, int64_t iPlane);
 
 private:
 

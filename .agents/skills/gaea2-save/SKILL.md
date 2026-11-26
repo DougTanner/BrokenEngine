@@ -2,7 +2,7 @@
 name: gaea2-save
 description: Save edits from a Gaea 2 Markdown view back to a .terrain JSON file. Reconstitutes the Newtonsoft $id/$ref object graph; pairs with /gaea2-load and /gaea2-modify.
 argument-hint: <name-or-Temp/path.md> [--output <path.terrain>]
-allowed-tools: [Read, Bash, PowerShell]
+allowed-tools: [Read, PowerShell]
 disable-model-invocation: true
 ---
 
@@ -22,57 +22,38 @@ or a full path; optionally followed by `--output <path>`.
 
 1. Resolve the input path. Done when one input `.md` path and one output path
    are fixed.
-   - Bare name → `Temp/<name>.md`.
-   - `.md` filename without dir → `Temp/<filename>`.
-   - Otherwise use as given.
+   - Input path resolution (bare names, `.md` filenames, and relative paths)
+     follows
+     [wrapper-contract.md](../gaea2-shared/references/wrapper-contract.md#no-inline-reconstruction).
    - If `--output` is absent, default to `<input-base>.terrain` next to the .md
      file. If the user wants to overwrite the original, pull the original path
      from the `.passthrough.json`'s `original_file` field and offer that.
 
-2. Validate the Markdown before saving. Dispatch the validator through the
-   shared Python wrapper, from the session worktree root. Done when the wrapper
-   has printed one `broken-engine-gaea2-python/v1` envelope.
-   ```powershell
-   pwsh -NoProfile -Command "& '.agents/skills/gaea2-shared/scripts/Invoke-Gaea2Python.ps1' -Script validate_markdown.py -Arguments '<Temp/name.md>'"
-   ```
-   - Use `-Command`, not `-File`, for this wrapper: that is the form that passes
-     the `-Arguments` list through intact.
-   - On `python.missing` / `python.stale` (exit 2) nothing ran — apply the
-     missing-interpreter rule in step 5.
+2. Validate the Markdown before saving. Dispatch `validate_markdown.py` and
+   handle `python.missing` / `python.stale` per
+   [wrapper-contract.md](../gaea2-shared/references/wrapper-contract.md#markdown-validator-gating).
+   Done when the wrapper has printed one `broken-engine-gaea2-python/v1`
+   envelope.
 
-3. Gate on the validator's own `broken-engine-gaea2-markdown/v1` envelope, which
-   is the string in the wrapper's `stdout` field, and on that inner `code`
-   rather than on the exit code. Done when the inner `code` is `ok`, or its
+3. Gate on the validator's inner `broken-engine-gaea2-markdown/v1` envelope per
+   [wrapper-contract.md](../gaea2-shared/references/wrapper-contract.md#markdown-validator-gating)
+   (including blocked input/parse codes, `internal.error`, and
+   `payload.entriesTruncated`). Done when the inner `code` is `ok`, or its
    entries are resolved or explicitly waived by the user.
-   - That holds for `python.script-failed` too, which is what the validator's
-     own blocked codes (it exits 2) look like from outside: parse the inner
-     envelope out of `stdout` for the diagnostic code first, and fall back to
-     the wrapper's `stderr` only when `stdout` carries no envelope.
-   - `ok` — no entries; proceed to step 4.
-   - `markdown.entries-reported` — `payload.entries` lists
-     `{nodeId, rule, message}` findings (`no-path-to-output`,
-     `required-input-unwired`, `missing-version-2`, `duplicate-node-id`, and the
-     rest). Every one of them is a defect Gaea would surface much later as a
-     failed load or a silently deactivated node, so saving is blocked: fix them
-     in `/gaea2-modify`, or get the user's explicit say-so to save anyway after
-     showing them the entries.
-   - `input.invalid`, `markdown.missing`, `markdown.unreadable`,
-     `passthrough.missing`, `passthrough.unreadable`,
-     `markdown.structure-unparsed` — the validator couldn't read or parse the
-     input at all, so it proved nothing. Resolve that first; a missing sidecar
-     means re-running `/gaea2-load` from the original `.terrain`.
-   - Report `payload.entriesTruncated` if set — more than 64 entries were found
-     and the list is cut off.
+   - `markdown.entries-reported` — saving is blocked: stop, show
+     `payload.entries` to the user, and ask the user either to run
+     `/gaea2-modify` to fix them or to give explicit approval to proceed with
+     the save anyway.
+   - `passthrough.missing` — follow the sidecar-recovery sequence under
+     [`### Failure modes`](#failure-modes).
 
 4. Run the save wrapper. One call resolves the input and output paths, checks
    Python, and runs the saver. Done when that one call has returned.
    ```powershell
-   pwsh -NoProfile -File .agents/skills/gaea2-shared/scripts/Invoke-Gaea2Save.ps1 -InputPath "<name-or-Temp/path.md>" [-Output "<path.terrain>"]
+   pwsh -NoProfile -NonInteractive -File .agents/skills/gaea2-shared/scripts/Invoke-Gaea2Save.ps1 -InputPath "<name-or-Temp/path.md>" [-Output "<path.terrain>"]
    ```
-   - `-InputPath` accepts the same forms as step 1 (a bare name becomes
-     `Temp/<name>.md`); omitting `-Output` defaults to `<input-base>.terrain`
-     beside the `.md`, so pass the original path explicitly when the user chose
-     to overwrite it.
+   - Pass `-Output` when `--output` was given or the user chose to overwrite
+     the original path; omit it for step 1's default.
    - The bundled [`save_terrain.py`](../gaea2-shared/scripts/save_terrain.py)
      owns parsing, reconstruction, and the `$id`, `$ref`, and port-parent
      fixups; do not reproduce or simplify those operations.
@@ -80,24 +61,20 @@ or a full path; optionally followed by `--output <path>`.
      for: nodes without a passthrough entry, edges that didn't bind to any input
      port, synthesized type FQNs.
 
-5. Act on the save envelope's `status`. Stdout is one JSON object,
+5. Act on the save envelope's `code`. Stdout is one JSON object,
    `schemaVersion` `broken-engine-gaea2-save/v1`, with `status`, `code`,
    `message`. Done when one `broken-engine-gaea2-save/v1` envelope has been read
-   and its `status` acted on.
-   - `ok` (exit 0) — `outputPath` is the file written and `warnings` holds the
-     saver's `WARNING:` lines (prefix stripped, at most 64; `truncated` flags a
+   and its `code` acted on.
+   - `ok` — `outputPath` is the file written and `warnings` holds the saver's
+     `WARNING:` lines (prefix stripped, capped by `$script:MaximumWarnings` in
+     `../gaea2-shared/scripts/Invoke-Gaea2Save.ps1`, with `truncated` flagging a
      cut-off). Continue to step 6.
-   - `input.needs-user` (exit 2) — no input name or path was supplied. Ask the
-     user which Markdown view to save, then re-run.
-   - `python.missing` / `python.stale` (exit 2) — no usable x64 CPython 3.12+
-     interpreter, and nothing else ran. Do not install anything: report to the
-     user that Python is missing or too old, quoting `message`, and — for
-     `python.missing` — the `installCommand` the envelope carries as the
-     suggested command for them to run (`installCommand` is null for a stale
-     interpreter, which the user resolves by upgrading). Stop until they say
-     it's installed.
-   - `input.not-found`, `save.failed`, `save.output-missing`, `internal.error`
-     (exit 1) — report `message` plus the envelope's `stderr`.
+   - `input.needs-user` — no input name or path was supplied. Ask the user which
+     Markdown view to save, then re-run.
+   - `python.missing` / `python.stale` — follow
+     [wrapper-contract.md](../gaea2-shared/references/wrapper-contract.md#missing-or-stale-python).
+   - `input.not-found`, `save.failed`, `save.output-missing`, `internal.error` —
+     report `message` plus the envelope's `stderr`.
 
 6. Sanity-check the output. Read the produced `.terrain` and confirm both of the
    following. (JSON validity needs no separate check — the script writes via
@@ -120,14 +97,9 @@ or a full path; optionally followed by `--output <path>`.
 
 ## Rules
 
-- Both wrappers resolve relative paths and `Temp/` against the repository root
-  whatever the shell's current directory is, and pass the child processes'
-  stderr through to yours — append your shell's stderr redirect (`2>$null` in
-  PowerShell, `2>/dev/null` in Bash) when you only want the JSON.
-- Never reconstruct these operations inline: don't run the shared
-  `.agents/scripts/Detect-Python.ps1` probe the wrappers already call and parse
-  its `OK`/`MISSING`/`STALE` line yourself, and don't invoke `save_terrain.py`
-  or `validate_markdown.py` with a bare `python` or a captured interpreter path.
+- Wrapper path resolution, stderr pass-through, and no-inline-reconstruction
+  rules live in
+  [wrapper-contract.md](../gaea2-shared/references/wrapper-contract.md#no-inline-reconstruction).
 
 ### Round-trip caveats to surface
 
@@ -147,8 +119,11 @@ or a full path; optionally followed by `--output <path>`.
 
 ### Failure modes
 
-- `ERROR: sidecar not found` — the `.passthrough.json` was deleted. Re-run
-  `/gaea2-load` from the original `.terrain` to regenerate.
+- `ERROR: sidecar not found` — `.passthrough.json` is missing. Stop and
+  instruct the user to preserve the edited Markdown first, run `/gaea2-load`
+  from the original `.terrain` to regenerate `.passthrough.json`, and pair the
+  regenerated sidecar with the preserved edited Markdown (same directory and
+  matching basename) before retrying `/gaea2-save`.
 - `WARNING: edge ... not wired` — Mermaid block references a `to_port` name that
   doesn't exist on the target node's port catalogue. Save still produces a file;
   Gaea may load with that input disconnected. Most often: a node was added in

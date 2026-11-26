@@ -61,9 +61,9 @@ public:
 
 	std::vector<Buffer> mUiRectangleStorageBuffers;
 
-	// Smoke hierarchical dispatch buffers (per-plane, per-texture occupancy; one active tile list shared by every plane)
-	VkBuffer mpSmokeOccupancyVkBuffers[shaders::kiMaxFlightPlanes][2] {};
-	VmaAllocation mpSmokeOccupancyVmaAllocations[shaders::kiMaxFlightPlanes][2] {};
+	// Smoke hierarchical dispatch buffers (A for TextureOne, B for TextureTwo; one active tile list shared by both spread halves)
+	VkBuffer mpSmokeOccupancyVkBuffers[2] {};
+	VmaAllocation mpSmokeOccupancyVmaAllocations[2] {};
 	int64_t miSmokeOccupancyBufferSize = 0;
 	VkBuffer mSmokeActiveTileVkBuffer = VK_NULL_HANDLE;
 	VmaAllocation mSmokeActiveTileVmaAllocation = VK_NULL_HANDLE;

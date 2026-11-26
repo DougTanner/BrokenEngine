@@ -11,17 +11,24 @@
 #   starts with a `Role:` line and carries a `Governing paths:` line; `Governing paths:` and `Scope:` values (including
 #   continuation lines up to the next column-0 1-3 word key-colon header) are the brief paths, compared case- and
 #   separator-insensitively against the read path (resolving relative paths against the transcript's recorded worktree
-#   root when available). Two exemptions suppress `match` rows: (1) a single bounded `Read`/`read_file` call per path in
-#   its checkpoint span whose requested line count is `<= 60` (`$script:SmallReadMaxLines`) and whose paired successful
-#   text result length is `<= 4,000` chars (`$script:SmallReadMaxChars`), and (2) a resolved worktree public subagent
-#   `SKILL.md` directly under `.agents/skills/<skill>/SKILL.md` or `.claude/skills/<skill>/SKILL.md` when
-#   `.agents/skills/<skill>/references/worker.md` exists. Non-exempt paths (including `references/worker.md`,
-#   main-session `SKILL.md` files without `references/worker.md`, source files, Plans, worker-only references, and
-#   same-named files outside the worktree's skills roots) still emit `match` rows for unbounded reads, over-floor reads,
-#   allowlisted shell reads, failed/unpaired/non-text/missing results, checkpoint-dispatch reads, and repeat reads of the
-#   same path in the same checkpoint span. Eligible `match` rows are emitted with their original `<line>` and
-#   `<read line>` immediately before `checkpoint-span`, while all ordinary rows stream unchanged and `checkpoint-span`
-#   and `context-envelope` formats stay unchanged.
+#   root when available). Three exemptions suppress `match` rows: (1) a single bounded `Read`/`read_file` call per path
+#   in its checkpoint span whose requested line count is `<= 60` (`$script:SmallReadMaxLines`) and whose paired
+#   successful text result length is `<= 4,000` chars (`$script:SmallReadMaxChars`), (2) a resolved worktree public
+#   subagent `SKILL.md` directly under `.agents/skills/<skill>/SKILL.md` or `.claude/skills/<skill>/SKILL.md` when
+#   `.agents/skills/<skill>/references/worker.md` exists, and (3) a single `Read`/`read_file` call per canonical path in
+#   its checkpoint span whose paired successful non-empty text result is `<= 20,000` chars (`$script:WorkflowRefMaxChars`)
+#   for a resolved worktree main-owned `.agents/references/<doc>` in `$script:MainOwnedReferenceDocs` or a main-session
+#   skill reference under `.agents/skills/<skill>/references/<file>.md` or `.claude/skills/<skill>/references/<file>.md`
+#   when `.agents/skills/<skill>/SKILL.md` exists and `.agents/skills/<skill>/references/worker.md` does not
+#   (`.agents/skills/` and `.claude/skills/` spellings of the same skill reference share one canonical peer identity).
+#   Non-exempt paths (including `references/worker.md`, references under skills with `references/worker.md`, shared
+#   non-skill references without an owning `SKILL.md`, main-session `SKILL.md` files without `references/worker.md`,
+#   worker-only `.agents/references/` docs, `change-workflow.md`, Plans, `Temp/` files, source files, and
+#   out-of-worktree files) still emit `match` rows outside exemption (1), as do over-cap reads, allowlisted shell reads,
+#   failed/unpaired/non-text/missing results, checkpoint-dispatch reads, and repeat reads of the same path (or canonical
+#   peer) in the same checkpoint span. Eligible `match` rows are emitted with their original `<line>` and `<read line>`
+#   immediately before `checkpoint-span`, while all ordinary rows stream unchanged and `checkpoint-span` and
+#   `context-envelope` formats stay unchanged.
 # `<line> brief-missing <input field> <field label>` — a delegation-shaped input field fails a brief requirement: its
 #   first non-blank line is not a `Role:` line, or it carries no `Governing paths:` line. A field is delegation-shaped
 #   when at least two `.agents/references/subagent-reporting.md` `## Task brief` field labels each start a line of it.
@@ -110,7 +117,10 @@ $script:BreachRowCap = 25
 # Small-read floor: a single bounded Read/read_file call per path in a checkpoint span at or below both limits emits no `match` row.
 $script:SmallReadMaxLines = 60
 $script:SmallReadMaxChars = 4000
-# Repository skills root and per-skill cache for the worktree public subagent `SKILL.md` `match`-row exemption.
+# Small main-readable workflow-reference floor and allowlisted main-owned `.agents/references/` docs.
+$script:WorkflowRefMaxChars = 20000
+$script:MainOwnedReferenceDocs = @('authority-order.md', 'codex-bridge.md', 'execution-card.md', 'subagent-handoff.md', 'subagent-reporting.md')
+# Repository skills root and per-skill cache for the worktree public subagent `SKILL.md` and main-session skill reference exemptions.
 $script:SkillsRoot = Join-Path $PSScriptRoot '..\..'
 $script:PublicSubagentSkillCache = @{}
 # Input fields that name the emitting invocation without leaking result content.
@@ -285,22 +295,49 @@ function Test-NormalizedPathMatch([string] $Left, [string] $Right) {
 	return $Left -ceq $Right -or $Left.EndsWith('/' + $Right) -or $Right.EndsWith('/' + $Left)
 }
 
-function Test-PublicSubagentSkillPath([string] $Key, [string] $RootKey) {
-	if ([string]::IsNullOrEmpty($Key)) { return $false }
+function Get-WorktreeRelativePathKey([string] $Key, [string] $RootKey) {
+	if ([string]::IsNullOrEmpty($Key)) { return $null }
 	$resolvedKey = Resolve-NormalizedPathKey $Key $RootKey
-	if ([string]::IsNullOrEmpty($resolvedKey)) { return $false }
-	$relKey = $resolvedKey
+	if ([string]::IsNullOrEmpty($resolvedKey)) { return $null }
 	if (-not [string]::IsNullOrEmpty($RootKey)) {
 		$rootPrefix = if ($RootKey.EndsWith('/')) { $RootKey } else { $RootKey + '/' }
-		if (-not $resolvedKey.StartsWith($rootPrefix, [StringComparison]::Ordinal)) { return $false }
-		$relKey = $resolvedKey.Substring($rootPrefix.Length)
+		if (-not $resolvedKey.StartsWith($rootPrefix, [StringComparison]::Ordinal)) { return $null }
+		return $resolvedKey.Substring($rootPrefix.Length)
 	}
+	return $resolvedKey
+}
+
+function Test-SkillHasWorkerRef([string] $SkillName) {
+	if (-not $script:PublicSubagentSkillCache.ContainsKey($SkillName)) {
+		$script:PublicSubagentSkillCache[$SkillName] = Test-Path -LiteralPath (Join-Path $script:SkillsRoot "$SkillName\references\worker.md") -PathType Leaf
+	}
+	return $script:PublicSubagentSkillCache[$SkillName]
+}
+
+function Test-PublicSubagentSkillPath([string] $Key, [string] $RootKey) {
+	$relKey = Get-WorktreeRelativePathKey $Key $RootKey
+	if ([string]::IsNullOrEmpty($relKey)) { return $false }
 	if ($relKey -cnotmatch '^\.(?:agents|claude)/skills/([^/]+)/skill\.md$') { return $false }
-	$skillName = $Matches[1]
-	if (-not $script:PublicSubagentSkillCache.ContainsKey($skillName)) {
-		$script:PublicSubagentSkillCache[$skillName] = Test-Path -LiteralPath (Join-Path $script:SkillsRoot "$skillName\references\worker.md") -PathType Leaf
+	return (Test-SkillHasWorkerRef $Matches[1])
+}
+
+function Get-MainWorkflowRefKey([string] $Key, [string] $RootKey) {
+	$relKey = Get-WorktreeRelativePathKey $Key $RootKey
+	if ([string]::IsNullOrEmpty($relKey)) { return $null }
+	if ($relKey -cmatch '^\.agents/references/([^/]+\.md)$') {
+		if ($script:MainOwnedReferenceDocs -ccontains $Matches[1]) { return $relKey }
+		return $null
 	}
-	return $script:PublicSubagentSkillCache[$skillName]
+	if ($relKey -cmatch '^\.(?:agents|claude)/skills/([^/]+)/references/([^/]+\.md)$') {
+		$skillName = $Matches[1]
+		$refFile = $Matches[2]
+		if ($refFile -cne 'worker.md' -and
+			(Test-Path -LiteralPath (Join-Path $script:SkillsRoot "$skillName\SKILL.md") -PathType Leaf) -and
+			-not (Test-SkillHasWorkerRef $skillName)) {
+			return '.agents/skills/' + $skillName + '/references/' + $refFile
+		}
+	}
+	return $null
 }
 
 function Test-CheckpointReviewBrief([string] $Text) {
@@ -851,7 +888,7 @@ function Write-ToolCallProjection([int] $LineNumber, [string] $ToolName, [string
 			IsSmallReadExempt = $null
 		}
 		$Reads.Add($readRecord)
-		if (-not [string]::IsNullOrEmpty($ToolUseId)) {
+		if ($null -eq $shellKind -and -not [string]::IsNullOrEmpty($ToolUseId)) {
 			$State.ReadByToolUseId[$ToolUseId] = $readRecord
 		}
 	}
@@ -1280,15 +1317,21 @@ try {
 			$read = $cand.Read
 			if (Test-PublicSubagentSkillPath $read.Key $state.WorktreeRoot) { continue }
 			if ($null -eq $read.IsSmallReadExempt) {
-				if ($read.SpanIndex -ge 0 -and
-					$read.IsBoundedSmallLines -and
+				$isSmallBounded = ($read.IsBoundedSmallLines -and
 					$null -ne $read.ResultChars -and
-					$read.ResultChars -le $script:SmallReadMaxChars) {
+					$read.ResultChars -le $script:SmallReadMaxChars)
+				$workflowRefKey = Get-MainWorkflowRefKey $read.Key $state.WorktreeRoot
+				$isSmallWorkflowRef = ($null -ne $workflowRefKey -and
+					$null -ne $read.ResultChars -and
+					$read.ResultChars -gt 0 -and
+					$read.ResultChars -le $script:WorkflowRefMaxChars)
+				if ($read.SpanIndex -ge 0 -and ($isSmallBounded -or $isSmallWorkflowRef)) {
 					$hasPeer = $false
 					foreach ($other in $reads) {
 						if ($other.SpanIndex -eq $read.SpanIndex -and
 							$other.Index -ne $read.Index -and
-							(Test-PathKeyMatch $read.Key $other.Key $state.WorktreeRoot)) {
+							((Test-PathKeyMatch $read.Key $other.Key $state.WorktreeRoot) -or
+							($null -ne $workflowRefKey -and $workflowRefKey -ceq (Get-MainWorkflowRefKey $other.Key $state.WorktreeRoot)))) {
 							$hasPeer = $true
 							break
 						}

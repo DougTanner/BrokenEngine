@@ -38,14 +38,12 @@ void RenderShadowSection(TweaksScreen& rScreen)
 	rScreen.WrapperSlider("Object Shadows Sunset", gObjectShadowsSunset, iSection);
 	rScreen.WrapperSlider("Object Shadows Sunset Stretch", gObjectShadowsSunsetStretch, iSection);
 	rScreen.WrapperSlider("Object Shadows Stretch Power", gObjectShadowsStretchPower, iSection);
-	rScreen.WrapperSlider("Object Shadows Blur Sigma Low", gObjectShadowsBlurSigmaLow, iSection);
-	rScreen.WrapperSlider("Object Shadows Blur Sigma High", gObjectShadowsBlurSigmaHigh, iSection);
+	rScreen.WrapperSlider("Object Shadows Blur Sigma", gObjectShadowsBlurSigma, iSection);
 	rScreen.WrapperSlider("Object Shadows Blur Radius Noon", gObjectShadowsBlurRadiusNoon, iSection);
 	rScreen.WrapperSlider("Object Shadows Blur Radius Sunset", gObjectShadowsBlurRadiusSunset, iSection);
 	rScreen.WrapperSlider("Object Shadows Terrain Shadow Fade", gObjectShadowsTerrainShadowFade, iSection);
 	rScreen.WrapperSlider("Object Shadows Underwater Fade", gObjectShadowsUnderwaterFade, iSection);
-	rScreen.WrapperSlider("Smoke Shadow Intensity Bottom", gSmokeShadowIntensityBottom, iSection);
-	rScreen.WrapperSlider("Smoke Shadow Intensity Top", gSmokeShadowIntensityTop, iSection);
+	rScreen.WrapperSlider("Smoke Shadow Intensity", gSmokeShadowIntensity, iSection);
 }
 
 } // namespace engine

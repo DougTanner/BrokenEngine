@@ -20,16 +20,13 @@ policy).
   carry forward via the Interpolate `Update`'s previous-frame copy (no lerp)
   then get overwritten by `Sync`. Last values persist on frames where sync has
   not yet run.
-- Dual pipeline, shared buffer per lighting layer: a shield goes to the layer of
-  the flight plane nearest it (`NearestPlaneIndex`), and each layer's main and
-  lighting pipelines (`FlightPlaneDepositKey`) share that layer's dynamic
-  storage buffer and both rebind on resize. `EndRender` always publishes every
-  layer's main count so shield geometry stays visible, while only the layer
-  matching an active `giLightingRefreshLayer` (`Render.h`) gets a nonzero
-  lighting count; inactive frames zero every layer's lighting count.
-- Culled-packed GPU buffers: per-element visibility test with margin; culled
-  elements do not advance their layer's write cursor, keeping each buffer
-  tightly packed.
+- Dual pipeline, shared buffer: the main and lighting pipelines (`kuiCrc`) share
+  one dynamic storage buffer and both rebind on resize. `EndRender` always
+  publishes the main count so shield geometry stays visible, and publishes the
+  same count to the lighting pipeline when `gbLightingRefreshFrame` (`Render.h`)
+  is true or zero when it is false.
+- Culled-packed GPU buffer: per-element visibility test with margin; culled
+  elements do not advance the write cursor, keeping the buffer tightly packed.
 - Type-registry colors: `TypeRegistry<HexShieldsType>` holds the per-type-index
   main + lighting colors (packed ABGR uint32) and minimum intensity; both colors
   decode to float4 inside the render loop.

@@ -1,6 +1,6 @@
 ---
 name: gaea2-modify
-description: Edit a Gaea 2 terrain previously loaded by /gaea2-load — add/remove/move/rewire nodes or change node properties. Operates on the Markdown file in Temp/ produced by /gaea2-load; write the result back to a .terrain with /gaea2-save.
+description: Edit a Gaea 2 terrain previously loaded by /gaea2-load — add/remove/move/rewire nodes or change node properties. Operates on the Markdown file in Temp/ produced by /gaea2-load; the user writes the result back to a .terrain with /gaea2-save.
 argument-hint: <name-or-Temp/path.md>
 allowed-tools: [Read, Edit, Write, Glob, Grep, PowerShell]
 disable-model-invocation: true
@@ -39,62 +39,38 @@ or a full path.
    2. Otherwise look for `Temp/<arg>.md` or `Temp/<arg>`.
    3. If still ambiguous, list `Temp/*.md` and ask the user which.
 
-2. Apply the requested change with the matching operation under
-   `### Edit operations` below. Before adding or retyping any node, read
-   `../gaea2-shared/references/node-conventions.md` — Id floors, types that
-   require `Version: 2`, required input ports, per-type enum values, and
-   `PortCount` rules all live there. Done when every requested change is
-   applied, and that reference has been read first for any node added or
-   retyped.
+2. Apply the change via `### Edit operations` below. Before adding a node, read
+   `../gaea2-shared/references/node-conventions.md`. For node type changes,
+   route to the user and stop — `.passthrough.json` pins `$type`
+   (`validate_markdown.py` flags mismatches). Done when applied (new nodes per
+   that reference) or routed.
 
-3. Run the validator on the edited file before reporting done, from the session
-   worktree root. It is required, not optional, and it reads only — it never
-   edits the Markdown or the sidecar. Done when the wrapper has printed one
+3. Run the validator on the edited file before reporting done, dispatching
+   `validate_markdown.py` and handling `python.missing` / `python.stale` per
+   [wrapper-contract.md](../gaea2-shared/references/wrapper-contract.md#markdown-validator-gating).
+   It is required, not optional. Done when the wrapper has printed one
    `broken-engine-gaea2-python/v1` envelope.
 
-   ```powershell
-   pwsh -NoProfile -Command "& '.agents/skills/gaea2-shared/scripts/Invoke-Gaea2Python.ps1' -Script validate_markdown.py -Arguments '<Temp/name.md>'"
-   ```
+4. Gate on the validator's inner `broken-engine-gaea2-markdown/v1` envelope per
+   [wrapper-contract.md](../gaea2-shared/references/wrapper-contract.md#markdown-validator-gating)
+   (including inner `code` parsing, `internal.error`, and
+   `payload.entriesTruncated`). Done when the inner `code` is `ok`.
 
-   - Use `-Command`, not `-File`: that is the form that passes the `-Arguments`
-     list through intact.
-   - The wrapper resolves relative paths and `Temp/` against the repository root
-     whatever the current directory is.
-   - On `python.missing` / `python.stale` (exit 2) nothing ran: tell the user
-     Python is missing or too old and never install it yourself — for
-     `python.missing` pass on the envelope's `installCommand` as the suggested
-     command for them to run, and for `python.stale` quote its
-     `message`/`probeLine` instead (`installCommand` is null there; the user
-     resolves it by upgrading).
-
-4. Gate on the validator's own `broken-engine-gaea2-markdown/v1` envelope, which
-   is the string in the wrapper's `stdout` field — read its `code`, not the exit
-   code. That holds for `python.script-failed` too: the validator exits 2 on its
-   own blocked codes, so parse the inner envelope out of `stdout` for the
-   diagnostic code first, and fall back to the wrapper's `stderr` only when
-   `stdout` carries no envelope. Done when the inner `code` is `ok`.
-
-   - `ok` — no entries; the mechanical checks pass.
-   - `markdown.entries-reported` — `payload.entries` lists
-     `{nodeId, rule, message}` findings. Fix every one before reporting done.
-     The rules cover Mermaid-versus-section agreement in both directions,
-     duplicate IDs, added nodes with an ID below 100, edges naming a node that
-     doesn't exist, types missing `Version: 2`, dynamic-port nodes missing
-     `PortCount`, unwired required In ports, an input port fed by more than one
-     producer, and nodes with no path to an output.
-   - `input.invalid`, `markdown.missing`, `markdown.unreadable`,
-     `passthrough.missing`, `passthrough.unreadable`,
-     `markdown.structure-unparsed` — the validator couldn't read or parse the
-     file at all, so it proved nothing. Resolve that before reporting done.
+   - `markdown.entries-reported` — fix every `{nodeId, rule, message}` finding
+     in `payload.entries` before reporting done (`CHECKS` and `MINIMUM_NODE_ID`
+     in `../gaea2-shared/scripts/validate_markdown.py` own the rules).
+   - Blocked input/parse codes — resolve the unreadable/missing file or parse
+     failure before reporting done.
 
 5. Then do the judgment the validator can't. Done when each of these has been
    checked.
 
    - Check that property values still parse as their original type — don't put a
      string where a float was, and see the type rules under "Edit a property".
-   - For any newly-added node, surface the port-catalogue limitation to the user
-     (the saver will use a default In/Out pair until passthrough is updated) so
-     they can decide whether to copy a port block from a sibling example.
+   - For any new node, warn the user that saving emits an empty `Ports` list and
+     drops incoming edges without a `.passthrough.json` port catalogue entry
+     (`../gaea2-save/SKILL.md` `### Failure modes`), so they can copy one from a
+     sibling file.
    - For any newly-added node, check the enum values against
      `## Per-type enum constraints` in
      `../gaea2-shared/references/node-conventions.md`; an invalid one silently
@@ -107,8 +83,9 @@ Find `### n<ID>: <Type>`, edit the `key: value` line beneath it.
 - Floats like `Duration: 15.870041` — change the number, keep float syntax (a
   trailing `.0` if integer-valued).
 - Ints like `Seed: 40828` — bare integer, no decimal.
-- Strings — quote with `"..."` only if the value contains `:`, `#`,
-  leading/trailing whitespace, or starts with `[`/`{`.
+- Strings — quote with `"..."` for `:`, `#`, leading/trailing whitespace,
+  leading `[`/`{`, or boolean/`null`/numeric values (`parse_scalar` in
+  `../gaea2-shared/scripts/save_terrain.py`).
 - Booleans — `true` / `false` (lowercase).
 
 #### Move a node
@@ -176,20 +153,19 @@ lines if adding variables.
 
 ### New node port-catalogue message
 
-"I added <Type> as node n<NEW_ID>, but its port catalogue isn't in passthrough
-yet — saving will use a default In/Out pair. If <Type> needs more ports (e.g.
-Erosion2's Flow/Wear/Deposits, Combine's secondary input), you'll need to copy
-the port block from another file of the same type."
+"I added <Type> as node n<NEW_ID> without a `.passthrough.json` port catalogue
+entry — saving emits an empty `Ports` list and drops incoming edges unless you
+add one with matching target port names (e.g., from a same-type sibling file)."
+(See `../gaea2-save/SKILL.md` `### Failure modes`.)
 
 ## Rules
 
 - The Markdown is the source of truth for topology, properties, positions,
   names, notes, and variables. The Mermaid block and per-node sections must stay
   in sync.
-- Never reconstruct the validator dispatch inline: don't run the shared
-  `.agents/scripts/Detect-Python.ps1` probe the wrapper already calls, and don't
-  invoke `validate_markdown.py` with a bare `python` or a captured interpreter
-  path.
+- Wrapper path resolution, stderr pass-through, and no-inline-reconstruction
+  rules live in
+  [wrapper-contract.md](../gaea2-shared/references/wrapper-contract.md#no-inline-reconstruction).
 - One validator limit is worth knowing: the reaches-output rule is skipped
   entirely when the graph has no output anchor at all — no `Export` node and no
   node carrying `SaveDefinition`. That is common in the shipping examples

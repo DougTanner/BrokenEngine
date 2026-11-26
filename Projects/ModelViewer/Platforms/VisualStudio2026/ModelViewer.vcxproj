@@ -294,6 +294,7 @@
     <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Render\Render.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Screenshot.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Input\Input.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Input\Keybinds.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Input\RawInputManager.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\LaunchOptions.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Memory\GlobalAllocator.h" />

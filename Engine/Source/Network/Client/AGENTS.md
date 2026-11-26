@@ -8,22 +8,23 @@ state, and receive buffers. The runtime owns connection and GUID persistence,
 connection outcomes (the modal message for a rejected, failed, or lost
 connection, and the frame transitions into a game on accept and back to the
 main menu on loss), discovery, the client active set and its visible-neighbor
-cache, the desired coordinates derived from them, which during a camera jump
-also keep the confirmed cells under the camera's previous cell loaded area,
-the harness viewer pin, subscription and clock state, generic full-state and
-delta adoption, received-update buffering and confirmation, ordered receive
-draining, ACK/flush, resets, and live terrain preparation. `ClientSessionBase`,
-which the game client session inherits, holds the runtime and the desync
-core and owns static-data application, owned-entity event application,
-`Reconcile`, and the resync, disconnect, and server-load session resets. Like
-`GameBase::ResetSession`, the server-load reset discards the camera tracking
-caches and clears smoke and particles, so no previous-world view carries into
-the new one. This directory also owns replay and desync machinery and the
-client crash-report upload. The game client session (the game project's own
-`Source/Network/Client/AGENTS.md`) owns the reconciler, each owned-entity
-event's gameplay effect, gameplay hydration and smoke continuity, UI, and
-gameplay policy. Collection hydration rules are in the game collection detail
-(the game project's own `Source/Frame/Collections/AGENTS.md`).
+cache, the desired coordinates derived from them (also keeping confirmed cells
+under the camera's previous cell loaded area when
+`mbPreviousCellLoadedAreaValid` is set), the harness viewer pin, subscription
+and clock state, generic full-state and delta adoption, received-update
+buffering and confirmation, ordered receive draining, ACK/flush, resets, and
+live terrain preparation. `ClientSessionBase`, which the game client session
+inherits, holds the runtime and the desync core and owns static-data
+application, owned-entity event application, `Reconcile`, and the resync,
+disconnect, and server-load session resets. Like `GameBase::ResetSession`, the
+server-load reset discards the camera tracking caches and clears smoke and
+particles, so no previous-world view carries into the new one. This directory
+also owns replay and desync machinery and the client crash-report upload. The
+game client session (the game project's own `Source/Network/Client/AGENTS.md`)
+owns the reconciler, each owned-entity event's gameplay effect, gameplay
+hydration and smoke continuity, UI, and gameplay policy. Collection hydration
+rules are in the game collection detail (the game project's own
+`Source/Frame/Collections/AGENTS.md`).
 
 ## Receive Paths
 

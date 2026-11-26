@@ -50,8 +50,8 @@ Ordinary preparation (omitted `mode:`) adds:
 - ordinary claim: claimed Plan path plus section line ranges from a heading
   lookup (`AGENTS.md` `## Environment`), written from the Plan's own citations
   (`path:line-range`). Main reads only Plan sections it must state from (such as
-  the risk tier for roles) and only `## Task brief` above, names cited
-  handoff/reporting references by path only, leaves them and target source to
+  the risk tier for roles), follows `subagent-reporting.md` `## Task brief` for
+  workflow-reference reads, leaves target source and non-exempt references to
   the `planner`, and reads source only for a decision the Plan and handoff
   cannot settle;
 - difference re-entry (per

@@ -97,13 +97,22 @@ public:
 	XMFLOAT2 mf2VisibleAreaQuadSize {};
 	XMFLOAT4 mf4RenderVisibleArea {};
 	XMFLOAT4 mf4LargeVisibleArea {};
-	// The cell loaded area: the world framing's ground footprint (minX, maxY, maxX, minY), which decides which cells
-	// load and are kept, instead of the visible areas. It sits at the look-at, or at the destination during a jump.
-	XMFLOAT4 mf4CellLoadedArea {};
-	// The cell loaded area at the look-at where the current jump started, held until that jump ends.
+	// The cell loaded area: the world framing's ground footprint (minX, maxY, maxX, minY), evaluated relative to
+	// mOptionalSubscriptionCenter at its height when present, or empty otherwise.
+	XMFLOAT4 mf4CellLoadedArea {std::numeric_limits<float>::max(), std::numeric_limits<float>::lowest(), std::numeric_limits<float>::lowest(), std::numeric_limits<float>::max()};
 	XMFLOAT4 mf4PreviousCellLoadedArea {};
-	// Set while mf4PreviousCellLoadedArea holds a jump's departure.
 	bool mbPreviousCellLoadedAreaValid = false;
+	std::optional<XMVECTOR> mOptionalSubscriptionCenter;
+
+	enum class ObserverState : uint8_t
+	{
+		kFollowing,
+		kObserving,
+		kAwaitingReturn,
+	};
+
+	ObserverState meObserverState = ObserverState::kFollowing;
+	XMVECTOR mVecObserverVelocity {};
 
 	XMVECTOR mVecPosition {};
 	XMVECTOR mVecEyePosition {};
@@ -187,10 +196,13 @@ public:
 
 	explicit CameraBase(const CameraSetup& rCameraSetup);
 
-	void Update(const FrameInterpolateBase& rFrameInterpolate, float fDeltaTime, float fSunDeltaTime, bool bMainMenuFrame, const CameraTarget& rPulledTarget);
+	void SetObserverMode(bool bEnabled);
+	void StepObserverPan(float fDeltaTime, std::span<const GridCoord> allowedCoordinates);
+	void Update(const FrameInterpolateBase& rFrameInterpolate, float fDeltaTime, float fSunDeltaTime, bool bMainMenuFrame, const CameraTarget& rPulledTarget, std::optional<XMVECTOR> optionalSubscriptionCenter = std::nullopt);
 
 	void ResetForSession();
 	void DiscardTrackingCaches();
+	void ClearCellLoadedArea();
 	void RestoreFraming(float fFraming);
 	// A call during the other's unfinished ease retraces it backward, keeping the framing and speed with the direction
 	// reversed; otherwise the ease starts at rest from the current rendered framing.

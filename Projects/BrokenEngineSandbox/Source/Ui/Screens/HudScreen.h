@@ -1,8 +1,8 @@
 #pragma once
 
 #if defined(BT_CLIENT)
+
 #include "Ui/MenuUtils.h"
-#endif
 
 namespace game
 {
@@ -18,13 +18,13 @@ private:
 	void RenderFleetPanel(float fTarget);
 	void RenderFocusedOwnedEntityPanel(float fTarget);
 
-#if defined(BT_CLIENT)
 	static float PanelWidth();
 	engine::SlidePanelState mFleetSlide {};
 	engine::SlidePanelState mFocusedOwnedEntitySlide {};
 	std::chrono::duration<float> mTimeWantingForceOpen = 0s;
 	bool mbPreviousForceOpen = false;
-#endif
 };
 
 } // namespace game
+
+#endif // BT_CLIENT

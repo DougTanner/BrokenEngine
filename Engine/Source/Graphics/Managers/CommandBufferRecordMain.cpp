@@ -163,48 +163,39 @@ void CommandBufferRecordMain::RecordLightingSpreadPipeline(VkCommandBuffer vkCom
 	}
 	gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerLightingSpread);
 
-	// Phase 2: Combine (tone map accumulate float16 → UNORM). Every layer records its own transitions and dispatch; only
-	// the refreshing layer's indirect dispatch is nonzero.
+	// Phase 2: Combine (tone map accumulate float16 → UNORM). The refresh predicate zeroes the indirect dispatch on skipped frames.
 	gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerLightingCombine);
-	for (int64_t i = 0; i < shaders::kiLightingLayers; ++i)
+	for (Texture& rCombineTexture : rRenderTargetTextures.mpCombineTextures)
 	{
-		for (Texture& rCombineTexture : rRenderTargetTextures.mpCombineTextures[i])
-		{
-			rCombineTexture.TransitionImageLayout(vkCommandBuffer, TextureLayout::kShaderReadOnly, TextureLayout::kComputeReadWrite);
-		}
-
-		gpPipelineManager->mpCombinePipelines[i].RecordComputeIndirect(iCommandBuffer, vkCommandBuffer);
+		rCombineTexture.TransitionImageLayout(vkCommandBuffer, TextureLayout::kShaderReadOnly, TextureLayout::kComputeReadWrite);
 	}
-
+	gpPipelineManager->mCombinePipeline.RecordComputeIndirect(iCommandBuffer, vkCommandBuffer);
 	gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerLightingCombine);
 
 	// Phase 3: Temporal accumulation reprojects + EMA-blends the previous directional history into the 3 directional
 	// combine outputs in place, then the history-copy compute pipeline publishes the blended result into distinct
 	// directional history images and derives the ambient combine target from those finalized values.
 	gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerLightingTemporal);
-	auto TransitionCombineAndHistory = [&](int64_t iLayer, TextureLayout eCombineNewLayout, TextureLayout eHistoryOldLayout, TextureLayout eHistoryNewLayout)
+	auto TransitionCombineAndHistory = [&](TextureLayout eCombineNewLayout, TextureLayout eHistoryOldLayout, TextureLayout eHistoryNewLayout)
 	{
-		for (int64_t j = 0; j < static_cast<int64_t>(std::size(rRenderTargetTextures.mpCombineTextures[iLayer])); ++j)
+		for (int64_t j = 0; j < static_cast<int64_t>(std::size(rRenderTargetTextures.mpCombineTextures)); ++j)
 		{
-			rRenderTargetTextures.mpCombineTextures[iLayer][j].TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, eCombineNewLayout);
-			rRenderTargetTextures.mpLightingHistoryTextures[iLayer][j].TransitionImageLayout(vkCommandBuffer, eHistoryOldLayout, eHistoryNewLayout);
+			rRenderTargetTextures.mpCombineTextures[j].TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, eCombineNewLayout);
+			rRenderTargetTextures.mpLightingHistoryTextures[j].TransitionImageLayout(vkCommandBuffer, eHistoryOldLayout, eHistoryNewLayout);
 		}
 	};
-	for (int64_t i = 0; i < shaders::kiLightingLayers; ++i)
-	{
-		TransitionCombineAndHistory(i, TextureLayout::kComputeReadWrite, TextureLayout::kShaderReadOnly, TextureLayout::kComputeReadOnly);
+	TransitionCombineAndHistory(TextureLayout::kComputeReadWrite, TextureLayout::kShaderReadOnly, TextureLayout::kComputeReadOnly);
 
-		gpPipelineManager->mpLightingTemporalPipelines[i].RecordComputeIndirect(iCommandBuffer, vkCommandBuffer);
+	gpPipelineManager->mLightingTemporalPipeline.RecordComputeIndirect(iCommandBuffer, vkCommandBuffer);
 
-		// Same-layout transitions make temporal writes visible to the history-copy shader, whose independent storage outputs
-		// preserve temporal's no-sampled/output-alias contract.
-		TransitionCombineAndHistory(i, TextureLayout::kComputeReadWrite, TextureLayout::kComputeReadOnly, TextureLayout::kComputeReadWrite);
-		rRenderTargetTextures.mpAmbientCombineTextures[i].TransitionImageLayout(vkCommandBuffer, TextureLayout::kShaderReadOnly, TextureLayout::kComputeReadWrite);
-		gpPipelineManager->mpLightingHistoryCopyPipelines[i].RecordComputeIndirect(iCommandBuffer, vkCommandBuffer);
+	// Same-layout transitions make temporal writes visible to the history-copy shader, whose independent storage outputs
+	// preserve temporal's no-sampled/output-alias contract.
+	TransitionCombineAndHistory(TextureLayout::kComputeReadWrite, TextureLayout::kComputeReadOnly, TextureLayout::kComputeReadWrite);
+	rRenderTargetTextures.mAmbientCombineTexture.TransitionImageLayout(vkCommandBuffer, TextureLayout::kShaderReadOnly, TextureLayout::kComputeReadWrite);
+	gpPipelineManager->mLightingHistoryCopyPipeline.RecordComputeIndirect(iCommandBuffer, vkCommandBuffer);
 
-		TransitionCombineAndHistory(i, TextureLayout::kShaderReadOnly, TextureLayout::kComputeReadWrite, TextureLayout::kShaderReadOnly);
-		rRenderTargetTextures.mpAmbientCombineTextures[i].TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kShaderReadOnly);
-	}
+	TransitionCombineAndHistory(TextureLayout::kShaderReadOnly, TextureLayout::kComputeReadWrite, TextureLayout::kShaderReadOnly);
+	rRenderTargetTextures.mAmbientCombineTexture.TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kShaderReadOnly);
 	gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerLightingTemporal);
 
 	// Final barrier: compute → fragment (combine textures are now readable by fragment shaders)
@@ -215,40 +206,29 @@ void CommandBufferRecordMain::RecordSmokeEmit(VkCommandBuffer vkCommandBuffer, i
 {
 	gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerSmokeEmit);
 
-	for (int64_t i = 0; i < gpFlightPlanes->Count(); ++i)
+	Texture& rSmokeTextureOne = gpTextureManager->mRenderTargetTextures.mSmokeTextureOne;
+	Texture& rSmokeTextureTwo = gpTextureManager->mRenderTargetTextures.mSmokeTextureTwo;
+
+	// Clear TextureTwo on a Smoke toggle or recreation. Global spread precedes Main, so the next spread refresh drains
+	// stale occupancy.
+	rSmokeTextureTwo.RecordBeginRenderPass(vkCommandBuffer);
+	gpPipelineManager->mpPipelines[kPipelineSmokeClearB].RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {0.0f, 0.0f, 0.0f, 0.0f});
+	vkCmdEndRenderPass(vkCommandBuffer);
+
+	rSmokeTextureOne.TransitionImageLayout(vkCommandBuffer, TextureLayout::kShaderReadOnly, TextureLayout::kColorAttachment);
+	rSmokeTextureOne.RecordBeginRenderPass(vkCommandBuffer);
+	gpPipelineManager->mpPipelines[kPipelineSmokeClearA].RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {0.0f, 0.0f, 0.0f, 0.0f});
+	XMFLOAT4 f4DepositPushConstants {static_cast<float>(shaders::kiAreaSelectorSmoke), 0.0f, 0.0f, 0.0f};
+	for ([[maybe_unused]] const auto& [rCrc, pPipeline] : gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineSmokeAxisAligned])
 	{
-		Texture& rSmokeTextureOne = gpTextureManager->mRenderTargetTextures.mSmokeTexturesOne[i];
-		Texture& rSmokeTextureTwo = gpTextureManager->mRenderTargetTextures.mSmokeTexturesTwo[i];
-
-		// Force-clear TextureTwo on the Smoke enabled/recreate edge. Global spread runs before Main, so any stale
-		// occupancy describing this cleared texture is consumed and drained by the next frame's spread. The shared
-		// clear pipelines draw in every plane's render passes, which stay compatible with plane 0's.
-		rSmokeTextureTwo.RecordBeginRenderPass(vkCommandBuffer);
-		gpPipelineManager->mpPipelines[kPipelineSmokeClearB].RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {0.0f, 0.0f, 0.0f, 0.0f});
-		vkCmdEndRenderPass(vkCommandBuffer);
-
-		rSmokeTextureOne.TransitionImageLayout(vkCommandBuffer, TextureLayout::kShaderReadOnly, TextureLayout::kColorAttachment);
-		rSmokeTextureOne.RecordBeginRenderPass(vkCommandBuffer);
-		gpPipelineManager->mpPipelines[kPipelineSmokeClearA].RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {0.0f, 0.0f, 0.0f, 0.0f});
-		// The deposit maps hold one pipeline per (collection, plane); each targets its own plane's render pass. Push
-		// constant x selects the smoke area and y the plane, so each plane deposits through its own published area.
-		XMFLOAT4 f4DepositPushConstants {static_cast<float>(shaders::kiAreaSelectorSmoke), static_cast<float>(i), 0.0f, 0.0f};
-		for (const auto& [rCrc, pPipeline] : gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineSmokeAxisAligned])
-		{
-			if (pPipeline->mInfo.vkTargetRenderPass == rSmokeTextureOne.mVkRenderPass)
-			{
-				pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, f4DepositPushConstants);
-			}
-		}
-		for (const auto& [rCrc, pPipeline] : gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineSmoke])
-		{
-			if (pPipeline->mInfo.vkTargetRenderPass == rSmokeTextureOne.mVkRenderPass)
-			{
-				pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, f4DepositPushConstants);
-			}
-		}
-		vkCmdEndRenderPass(vkCommandBuffer);
+		pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, f4DepositPushConstants);
 	}
+	for ([[maybe_unused]] const auto& [rCrc, pPipeline] : gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineSmoke])
+	{
+		pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, f4DepositPushConstants);
+	}
+	vkCmdEndRenderPass(vkCommandBuffer);
+
 	gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerSmokeEmit);
 }
 

@@ -5,15 +5,10 @@ Steps and rules for the dispatched reviewer. The public
 
 ## Steps
 
-1. Run below with zero disk writes (`-Head` from `Baseline` for a committed
-   head; `-UntrackedPath` or `-IncludeUntracked` from `Scope`). Require `status`
-   `pass`, else report unavailability without enumerating hunks. Keep
-   instruction-doc paths and read `counts.unlistedUntracked`. Done when ready or
-   unavailable.
-
-```powershell
-pwsh -NoProfile -Command 'Import-Module ./.agents/scripts/SessionChangeInventory.psm1; Get-SessionChangeInventory -RepositoryRoot (Get-Location).Path -Baseline <baseline SHA> -Regions|Select-Object status,coretide,counts,entries,regions|ConvertTo-Json -Depth 5'
-```
+1. Use the inventory in [`../SKILL.md`](../SKILL.md) `## Inputs`. For bridge
+   input see [`codex-bridge.md`](../../../references/codex-bridge.md) step 2.
+   Require `status` `pass` or report unavailability without enumerating hunks.
+   Select instruction-doc paths and check `counts.unlistedUntracked`.
 
 2. Flag changed prose that restates or paraphrases content another location
    already owns — a reference doc, a script's own documented usage, a parent
@@ -37,14 +32,11 @@ pwsh -NoProfile -Command 'Import-Module ./.agents/scripts/SessionChangeInventory
    result, and the script/reference that owns the computation or where it
    should be extracted.
 
-4. Flag as `instruction-change` prose in the step 1 regions that breaks the
-   root `Instruction changes` directive, leaving model names to the
-   static-checks `model-names` row. When the dispatch supplies
-   `Stated net size`, run the static-checks command of the Change Workflow Run
-   targeted pre-review checks step, adding `-Head <commit>` for a committed
-   head, and flag its `instruction-size` row's `netTokens` above that size as
-   `instruction-change` naming both sizes. Done when every step 1 region the
-   directive covers is checked and any stated size is compared.
+4. Flag step 1 prose that breaks the root `Instruction changes` directive as
+   `instruction-change`, leaving model names to static checks. When
+   `## Inputs` calls for `instruction-size`, use its row, supplied as in step 1
+   for bridge runs. Flag `netTokens` above the stated size as
+   `instruction-change` and name both sizes.
 
 5. Measure each changed `SKILL.md` with `pwsh -NoProfile -File
    .agents/scripts/Measure-Tokens.ps1 -Path <file>`. A `SKILL.md` body over

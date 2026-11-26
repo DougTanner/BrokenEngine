@@ -75,8 +75,7 @@ void MissilesInterpolate::BeginRender(int64_t iCommandBuffer, const std::unorder
 				XMMATRIX matYaw = common::RotationMatrixFromDirection(rCurrent.pVecDirections[i], XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f));
 				XMMATRIX matTranslation = XMMatrixTranslationFromVector(vecPosition);
 				XMMATRIX matInstanceTransform = matScaling * matYaw * matTranslation;
-				int64_t iPlane = engine::gpFlightPlanes->NearestPlaneIndex(f4Position.z);
-				engine::FillModelLayout(shadowBounds, matAlignment, matInstanceTransform, vecPosition, iPlane, nullptr, {}, 0, {}, pLayouts[iCount++]);
+				engine::FillModelLayout(shadowBounds, matAlignment, matInstanceTransform, vecPosition, nullptr, {}, 0, {}, pLayouts[iCount++]);
 			}
 		}
 		return iCount;

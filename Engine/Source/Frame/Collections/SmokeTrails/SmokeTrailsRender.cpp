@@ -14,21 +14,17 @@ namespace engine
 
 constexpr int64_t kiDynamicBufferInitialCapacity = 2'048;
 
-static int64_t spiRendered[shaders::kiMaxFlightPlanes] {};
+static int64_t siRendered = 0;
 
 void SmokeTrailsInterpolate::GraphicsResources()
 {
-	for (int64_t i = 0; i < gpFlightPlanes->Count(); ++i)
-	{
-		common::crc_t uiDepositKey = DynamicPipelines::FlightPlaneDepositKey(kuiCrc, i);
-		gpBufferManager->CreateDynamicBuffer(uiDepositKey, kBufferMain, kpcName, sizeof(shaders::QuadLayout), kiDynamicBufferInitialCapacity);
-		gpPipelineManager->mDynamicPipelines.CreateDepositPipeline(kDynamicPipelineSmoke, uiDepositKey, kpcName, data::kShadersQuadsQuadsVisibleAreavertCrc, data::kShadersSmokeSmokefragCrc, gpTextureManager->mRenderTargetTextures.mSmokeTexturesOne[i], {.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .pTexture = &gpTextureManager->mRenderTargetTextures.mSmokeGradientTexture}, &gpBufferManager->mpSmokeOccupancyVkBuffers[i][0]);
-	}
+	gpBufferManager->CreateDynamicBuffer(kuiCrc, kBufferMain, kpcName, sizeof(shaders::QuadLayout), kiDynamicBufferInitialCapacity);
+	gpPipelineManager->mDynamicPipelines.CreateDepositPipeline(kDynamicPipelineSmoke, kuiCrc, kpcName, data::kShadersQuadsQuadsVisibleAreavertCrc, data::kShadersSmokeSmokefragCrc, gpTextureManager->mRenderTargetTextures.mSmokeTextureOne, {.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .pTexture = &gpTextureManager->mRenderTargetTextures.mSmokeGradientTexture}, &gpBufferManager->mpSmokeOccupancyVkBuffers[0]);
 }
 
 void SmokeTrailsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoordinates)
 {
-	std::ranges::fill(spiRendered, 0);
+	siRendered = 0;
 
 	int64_t iTotalCapacity = AccumulateRenderCapacity(rRenderInterpolates, rActiveCoordinates, [](const game::FrameInterpolate& rInterpolate) -> const SmokeTrailsInterpolate&
 	{
@@ -40,14 +36,9 @@ void SmokeTrailsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer
 		return;
 	}
 
-	// Each trail adds at most one quad per plane, so every plane's buffer takes the full capacity.
-	for (int64_t i = 0; i < gpFlightPlanes->Count(); ++i)
+	if (Buffer* pBuffer = gpBufferManager->ResizeDynamicBufferIfNeeded(kuiCrc, kBufferMain, kpcName, sizeof(shaders::QuadLayout), iTotalCapacity, iCommandBuffer); pBuffer != nullptr)
 	{
-		common::crc_t uiDepositKey = DynamicPipelines::FlightPlaneDepositKey(kuiCrc, i);
-		if (Buffer* pBuffer = gpBufferManager->ResizeDynamicBufferIfNeeded(uiDepositKey, kBufferMain, kpcName, sizeof(shaders::QuadLayout), iTotalCapacity, iCommandBuffer); pBuffer != nullptr)
-		{
-			PipelineDescriptorWriter::UpdateStorageBuffer(*gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineSmoke].at(uiDepositKey), iCommandBuffer, 1, pBuffer);
-		}
+		PipelineDescriptorWriter::UpdateStorageBuffer(*gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineSmoke].at(kuiCrc), iCommandBuffer, 1, pBuffer);
 	}
 }
 
@@ -61,13 +52,8 @@ void SmokeTrailsInterpolate::Render([[maybe_unused]] const game::FrameInterpolat
 		return;
 	}
 
-	shaders::QuadLayout* ppTrailLayouts[shaders::kiMaxFlightPlanes] {};
-	for (int64_t i = 0; i < gpFlightPlanes->Count(); ++i)
-	{
-		auto [pTrailLayouts, iBufferCapacity] = gpBufferManager->GetDynamicStorageBuffer<shaders::QuadLayout>(DynamicPipelines::FlightPlaneDepositKey(kuiCrc, i), kBufferMain, iCommandBuffer);
-		ASSERT(spiRendered[i] + rCurrent.iCount <= iBufferCapacity);
-		ppTrailLayouts[i] = pTrailLayouts;
-	}
+	auto [pTrailLayouts, iBufferCapacity] = gpBufferManager->GetDynamicStorageBuffer<shaders::QuadLayout>(kuiCrc, kBufferMain, iCommandBuffer);
+	ASSERT(siRendered + rCurrent.iCount <= iBufferCapacity);
 
 	static common::RandomEngine sRandomEngine;
 
@@ -97,56 +83,42 @@ void SmokeTrailsInterpolate::Render([[maybe_unused]] const game::FrameInterpolat
 			fLength = 0.0f;
 		}
 
-		SmokePlaneWeights planeWeights = ComputeSmokePlaneWeights(XMVectorGetZ(vecLocalPosition));
-		float pfPlaneWeights[] = {1.0f - planeWeights.fUpperWeight, planeWeights.fUpperWeight};
-		for (int64_t j = 0; j < std::ssize(pfPlaneWeights); ++j)
+		XMVECTOR vecBasePosition = ProjectToBaseHeight(vecLocalPosition, rBasis);
+		XMVECTOR vecBaseSmoothedPosition = ProjectToBaseHeight(vecLocalSmoothedPosition, rBasis);
+
+		XMVECTOR vecToSmoothed = XMVectorSubtract(vecBasePosition, vecBaseSmoothedPosition);
+		float fLengthScale = XMVectorGetX(XMVector3Length(vecToSmoothed));
+		if (fLengthScale <= 0.01f)
 		{
-			if (pfPlaneWeights[j] == 0.0f)
-			{
-				continue;
-			}
-			int64_t iPlane = planeWeights.iLowerPlane + j;
-
-			XMVECTOR vecBasePosition = ProjectToFlightPlane(vecLocalPosition, rBasis, iPlane);
-			XMVECTOR vecBaseSmoothedPosition = ProjectToFlightPlane(vecLocalSmoothedPosition, rBasis, iPlane);
-
-			XMVECTOR vecToSmoothed = XMVectorSubtract(vecBasePosition, vecBaseSmoothedPosition);
-			float fLengthScale = XMVectorGetX(XMVector3Length(vecToSmoothed));
-			if (fLengthScale <= 0.01f)
-			{
-				continue;
-			}
-			XMVECTOR vecToSmoothedNormal = XMVector3Normalize(vecToSmoothed);
-
-			XMVECTOR vecLeftNormal = XMVector3Normalize(XMVector3Cross(vecToSmoothedNormal, XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f)));
-
-			XMVECTOR vecPointOne = XMVectorAdd(vecBasePosition, XMVectorScale(vecLeftNormal, gSmokeTrailsWidthCurrent.mfCurrent * fWidth));
-			XMVECTOR vecPointTwo = XMVectorAdd(vecBasePosition, XMVectorScale(vecLeftNormal, -gSmokeTrailsWidthCurrent.mfCurrent * fWidth));
-
-			XMVECTOR vecPointThree = XMVectorSubtract(XMVectorAdd(vecBaseSmoothedPosition, XMVectorScale(vecLeftNormal, gSmokeTrailsWidthPrevious.mfCurrent * fJitterOne)), XMVectorScale(vecToSmoothedNormal, fLength * fLengthScale));
-			XMVECTOR vecPointFour = XMVectorSubtract(XMVectorAdd(vecBaseSmoothedPosition, XMVectorScale(vecLeftNormal, -gSmokeTrailsWidthPrevious.mfCurrent * fJitterTwo)), XMVectorScale(vecToSmoothedNormal, fLength * fLengthScale));
-
-			shaders::QuadLayout& rTrailLayout = ppTrailLayouts[iPlane][spiRendered[iPlane]];
-			XMStoreFloat4A(&f4Position, vecPointOne);
-			rTrailLayout.pf4VerticesTextureCoordinates[0] = {f4Position.x, f4Position.y, 0.0f, 0.0f};
-			XMStoreFloat4A(&f4Position, vecPointTwo);
-			rTrailLayout.pf4VerticesTextureCoordinates[1] = {f4Position.x, f4Position.y, 1.0f, 0.0f};
-			XMStoreFloat4A(&f4Position, vecPointThree);
-			rTrailLayout.pf4VerticesTextureCoordinates[2] = {f4Position.x, f4Position.y, 0.0f, 1.0f};
-			XMStoreFloat4A(&f4Position, vecPointFour);
-			rTrailLayout.pf4VerticesTextureCoordinates[3] = {f4Position.x, f4Position.y, 1.0f, 1.0f};
-
-			float fQuantity = fIntensity * gSmokeTrailsQuantity.mfCurrent / fLengthScale * pfPlaneWeights[j];
-			rTrailLayout.pf4Parameters[0] = {fQuantity, 1.0f, 0.0f, 0.0f};
-			rTrailLayout.pf4Parameters[1] = {fQuantity, 1.0f, 0.0f, 0.0f};
-			rTrailLayout.pf4Parameters[2] = {fQuantity, 0.0f, 0.0f, 0.0f};
-			rTrailLayout.pf4Parameters[3] = {fQuantity, 0.0f, 0.0f, 0.0f};
-
-			rTrailLayout.f4Parameters = {};
-			rTrailLayout.uiColor = static_cast<uint32_t>(rType.iColor);
-
-			++spiRendered[iPlane];
+			continue;
 		}
+		XMVECTOR vecToSmoothedNormal = XMVector3Normalize(vecToSmoothed);
+
+		XMVECTOR vecLeftNormal = XMVector3Normalize(XMVector3Cross(vecToSmoothedNormal, XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f)));
+
+		XMVECTOR vecPointOne = XMVectorAdd(vecBasePosition, XMVectorScale(vecLeftNormal, gSmokeTrailsWidthCurrent.mfCurrent * fWidth));
+		XMVECTOR vecPointTwo = XMVectorAdd(vecBasePosition, XMVectorScale(vecLeftNormal, -gSmokeTrailsWidthCurrent.mfCurrent * fWidth));
+
+		XMVECTOR vecPointThree = XMVectorSubtract(XMVectorAdd(vecBaseSmoothedPosition, XMVectorScale(vecLeftNormal, gSmokeTrailsWidthPrevious.mfCurrent * fJitterOne)), XMVectorScale(vecToSmoothedNormal, fLength * fLengthScale));
+		XMVECTOR vecPointFour = XMVectorSubtract(XMVectorAdd(vecBaseSmoothedPosition, XMVectorScale(vecLeftNormal, -gSmokeTrailsWidthPrevious.mfCurrent * fJitterTwo)), XMVectorScale(vecToSmoothedNormal, fLength * fLengthScale));
+
+		shaders::QuadLayout& rTrailLayout = pTrailLayouts[siRendered];
+		XMStoreFloat4A(&f4Position, vecPointOne);
+		rTrailLayout.pf4VerticesTextureCoordinates[0] = {f4Position.x, f4Position.y, 0.0f, 0.0f};
+		XMStoreFloat4A(&f4Position, vecPointTwo);
+		rTrailLayout.pf4VerticesTextureCoordinates[1] = {f4Position.x, f4Position.y, 1.0f, 0.0f};
+		XMStoreFloat4A(&f4Position, vecPointThree);
+		rTrailLayout.pf4VerticesTextureCoordinates[2] = {f4Position.x, f4Position.y, 0.0f, 1.0f};
+		XMStoreFloat4A(&f4Position, vecPointFour);
+		rTrailLayout.pf4VerticesTextureCoordinates[3] = {f4Position.x, f4Position.y, 1.0f, 1.0f};
+
+		float fQuantity = fIntensity * gSmokeTrailsQuantity.mfCurrent / fLengthScale;
+		rTrailLayout.pf4Parameters[0] = {fQuantity, 1.0f, 0.0f, 0.0f};
+		rTrailLayout.pf4Parameters[1] = {fQuantity, 1.0f, 0.0f, 0.0f};
+		rTrailLayout.pf4Parameters[2] = {fQuantity, 0.0f, 0.0f, 0.0f};
+		rTrailLayout.pf4Parameters[3] = {fQuantity, 0.0f, 0.0f, 0.0f};
+
+		++siRendered;
 	}
 }
 
@@ -154,12 +126,9 @@ void SmokeTrailsInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
 {
 	if constexpr (kbProfiling)
 	{
-		gpProfileManager->GetCpuCounter(kCpuCounterSmokeTrailsRendered).iCount = std::ranges::fold_left(spiRendered, 0i64, std::plus {});
+		gpProfileManager->GetCpuCounter(kCpuCounterSmokeTrailsRendered).iCount = siRendered;
 	}
-	for (int64_t i = 0; i < gpFlightPlanes->Count(); ++i)
-	{
-		gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineSmoke].at(DynamicPipelines::FlightPlaneDepositKey(kuiCrc, i))->WriteIndirectBuffer(iCommandBuffer, gSmokeEnabled.Get<bool>() ? spiRendered[i] : 0);
-	}
+	gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineSmoke].at(kuiCrc)->WriteIndirectBuffer(iCommandBuffer, gSmokeEnabled.Get<bool>() ? siRendered : 0);
 }
 
 } // namespace engine

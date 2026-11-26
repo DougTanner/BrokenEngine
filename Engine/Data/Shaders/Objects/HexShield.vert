@@ -88,10 +88,10 @@ void main()
 	}
 	else
 	{
-		// Eye-line intersection with the refreshing lighting layer's flight plane, the plane this pass deposits into
-		// (unclamped, unlike FlightPlanePosition which is a no-op above the plane)
+		// Eye-line intersection with the base flight plane, the plane this pass deposits into
+		// (unclamped, unlike BaseHeightPosition which is a no-op above the plane)
 		vec3 f3ToEye = ToEyeLine(mainLayout, f3OutPosition);
-		float fT = (globalLayout.pfFlightPlaneHeights[globalLayout.uiLightingRefreshLayer] - f3OutPosition.z) / f3ToEye.z;
+		float fT = (globalLayout.fBaseHeight - f3OutPosition.z) / f3ToEye.z;
 		vec3 f3BasePosition = f3OutPosition + fT * f3ToEye;
 		vec2 f2VisibleAreaPosition = WorldToVisibleArea(f3BasePosition, globalLayout.lightingAreaToUv);
 		gl_Position = vec4(vec2(-1.0f + 2.0f * f2VisibleAreaPosition.x, 1.0f - 2.0f * f2VisibleAreaPosition.y), 0.0f, 1.0f);

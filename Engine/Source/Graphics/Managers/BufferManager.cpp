@@ -523,38 +523,30 @@ void BufferManager::CreateSmokeHierarchicalBuffers()
 {
 	DestroySmokeHierarchicalBuffers();
 
-	// Every plane's smoke textures share plane 0's extent, so one size serves every plane's buffers.
-	int64_t iMaxWidth = gpTextureManager->mRenderTargetTextures.mSmokeTexturesOne[0].mInfo.vkExtent3D.width;
-	int64_t iMaxHeight = gpTextureManager->mRenderTargetTextures.mSmokeTexturesOne[0].mInfo.vkExtent3D.height;
-	int64_t iTilesX = TileCount(iMaxWidth);
-	int64_t iTilesY = TileCount(iMaxHeight);
+	int64_t iWidth = gpTextureManager->mRenderTargetTextures.mSmokeTextureOne.mInfo.vkExtent3D.width;
+	int64_t iHeight = gpTextureManager->mRenderTargetTextures.mSmokeTextureOne.mInfo.vkExtent3D.height;
+	int64_t iTilesX = TileCount(iWidth);
+	int64_t iTilesY = TileCount(iHeight);
 	int64_t iTotalTiles = iTilesX * iTilesY;
 
 	// Bit-packed occupancy: 1 bit per tile, packed into uint32s
 	int64_t iOccupancyWordCount = (iTotalTiles + 31) / 32;
 	miSmokeOccupancyBufferSize = iOccupancyWordCount * static_cast<int64_t>(sizeof(uint32_t));
-	int64_t iPlaneCount = gpFlightPlanes->Count();
-	for (int64_t i = 0; i < iPlaneCount; ++i)
+	for (int64_t i = 0; i < 2; ++i)
 	{
-		for (int64_t j = 0; j < 2; ++j)
-		{
-			Buffer::CreateBuffer(j == 0 ? "SmokeOccupancyA" : "SmokeOccupancyB", miSmokeOccupancyBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, mpSmokeOccupancyVkBuffers[i][j], mpSmokeOccupancyVmaAllocations[i][j]);
-		}
+		Buffer::CreateBuffer(i == 0 ? "SmokeOccupancyA" : "SmokeOccupancyB", miSmokeOccupancyBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, mpSmokeOccupancyVkBuffers[i], mpSmokeOccupancyVmaAllocations[i]);
 	}
 
-	// Occupancy describes persistent texture contents, so every buffer must start empty alongside the
+	// Occupancy describes persistent texture contents, so both buffers must start empty alongside the
 	// creation-time smoke texture clears. The one-shot barrier also makes the fills visible to the first spread.
 	OneShotCommandBuffer oneShotCommandBuffer;
-	VkBufferMemoryBarrier pVkSmokeOccupancyInitializationBarriers[shaders::kiMaxFlightPlanes * 2] {};
-	for (int64_t i = 0; i < iPlaneCount; ++i)
+	VkBufferMemoryBarrier pVkSmokeOccupancyInitializationBarriers[2] {};
+	for (int64_t i = 0; i < 2; ++i)
 	{
-		for (int64_t j = 0; j < 2; ++j)
-		{
-			vkCmdFillBuffer(oneShotCommandBuffer.mVkCommandBuffer, mpSmokeOccupancyVkBuffers[i][j], 0, static_cast<VkDeviceSize>(miSmokeOccupancyBufferSize), 0);
-			pVkSmokeOccupancyInitializationBarriers[i * 2 + j] = Buffer::WholeBufferBarrier(VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT, mpSmokeOccupancyVkBuffers[i][j]);
-		}
+		vkCmdFillBuffer(oneShotCommandBuffer.mVkCommandBuffer, mpSmokeOccupancyVkBuffers[i], 0, static_cast<VkDeviceSize>(miSmokeOccupancyBufferSize), 0);
+		pVkSmokeOccupancyInitializationBarriers[i] = Buffer::WholeBufferBarrier(VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT, mpSmokeOccupancyVkBuffers[i]);
 	}
-	vkCmdPipelineBarrier(oneShotCommandBuffer.mVkCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, static_cast<uint32_t>(iPlaneCount * 2), pVkSmokeOccupancyInitializationBarriers, 0, nullptr);
+	vkCmdPipelineBarrier(oneShotCommandBuffer.mVkCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, static_cast<uint32_t>(std::size(pVkSmokeOccupancyInitializationBarriers)), pVkSmokeOccupancyInitializationBarriers, 0, nullptr);
 	oneShotCommandBuffer.Execute();
 
 	// Active tile list: VkDispatchIndirectCommand (12 bytes) + packed tile indices (4 bytes each)
@@ -565,16 +557,13 @@ void BufferManager::CreateSmokeHierarchicalBuffers()
 
 void BufferManager::DestroySmokeHierarchicalBuffers()
 {
-	for (int64_t i = 0; i < shaders::kiMaxFlightPlanes; ++i)
+	for (int64_t i = 0; i < 2; ++i)
 	{
-		for (int64_t j = 0; j < 2; ++j)
+		if (mpSmokeOccupancyVkBuffers[i] != VK_NULL_HANDLE)
 		{
-			if (mpSmokeOccupancyVkBuffers[i][j] != VK_NULL_HANDLE)
-			{
-				vmaDestroyBuffer(gpDeviceManager->mpAllocator, mpSmokeOccupancyVkBuffers[i][j], mpSmokeOccupancyVmaAllocations[i][j]);
-				mpSmokeOccupancyVkBuffers[i][j] = VK_NULL_HANDLE;
-				mpSmokeOccupancyVmaAllocations[i][j] = VK_NULL_HANDLE;
-			}
+			vmaDestroyBuffer(gpDeviceManager->mpAllocator, mpSmokeOccupancyVkBuffers[i], mpSmokeOccupancyVmaAllocations[i]);
+			mpSmokeOccupancyVkBuffers[i] = VK_NULL_HANDLE;
+			mpSmokeOccupancyVmaAllocations[i] = VK_NULL_HANDLE;
 		}
 	}
 	miSmokeOccupancyBufferSize = 0;

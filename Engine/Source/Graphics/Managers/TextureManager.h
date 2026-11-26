@@ -114,8 +114,9 @@ public:
 		data::kTexturesWaterBC7FoamWhiteFinepngCrc,
 		data::kTexturesWaterBC7FoamWhiteBroadpngCrc,
 		data::kTexturesWaterBC7FoamAmbientCGWhitepngCrc,
+		data::kTexturesWaterBC7FoamTurbulentBandspngCrc,
 	};
-	static inline constexpr std::string_view kpWaterFoamNames[] {"White Fine", "White Broad", "ambientCG White"};
+	static inline constexpr std::string_view kpWaterFoamNames[] {"White Fine", "White Broad", "ambientCG White", "Turbulent Bands"};
 	static_assert(std::size(kpWaterFoamCrcs) == kiWaterFoamTextureCount);
 	static_assert(std::size(kpWaterFoamNames) == kiWaterFoamTextureCount);
 

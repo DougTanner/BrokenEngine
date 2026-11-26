@@ -31,17 +31,18 @@ may feed simulation state.
 - `CommandBufferRecordMain::Record` includes the lighting deposit and spread
   passes only when `gLightingEnabled` is on; those recorded passes clear their
   respective attachments by load op on each world frame with `gLightingEnabled`
-  on (including frames that skip a layer refresh), so no clear pass is recorded.
-- World lighting has one layer per flight plane, each keeping combine outputs,
-  history, area latch, and reset flag; one shared deposit-to-history-copy chain
-  refreshes at most one layer per frame (`giLightingRefreshLayer`, `Render.h`).
-  The refreshing layer advances its areas and publishes full-texture work; other
-  layers keep theirs, and a skipped enabled frame publishes zero work (load
-  clears above still run). Published UVs stay finite across reset-pending and
-  disabled frames (`PopulateLightingParameters` in `LightingUniforms.cpp` owns
-  snapped-area fallback, pending-reset handling, and `siPendingLayer`
-  next-frame priority). Lighting (`../../../Data/Shaders/Lighting/AGENTS.md`
-  `## Pipeline Contracts`) owns the reset and history-copy sequence.
+  on (including frames that skip a lighting refresh), so no clear pass is
+  recorded.
+- World lighting has one layer at the base flight plane height, keeping its
+  combine outputs, history, area latch, and reset flag; one
+  deposit-to-history-copy chain refreshes it on scheduled or forced frames
+  (`gbLightingRefreshFrame`, `Render.h`). A refresh advances its areas and
+  publishes full-texture work; a skipped enabled frame keeps its held areas and
+  publishes zero work (load clears above still run). Published UVs stay finite
+  across reset-pending and disabled frames (`PopulateLightingParameters` in
+  `LightingUniforms.cpp` owns snapped-area fallback and pending-reset handling).
+  Lighting (`../../../Data/Shaders/Lighting/AGENTS.md` `## Pipeline Contracts`)
+  owns the reset and history-copy sequence.
 - The terrain shadow elevation, source, blur, temporal, and history-copy chain
   shares one update interval, using the same current/previous area latch as
   lighting (`TemporalAreaLatch`, `Render.h`). A refresh runs on the cadence, on
@@ -63,24 +64,22 @@ may feed simulation state.
 - The lighting, terrain shadow, object shadow, and smoke schedules read
   `Graphics::miFrameCounter`, which the residency step
   (`Graphics::UpdateFrameResidency`) advances once per frame, before
-  `RenderFrameGlobal` on a world frame. Lighting and smoke share one rule: with
-  cadence N and C layers or planes, a frame is scheduled when
-  `miFrameCounter % N == 0` and schedules index `(miFrameCounter / N) % C` —
-  lighting that layer, smoke that plane with `gSmokeLayerStagger` on and every
-  plane with it off. Terrain shadows refresh when
+  `RenderFrameGlobal` on a world frame. `PopulateLightingParameters`
+  (`LightingUniforms.cpp`) computes the scheduled lighting refresh from
+  `miFrameCounter` and `gLightingUpdateCadence`, and `RenderSmokeGlobal`
+  (`SmokeUniforms.cpp`) computes the scheduled smoke refresh from
+  `miFrameCounter` and `gSmokeUpdateCadence`. Terrain shadows refresh when
   `(miFrameCounter + 1) % shadowCadence == 0` and object shadows when
   `miFrameCounter % objectShadowCadence` equals `1 % objectShadowCadence`.
   Forced refreshes — resets, first use, and a teleport — stay outside the
   schedule. A teleport is the live visible area's center lying outside the area
-  a chain's retained texture was last written for (each lighting layer's and
-  smoke plane's own), tested after the `RetainedAreaBasis` shift; a view edge
-  that only pans past that area samples outside it until the next refresh. A
-  lighting reset or first use needs both layers, and a teleport each layer
-  whose area the center left.
+  a chain's retained texture was last written for, tested after the
+  `RetainedAreaBasis` shift; a view edge that only pans past that area samples
+  outside it until the next refresh.
 - `Graphics::Refresh` is the sole caller of `gLightingEnabled.Changed<bool>()`.
   With Lighting off, `CommandBufferRecordMain::Record` omits lighting passes
-  (visible sprites and shields still render) and frames mark no
-  `giLightingRefreshLayer`. `RenderTargetTextures::ClearLightingTextures()`
+  (visible sprites and shields still render) and frames clear
+  `gbLightingRefreshFrame`. `RenderTargetTextures::ClearLightingTextures()`
   (`../Managers/RenderTargetTextures.h`), called from `CreateLightingTextures()`
   and `Graphics::Create()` on a surviving-texture disable, owns target clear
   coverage, values, and `gbLightingTemporalReset` rearming.
@@ -159,21 +158,18 @@ may feed simulation state.
   enable, disable, recreate, and occupancy paths must clear or drain stale tiles
   without relying on command-buffer re-recording.
 - GameBase publishes gameplay pause before Global. Paused smoke skips cadence
-  and teleport refreshes while retaining its pending steps; held areas still
-  follow camera-cell basis shifts. Clear, disable, and recreation paths retain
+  and teleport refreshes while retaining its pending steps; its held area still
+  follows camera-cell basis shifts. Clear, disable, and recreation paths retain
   precedence. Wind publishes zero delta and holds its accumulated time, but
   keeps ping-pong and occupancy rebuilding active. All smoke and wind producers
   publish zero deposit counts. Resume excludes paused frames and time.
-- Each flight plane's smoke keeps its own held area, step count, and decay. With
-  `gSmokeLayerStagger` on, a scheduled frame (`## Ordering and Publication`)
-  refreshes only its scheduled plane, which steps by its unpaused frames since
-  its last refresh; off, every live plane refreshes on each scheduled frame. A
-  smoke clear and the disabled path refresh every plane, and a teleport
-  (`## Ordering and Publication`) refreshes plane k early. A skipped plane
-  publishes its held area as both current and previous and zeroes its dilate
-  dispatch, so its next refresh remaps held to current. Wind and wind deposits
-  read plane 0's area pair, so wind's remap is the identity on frames plane 0
-  skips.
+- Smoke keeps one held area, step count, and decay for its single field. A
+  scheduled frame (`## Ordering and Publication`) or teleport refreshes the
+  field, stepping by the unpaused frames since its last refresh; a smoke clear
+  and the disabled path also refresh it. A skipped frame publishes the held
+  area as both current and previous and zeroes the dilate dispatch, so the next
+  refresh remaps held to current (`RenderSmokeGlobal` in `SmokeUniforms.cpp`;
+  see `../../../Data/Shaders/Wind/AGENTS.md` for wind's use of the pair).
 
 ## Area Roles
 

@@ -11,6 +11,11 @@
 namespace toolcli
 {
 
+bool IsValidAgentCli(std::string_view value)
+{
+	return value == "claude" || value == "codex" || value == "agy";
+}
+
 bool Utf8PathLess(std::wstring_view left, std::wstring_view right)
 {
 	return WideToUtf8(left) < WideToUtf8(right);
@@ -118,9 +123,18 @@ static bool ParsePlanBytes(Plan& rPlan)
 				rPlan.bDependenciesKnown = true;
 			}
 		}
-		if (metadata.size() != 2 || !metadata.contains("createdUtc") || !metadata["createdUtc"].is_string() || !metadata.contains("dependsOn") || !metadata["dependsOn"].is_array())
+		bool bHasAgentCli = metadata.is_object() && metadata.contains("agentCli");
+		if (bHasAgentCli && metadata["agentCli"].is_string())
 		{
-			rPlan.diagnostic = "metadata requires exactly createdUtc and dependsOn";
+			std::string agentCli = metadata["agentCli"].get<std::string>();
+			if (IsValidAgentCli(agentCli))
+			{
+				rPlan.agentCli = std::move(agentCli);
+			}
+		}
+		if (!metadata.is_object() || std::cmp_not_equal(metadata.size(), bHasAgentCli ? 3 : 2) || !metadata.contains("createdUtc") || !metadata["createdUtc"].is_string() || !metadata.contains("dependsOn") || !metadata["dependsOn"].is_array())
+		{
+			rPlan.diagnostic = "metadata requires createdUtc, dependsOn, and optional agentCli";
 			return false;
 		}
 		int64_t iTicks = 0;
@@ -138,6 +152,11 @@ static bool ParsePlanBytes(Plan& rPlan)
 		if (!std::is_sorted(rPlan.dependencies.begin(), rPlan.dependencies.end(), Utf8PathLess) || std::adjacent_find(rPlan.dependencies.begin(), rPlan.dependencies.end()) != rPlan.dependencies.end())
 		{
 			rPlan.diagnostic = "dependencies must be unique ordinal-sorted";
+			return false;
+		}
+		if (bHasAgentCli && rPlan.agentCli.empty())
+		{
+			rPlan.diagnostic = "agentCli must be claude, codex, or agy";
 			return false;
 		}
 		rPlan.bValid = true;
@@ -167,35 +186,19 @@ static bool IsDirectoryGuidance(std::wstring_view path)
 	return filename == L"AGENTS.md";
 }
 
-// Guidance metadata is inert in both directions: never executable, and never another Plan's dependency child, so
-// dropping its outgoing edges keeps it out of terminal preparation's child scans.  The entry itself stays in the Plan
-// map because inbound edges block on membership alone, which is what stops a dependent plan going stale.  A tracked
-// file absent from the worktree keeps its "missing" classification, which the baseline comparison needs to erase it.
+// Guidance is never executable; keeping its empty dependency list marked known lets RunTerminal skip it without
+// failing on unknown dependencies, and keeping it in the Plan map lets MarkCycles exclude any Plan that depends on it.
 static void ClassifyDirectoryGuidance(Plan& rPlan)
 {
-	if (!IsDirectoryGuidance(rPlan.path))
-	{
-		return;
-	}
-	if (rPlan.diagnostic == "missing")
-	{
-		return;
-	}
 	rPlan.bValid = false;
 	rPlan.diagnostic = "manual";
-	rPlan.dependencies.clear();
 	rPlan.bDependenciesKnown = true;
 }
 
 // Every plan document carries byte-zero metadata, so a marker-less one is a defect rather than a reference file.
-// Guidance is the one document that is never a plan, at any depth, so it stays silent instead of being reported.
 static void ReportInvalidMetadata(const Plan& rPlan, nlohmann::json& rDiagnostics)
 {
-	if (IsDirectoryGuidance(rPlan.path))
-	{
-		return;
-	}
-	std::string message = rPlan.diagnostic == "manual" ? "plan document requires byte-zero broken-engine-plan/v1 metadata" : rPlan.diagnostic;
+	std::string message = rPlan.diagnostic == "manual" ? "plan document requires byte-zero broken-engine-plan/v2 metadata" : rPlan.diagnostic;
 	rDiagnostics.push_back({{"plan", WideToUtf8(rPlan.path)}, {"code", "invalid-metadata"}, {"message", std::move(message)}});
 }
 
@@ -225,11 +228,25 @@ bool BuildPlans(const std::filesystem::path& rRepository, std::wstring_view pref
 		Plan plan {};
 		plan.path = path;
 		plan.diskPath = rRepository / repositoryPath;
-		ParsePlan(plan);
-		ClassifyDirectoryGuidance(plan);
-		if (!plan.bValid && plan.diagnostic != "missing")
+		if (IsDirectoryGuidance(plan.path))
 		{
-			ReportInvalidMetadata(plan, rDiagnostics);
+			std::error_code error;
+			if (!std::filesystem::exists(ExtendedLengthPath(plan.diskPath), error) && !error)
+			{
+				plan.diagnostic = "missing";
+			}
+			else
+			{
+				ClassifyDirectoryGuidance(plan);
+			}
+		}
+		else
+		{
+			ParsePlan(plan);
+			if (!plan.bValid && plan.diagnostic != "missing")
+			{
+				ReportInvalidMetadata(plan, rDiagnostics);
+			}
 		}
 		rPlans.emplace(std::move(path), std::move(plan));
 	}
@@ -271,19 +288,25 @@ bool BuildPlansAtCommit(const std::filesystem::path& rRepository, std::wstring_v
 		{
 			continue;
 		}
-		std::optional<std::string> optionalBytes = RunGit({L"-C", rRepository.wstring(), L"show", std::wstring(commit) + L":" + repositoryPath});
-		if (!optionalBytes)
-		{
-			return false;
-		}
 		Plan plan {};
 		plan.path = path;
-		plan.bytes = std::move(*optionalBytes);
-		ParsePlanBytes(plan);
-		ClassifyDirectoryGuidance(plan);
-		if (!plan.bValid)
+		if (IsDirectoryGuidance(plan.path))
 		{
-			ReportInvalidMetadata(plan, rDiagnostics);
+			ClassifyDirectoryGuidance(plan);
+		}
+		else
+		{
+			std::optional<std::string> optionalBytes = RunGit({L"-C", rRepository.wstring(), L"show", std::wstring(commit) + L":" + repositoryPath});
+			if (!optionalBytes)
+			{
+				return false;
+			}
+			plan.bytes = std::move(*optionalBytes);
+			ParsePlanBytes(plan);
+			if (!plan.bValid)
+			{
+				ReportInvalidMetadata(plan, rDiagnostics);
+			}
 		}
 		rPlans.emplace(std::move(path), std::move(plan));
 	}

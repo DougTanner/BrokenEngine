@@ -23,9 +23,22 @@ static bool GetClientOwnedEntityPosition(const Frame& rFrame, XMVECTOR& rVecPosi
 	return true;
 }
 
-static bool GetClientSnapshotPosition(XMVECTOR& rVecPosition, int64_t& riTick)
+static bool GetClientSnapshotPosition(engine::GridCoord& rFocusedCoordinate, XMVECTOR& rVecPosition, int64_t& riTick)
 {
-	auto it = gpGame->mCells.find(gpGame->mClientGridCoordinate);
+	engine::GlobalId focusedGlobalIdentifier = gpGame->ClientOwnedEntityIdentifier();
+	if (focusedGlobalIdentifier.iValue == 0)
+	{
+		return false;
+	}
+
+	rFocusedCoordinate = gpGame->mClientGridCoordinate;
+	auto ownedIt = std::ranges::find(gpGame->mClientOwnedEntities, focusedGlobalIdentifier, &engine::OwnedEntity::globalId);
+	if (ownedIt != gpGame->mClientOwnedEntities.end())
+	{
+		rFocusedCoordinate = ownedIt->coord;
+	}
+
+	auto it = gpGame->mCells.find(rFocusedCoordinate);
 	if (it == gpGame->mCells.end())
 	{
 		return false;
@@ -34,18 +47,18 @@ static bool GetClientSnapshotPosition(XMVECTOR& rVecPosition, int64_t& riTick)
 	{
 		return false;
 	}
-	const Frame& rFrame = gpGame->RenderFrame(gpGame->mClientGridCoordinate);
+	const Frame& rFrame = gpGame->RenderFrame(rFocusedCoordinate);
 	riTick = rFrame.interpolate.iTick;
 	return GetClientOwnedEntityPosition(rFrame, rVecPosition);
 }
 
 // A full replay can leave the ring without history before its confirmed frame, so the replayed timeline's frame at
-// iTick is looked up in the client coord's replay stack rather than the ring.
-static bool GetClientReplayedPosition(std::span<const engine::CoordWork> works, int64_t iTick, XMVECTOR& rVecPosition)
+// iTick is looked up in the focused entity's coord replay stack rather than the ring.
+static bool GetClientReplayedPosition(std::span<const engine::CoordWork> works, engine::GridCoord focusedCoordinate, int64_t iTick, XMVECTOR& rVecPosition)
 {
 	for (const engine::CoordWork& rWork : works)
 	{
-		if (rWork.coord != gpGame->mClientGridCoordinate)
+		if (rWork.coord != focusedCoordinate || !(rWork.scratch.flags & engine::ReconcileScratchFlags::kReplayed))
 		{
 			continue;
 		}
@@ -78,9 +91,10 @@ engine::ReconcileDesyncInfo ClientReconciler::Run()
 	// Capture the client position at the render source tick for visual error smoothing, so the post-replay read
 	// compares the same tick and excludes the ticks this dispatch commits. Read before the dispatch, which is the
 	// single engine entry point; the value goes unused when no coord is eligible.
+	engine::GridCoord preWritebackCoordinate {};
 	XMVECTOR vecPreWritebackPosition {};
 	int64_t iPreWritebackTick = -1;
-	bool bCapturedPrePosition = GetClientSnapshotPosition(vecPreWritebackPosition, iPreWritebackTick);
+	bool bCapturedPrePosition = GetClientSnapshotPosition(preWritebackCoordinate, vecPreWritebackPosition, iPreWritebackTick);
 
 	engine::ReconcileDispatchResult dispatch = mDispatcher.Run(inputs);
 
@@ -95,18 +109,22 @@ engine::ReconcileDesyncInfo ClientReconciler::Run()
 	}
 
 	// Owned-entity transfer migration updates previous client armor.
-	ReconcileUpdateClientState(dispatch.activeWorks, dispatch.bAnyFullReplay, confirmedClientState);
+	bool bAnyWorkReplayed = std::ranges::any_of(dispatch.activeWorks, [](const engine::CoordWork& rWork)
+	{
+		return static_cast<bool>(rWork.scratch.flags & engine::ReconcileScratchFlags::kReplayed);
+	});
+	ReconcileUpdateClientState(dispatch.activeWorks, bAnyWorkReplayed, confirmedClientState);
 
-	if (bCapturedPrePosition && dispatch.bAnyFullReplay)
+	if (bCapturedPrePosition)
 	{
 		XMVECTOR vecPostWritebackPosition {};
-		if (GetClientReplayedPosition(dispatch.activeWorks, iPreWritebackTick, vecPostWritebackPosition))
+		if (GetClientReplayedPosition(dispatch.activeWorks, preWritebackCoordinate, iPreWritebackTick, vecPostWritebackPosition))
 		{
 			XMVECTOR vecError = XMVectorSubtract(vecPreWritebackPosition, vecPostWritebackPosition);
 			float fTotal = engine::gpCamera->AddVisualErrorOffset(vecError);
 			if (fTotal > engine::CameraBase::kfVisualErrorMaxDistance)
 			{
-				LOG(kNetwork, kWarning, "Visual error offset reset (exceeded max) Coord: ({},{}) Delta: {} Max: {}", gpGame->mClientGridCoordinate.iQ, gpGame->mClientGridCoordinate.iR, common::Wb(XMVectorGetX(XMVector3Length(vecError)), 3), common::Wb(engine::CameraBase::kfVisualErrorMaxDistance, 1));
+				LOG(kNetwork, kWarning, "Visual error offset reset (exceeded max) Coord: ({},{}) Delta: {} Max: {}", preWritebackCoordinate.iQ, preWritebackCoordinate.iR, common::Wb(XMVectorGetX(XMVector3Length(vecError)), 3), common::Wb(engine::CameraBase::kfVisualErrorMaxDistance, 1));
 			}
 			else
 			{
@@ -119,7 +137,7 @@ engine::ReconcileDesyncInfo ClientReconciler::Run()
 					int64_t iCurrentTick = gpGame->miTickCounter;
 					if (fChange > 0.15f && (iCurrentTick - miLastVisualErrorLogTick > 32))
 					{
-						LOG(kNetwork, kDebug, "Visual error offset Coord: ({},{}) Delta: {} Accumulated: {}", gpGame->mClientGridCoordinate.iQ, gpGame->mClientGridCoordinate.iR, common::Wb(fDelta, 3), common::Wb(fTotal, 3));
+						LOG(kNetwork, kDebug, "Visual error offset Coord: ({},{}) Delta: {} Accumulated: {}", preWritebackCoordinate.iQ, preWritebackCoordinate.iR, common::Wb(fDelta, 3), common::Wb(fTotal, 3));
 						mfLastLoggedVisualErrorDelta = fDelta;
 						miLastVisualErrorLogTick = iCurrentTick;
 					}

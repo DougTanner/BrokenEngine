@@ -12,7 +12,9 @@ namespace engine
 {
 
 struct CellStaticData;
+#if defined(BT_CLIENT)
 class Wrapper;
+#endif
 
 } // namespace engine
 
@@ -24,9 +26,11 @@ struct BlastersType
 	XMFLOAT2 f2Size {0.11f, 1.5f};
 	int64_t iAreaLightTypeIndex = 0;
 	int64_t iPointLightTypeIndex = 0xFF; // 0xFF = use area light
+#if defined(BT_CLIENT)
 	engine::Wrapper* pWindTrailIntensityWrapper = nullptr;
 	engine::Wrapper* pWindTrailWidthWrapper = nullptr;
 	engine::Wrapper* pWindTrailLengthMultiplierWrapper = nullptr;
+#endif
 };
 
 struct BlastersInterpolate : public engine::Collection<BlastersInterpolate>, public engine::TypeRegistry<BlastersType>

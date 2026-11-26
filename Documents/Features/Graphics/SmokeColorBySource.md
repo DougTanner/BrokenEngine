@@ -6,7 +6,7 @@ or a new smoke source (burning wrecks, engine damage) wants its own look.
 
 ## Context
 
-Smoke is a client-only 2D density field per flight plane
+Smoke is a single client-only 2D density field
 (`Engine/Data/Shaders/Smoke/AGENTS.md`): one `R16_SFLOAT` channel per texel
 (`shaders::kVkFormatSmoke`), deposited additively through `Smoke.frag` by the
 `SmokeTrails` and `Puffs` collections, advected and diffused by the two spread
@@ -27,9 +27,10 @@ through `SmokeTrails`, each under its own registered trail type; explosions,
 blaster terrain hits (`BlastersUpdate.cpp`), and omni impacts
 (`OmnisCombat.cpp`) deposit through `Puffs`. A per-type color already exists
 but never reaches the field: `SmokeTrailsType::iColor` and `PuffsType::uiColor`,
-all registered as `0xFFFFFFFF`, are copied into each instance's `uiColor`
-(`QuadLayout`, `AxisAlignedQuadLayout`), but the deposit vertex shaders do not
-forward it and `Smoke.frag` writes density only.
+all registered as `0xFFFFFFFF`, never reach `Smoke.frag` — `PuffsRender.cpp`
+copies `PuffsType::uiColor` into `AxisAlignedQuadLayout::uiColor`, while
+`SmokeTrailsRender.cpp` leaves `QuadLayout::uiColor` unset, the deposit vertex
+shaders do not forward `uiColor`, and `Smoke.frag` writes density only.
 
 ## Design
 
@@ -47,9 +48,11 @@ forward it and `Smoke.frag` writes density only.
     trails from puffs; missile exhaust and explosion trails both use
     `SmokeTrails`, so it cannot make exhaust white and explosion smoke dark on
     its own.
-  - Per type: derive shade from the existing type color by forwarding the
-    instance `uiColor` to `Smoke.frag`. Separates missile trails from explosion
-    trails with no new collection member.
+  - Per type: derive shade from the existing type color by populating
+    `QuadLayout::uiColor` in `SmokeTrailsRender.cpp` (matching
+    `PuffsRender.cpp`) and forwarding the instance `uiColor` to `Smoke.frag`.
+    Separates missile trails from explosion trails with no new collection
+    member.
   - Per instance: a new collection member, for sources that share one type (a
     missile trail versus a burning-wreck trail).
 - **Composite.** Every compositing reader of the field (`AddSmoke`, and the
@@ -78,8 +81,6 @@ forward it and `Smoke.frag` writes density only.
 - Client-only rendering; smoke is not CRC'd, so no determinism exposure.
 - A second channel doubles the smoke textures' memory and the spread passes'
   texture bandwidth.
-- Each flight plane owns its own smoke textures, so the shade channel goes into
-  every plane's textures.
 - References:
   - Fedkiw, Stam, Jensen, "Visual Simulation of Smoke" (SIGGRAPH 2001),
     https://www.graphics.stanford.edu/papers/smoke/ — vorticity confinement

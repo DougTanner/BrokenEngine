@@ -3,8 +3,8 @@
 Read this reference when a `/next-plan` run meets one of the rare branches
 below: a deferral, a runtime criterion only rendered pixels can settle, a
 retained-work resume, a targeted `none-available` result naming another
-session's claim, or changes requested at the landing confirmation. The workflow
-stays in [`/next-plan`](../SKILL.md).
+session's claim or an `agentCliLock`, or changes requested at the landing
+confirmation. The workflow stays in [`/next-plan`](../SKILL.md).
 
 ## Deferral
 
@@ -66,6 +66,16 @@ plain `git status`. Taking the Plan over, on the user instruction
 `pwsh -NoProfile -File .agents/skills/next-plan/scripts/Invoke-NextPlanClaim.ps1 -Plan '<path>' -UserAuthorizedTakeover`
 That switch is valid only with `-Plan`; nothing else releases another session's
 claim.
+
+## Agent CLI override
+
+On a targeted `none-available` result with `agentCliLock`, report the Plan and
+`agentCliLock` CLI and ask to override before following `nextAction`. If
+declined, follow `nextAction`. On explicit user confirmation
+([`../SKILL.md`](../SKILL.md) `## Rules`), rerun step 3's claim with canonical
+`-Plan` (never bare or partial) and `-AllowAgentCliMismatch`. If also peer-held,
+`-UserAuthorizedTakeover` alone keeps the peer's claim and returns
+`agentCliLock`; pass both switches once both are confirmed.
 
 ## Changes requested at landing
 

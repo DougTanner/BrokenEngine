@@ -1,5 +1,7 @@
 #pragma once
 
+#if defined(BT_CLIENT)
+
 #include "HeightLerpWrapperQuartet.h"
 #include "WrapperBase.h"
 
@@ -33,3 +35,5 @@ inline Wrapper gTerrainRockNormalsSizeThree(0.25f, 0.01f, 0.5f);
 inline Wrapper gTerrainRockNormalsBlend(0.7f, 0.0f, 2.0f);
 
 } // namespace engine
+
+#endif // BT_CLIENT

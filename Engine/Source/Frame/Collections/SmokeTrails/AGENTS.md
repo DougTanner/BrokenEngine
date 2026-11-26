@@ -1,8 +1,8 @@
 # SmokeTrails - Owner-Driven Smoke Ribbons
 
-Client-only smoke trails are owner-driven flight-plane ribbons deposited into
-the screen-space smoke simulation. Explosions and game collections own their
-types and lifetimes.
+Client-only smoke trails are owner-driven ribbons deposited into the
+screen-space smoke simulation. Explosions and game collections own their types
+and lifetimes.
 
 ## Invariants
 
@@ -15,9 +15,8 @@ types and lifetimes.
 - New trails briefly suppress length until movement establishes a segment. Trail
   identity is client-local and never crosses a cell boundary, so an owner that
   transfers always starts a fresh trail and takes that suppression again.
-- A trail is weighted between the flight planes bracketing its current height.
-  Both ribbon endpoints project to each weighted plane; width remains
-  perpendicular to the segment on that plane.
+- Both ribbon endpoints project through `ProjectToBaseHeight`; width remains
+  perpendicular to the projected segment.
 - The smoothed tail position column overloads its W component: W == 0 marks a
   slot with no smoothed history yet, so that update copies the owner's position
   instead of easing toward it and W becomes 1 with it. This is a deliberate

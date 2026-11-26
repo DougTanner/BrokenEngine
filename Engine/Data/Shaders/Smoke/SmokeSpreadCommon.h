@@ -1,4 +1,4 @@
-// Sample wind field from the current ping-pong buffer (wind is in UV of smoke plane 0's current area, pf4SmokeAreas[0])
+// Sample wind field from the current ping-pong buffer (wind shares the smoke current area, f4SmokeArea)
 vec2 SmokeWindSample(GlobalLayout globalLayout, sampler2D windTextureSamplerOne, sampler2D windTextureSamplerTwo, vec2 f2WindTextureCoordinate)
 {
 	return globalLayout.fWindTextureIndex < 0.5f ? textureLod(windTextureSamplerOne, f2WindTextureCoordinate, 0.0f).rg : textureLod(windTextureSamplerTwo, f2WindTextureCoordinate, 0.0f).rg;
@@ -8,14 +8,13 @@ vec2 SmokeWindSample(GlobalLayout globalLayout, sampler2D windTextureSamplerOne,
 // f2InputTextureCoordinate:  UV in the previous-refresh smoke texture's coord system (= previous-area UV).
 // f2WorldPosition:  world position of this output texel (computed from the area the texel lies in + output UV).
 // f2WindSample:  current-frame wind velocity at this output texel (SmokeWindSample).
-// iPlane:  this dispatch's flight plane, selecting its step count and decay.
 // Decoupling the input UV, world position, and the wind sample's UV lets the smoke world-area shift AND scale between refreshes.
-vec4 SmokeSpread(GlobalLayout globalLayout, sampler2D textureSampler, sampler2D noiseTextureSampler, vec2 f2InputTextureCoordinate, vec2 f2WorldPosition, vec2 f2WindSample, float fNoiseScale, int iPlane)
+vec4 SmokeSpread(GlobalLayout globalLayout, sampler2D textureSampler, sampler2D noiseTextureSampler, vec2 f2InputTextureCoordinate, vec2 f2WorldPosition, vec2 f2WindSample, float fNoiseScale)
 {
-	float fStepCount = globalLayout.pfSmokeStepCounts[iPlane];
+	float fStepCount = globalLayout.fSmokeStepCount;
 	vec2 f2WindWorldPosition = f2WorldPosition + globalLayout.f2SmokeWindTimeOffset;
 	float fWindNoiseSample = -1.0f + 2.0f * textureLod(noiseTextureSampler, globalLayout.fSmokeWindNoiseScale * fNoiseScale * f2WindWorldPosition, 0.0f).x;
-	float fWindNoise = max(0.0f, globalLayout.pfSmokeWindNoiseQuantities[iPlane] * fWindNoiseSample);
+	float fWindNoise = max(0.0f, globalLayout.fSmokeWindNoiseQuantity * fWindNoiseSample);
 
 	vec2 f2TimeNoise = globalLayout.f2SmokeSwirlTimeOffset;
 	float fSwirlNoiseSampleX = -1.0f + 2.0f * textureLod(noiseTextureSampler, f2TimeNoise + fNoiseScale * f2WorldPosition, 0.0f).x;
@@ -36,11 +35,11 @@ vec4 SmokeSpread(GlobalLayout globalLayout, sampler2D textureSampler, sampler2D 
 	vec2 f2WindAdvection = fHasWind * globalLayout.fWindSmokeAdvection * f2WindRescaled;
 	// Noise-modulated displacement for visual variation (works in gradient fields)
 	vec2 f2WindDisplacement = fStepCount * globalLayout.fWindDisplacementNoiseScale * abs(fWindNoiseSample) * f2WindRescaled;
-	// One refresh advances by every frame since the plane's previous refresh
+	// A normal refresh scales displacement by the unpaused frames since the preceding refresh. Clear and disabled passes use one step.
 	vec2 f2Base = f2InputTextureCoordinate + fStepCount * f2Noise + fStepCount * f2WindAdvection;
 	float fSmokeStayed = textureLod(textureSampler, f2Base, 0.0f).x;
 	float fSmokeMoved = textureLod(textureSampler, f2Base + f2WindDisplacement, 0.0f).x;
-	return globalLayout.pfSmokeDecays[iPlane] * vec4(mix(fSmokeStayed, mix(fSmokeMoved, fSmokeStayed, globalLayout.fWindSmokeRetention), fHasWind));
+	return globalLayout.fSmokeDecay * vec4(mix(fSmokeStayed, mix(fSmokeMoved, fSmokeStayed, globalLayout.fWindSmokeRetention), fHasWind));
 }
 
 // Per-step backward-lookup UV offset from the 2D curl (dP/dy, -dP/dx) of the noise texture read as a world-anchored

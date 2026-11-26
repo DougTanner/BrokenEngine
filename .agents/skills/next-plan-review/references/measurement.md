@@ -6,15 +6,12 @@ routing for [`/next-plan-review`](../SKILL.md).
 
 ## Measure main-session token efficiency
 
-The main session runs the most expensive model, so concern 4 asks what entered
-its context and what each entry bought; a subagent's own context is out of
-scope. Measure before judging. For a Claude or `agy` parent transcript, run once
-`pwsh -NoProfile -File .agents/skills/next-plan-checkpoint-review/scripts/Get-TranscriptProjection.ps1 -TranscriptPath '<parent transcript path>'`,
-whose header comment states the row shapes: its rows select which records to
-open, and the `len` column only orders that selection. Measure a finding's
-chars from the opened record's own content, and a brief's from its dispatch
-record. For any other transcript, measure from the record sizes it exposes, and
-report `unverified` when it exposes none.
+For concern 4, measure what entered main and what each entry bought. For a
+Claude or `agy` parent, use the worker step 5 projection to select records
+(`len` only ranks them). Count finding chars in the opened record and brief
+chars in the dispatch. For other transcripts, use exposed record sizes. For
+redacted content, use only original field lengths keyed to the record selector.
+Mark missing lengths `unverified`.
 
 Then judge each check below. A finding names the emitting artifact — the
 skill, reference, script, or role — the measured chars, and the concrete

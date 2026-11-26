@@ -190,6 +190,9 @@ static void PopulateWaterReducedUv(shaders::GlobalLayout& rGlobalLayout, std::ch
 		float fTextureInverseTileSize = ReduceFoamOrigin(gWaterFoamTextureTileSize.mfCurrent, rGlobalLayout.f2WaterFoamReducedTextureOrigin);
 		rGlobalLayout.fWaterFoamTextureInverseTileSize = fTextureInverseTileSize;
 		rGlobalLayout.fWaterFoamTextureStrength = gWaterFoamEnabled.Get<bool>() && !gbGraphicsPinned ? gWaterFoamTextureStrength.mfCurrent : 0.0f;
+		rGlobalLayout.fWaterFoamEdgeSoftness = gWaterFoamEdgeSoftness.mfCurrent;
+		rGlobalLayout.fWaterFoamErosionCurve = gWaterFoamErosionCurve.mfCurrent;
+		rGlobalLayout.fWaterFoamDistanceSoften = gWaterFoamDistanceSoften.mfCurrent;
 		float fBreakupInverseTileSize = ReduceFoamOrigin(gWaterFoamBreakupTileSize.mfCurrent, rGlobalLayout.f2WaterFoamBreakupReducedTextureOrigin);
 		rGlobalLayout.fWaterFoamBreakupInverseTileSize = fBreakupInverseTileSize;
 		rGlobalLayout.fWaterFoamBreakupAmount = gWaterFoamBreakupAmount.mfCurrent;
@@ -318,13 +321,11 @@ void PopulateWaterParameters(shaders::GlobalLayout& rGlobalLayout, float fSunAng
 // Gerstner wave phase-reduction modulus (shared by both bands).
 constexpr double kfWaveTwoPi = 2.0 * 3.14159265358979323846;
 
-// CPU staging for one Gerstner wave band. Wave math reads and writes this cacheable copy because
-// each readback from the write-combined mapped uniform buffer stalls on memory latency; the populate
-// ends with one memcpy per array region into rMainLayout, which `vec4` == XMFLOAT4 makes a straight
-// copy. Rebuilt only when the consumed tunables change: direction (pf4WavesOne.xy), wavenumber k
-// (pf4WavesTwo.x), angular rate (pf4WavesTwo.z, CPU-only), pfBaseAmplitude (before the framing fade
-// scale), pfPhaseOffset. Rewritten every frame: pf4WavesTwo.y (pfBaseAmplitude x fade scale x
-// anti-aliasing weight) and pf4WavesTwo.w (the fmod phase term). Sized to the 256-entry shader maxima.
+// Staging avoids slow reads from write-combined uniform memory. Band tunable changes rebuild direction,
+// wavenumber, CPU-only angular rate, base amplitude, and phase offset; each populated band refreshes
+// anti-aliased amplitude and reduced phase per frame. WaterDisplacement.comp applies framing fade to
+// displacement and normals while retaining unfaded amplitude for foam compression. Both wave arrays
+// match the shader capacity and each copies to MainLayout in one memcpy because vec4 is XMFLOAT4.
 struct GerstnerWaveBandStaging
 {
 	XMFLOAT4 pf4WavesOne[256];
@@ -356,13 +357,13 @@ static WaveBandTunables sLowWaveTunables {};
 static WaveBandTunables sMediumWaveTunables {};
 
 // Cached wave terms require fixed per-wave float expression order and RandomEngine consumption: two draws per wave, both
-// always taken.
-static void PopulateGerstnerBand(const WaveBandTunables& rTunables, WaveBandTunables& rCachedTunables, GerstnerWaveBandStaging& rStaging, shaders::vec4* pf4LayoutWavesOne, shaders::vec4* pf4LayoutWavesTwo, int32_t& riLayoutCount, uint32_t uiSeed, double fWaveTime, double fWaveCameraX, double fWaveCameraY, float fAmplitudeScale, float fQuadSize)
+// always taken. Returns the band's mean Nyquist anti-aliasing weight (0 when skipped or all waves alias out).
+static float PopulateGerstnerBand(const WaveBandTunables& rTunables, WaveBandTunables& rCachedTunables, GerstnerWaveBandStaging& rStaging, shaders::vec4* pf4LayoutWavesOne, shaders::vec4* pf4LayoutWavesTwo, int32_t& riLayoutCount, uint32_t uiSeed, double fWaveTime, double fWaveCameraX, double fWaveCameraY, float fAmplitudeScale, bool bKeepUnfadedForFoam, float fQuadSize)
 {
-	if (fAmplitudeScale <= 0.0f)
+	if (fAmplitudeScale <= 0.0f && !bKeepUnfadedForFoam)
 	{
 		riLayoutCount = 0;
-		return;
+		return 0.0f;
 	}
 
 	int64_t iCount = rTunables.iCount;
@@ -400,13 +401,15 @@ static void PopulateGerstnerBand(const WaveBandTunables& rTunables, WaveBandTuna
 
 	// The shader phase is k*dot(D, x) + w, so subtracting the time term makes waves travel along +D.
 	double fTimeScale = static_cast<double>(gWaterWaveTimeScale.mfCurrent);
+	float fAliasWeightSum = 0.0f;
 	for (int64_t i = 0; i < iCount; ++i)
 	{
 		// A wave shorter than two grid quads aliases on the vertex grid and flickers as the quad size re-latches.
 		float fQuads = XM_2PI / (rStaging.pf4WavesTwo[i].x * fQuadSize);
 		float fAlias = std::clamp((fQuads - 2.0f) * 0.5f, 0.0f, 1.0f);
 		float fAliasWeight = fAlias * fAlias * (3.0f - 2.0f * fAlias);
-		rStaging.pf4WavesTwo[i].y = rStaging.pfBaseAmplitude[i] * fAmplitudeScale * fAliasWeight;
+		fAliasWeightSum += fAliasWeight;
+		rStaging.pf4WavesTwo[i].y = rStaging.pfBaseAmplitude[i] * fAliasWeight;
 		double fDirectionX = static_cast<double>(rStaging.pf4WavesOne[i].x);
 		double fDirectionY = static_cast<double>(rStaging.pf4WavesOne[i].y);
 		double fWavenumber = static_cast<double>(rStaging.pf4WavesTwo[i].x);
@@ -415,20 +418,32 @@ static void PopulateGerstnerBand(const WaveBandTunables& rTunables, WaveBandTuna
 		rStaging.pf4WavesTwo[i].w = static_cast<float>(std::fmod((fDirectionX * fWaveCameraX + fDirectionY * fWaveCameraY) * fWavenumber + fPhaseOffset - fRate * fTimeScale * fWaveTime, kfWaveTwoPi));
 	}
 
+	if (fAliasWeightSum <= 0.0f)
+	{
+		riLayoutCount = 0;
+		return 0.0f;
+	}
+
 	std::memcpy(pf4LayoutWavesOne, rStaging.pf4WavesOne, static_cast<size_t>(iCount) * sizeof(pf4LayoutWavesOne[0]));
 	std::memcpy(pf4LayoutWavesTwo, rStaging.pf4WavesTwo, static_cast<size_t>(iCount) * sizeof(pf4LayoutWavesTwo[0]));
 	riLayoutCount = static_cast<int32_t>(iCount);
+	return fAliasWeightSum / static_cast<float>(iCount);
 }
 
-// Wave phase reduction: fCurrentTime is the same elapsed time this frame's RenderFrameGlobal received.
-// PopulateGerstnerBand publishes each iWater*Count beside its MainLayout wave arrays; when a per-stack camera-framing
-// fade clamps amplitude to zero it zeroes the count so the WaterDisplacement.comp Gerstner loop short-circuits to no work.
+// Wave phase reduction uses the same elapsed time as RenderFrameGlobal. PopulateGerstnerBand publishes a zero
+// count when framing fully fades the band with foam inactive or every wave in the band aliases out, so
+// WaterDisplacement.comp skips that band's Gerstner loop.
 static void PopulateGerstnerWaves(shaders::MainLayout& rMainLayout, float fCurrentTime, GraphicsQualityLevel eWaterLevel)
 {
 	if (eWaterLevel == GraphicsQualityLevel::kLow)
 	{
 		rMainLayout.iWaterLowCount = 0;
 		rMainLayout.iWaterMediumCount = 0;
+		rMainLayout.fWaterLowAmplitudeScale = 0.0f;
+		rMainLayout.fWaterMediumAmplitudeScale = 0.0f;
+		rMainLayout.fWaterFoamHighZoomBlend = 0.0f;
+		rMainLayout.f2WaterFoamHighZoomScroll.x = 0.0f;
+		rMainLayout.f2WaterFoamHighZoomScroll.y = 0.0f;
 		return;
 	}
 
@@ -453,8 +468,30 @@ static void PopulateGerstnerWaves(shaders::MainLayout& rMainLayout, float fCurre
 	float fMediumFadeEnd = gWaterMediumAmplitudeFadeEnd.mfCurrent;
 	float fMediumAmplitudeScale = std::clamp((fMediumFadeEnd - fCameraFraming) / std::max(fMediumFadeEnd - fMediumFadeStart, 1.0e-3f), 0.0f, 1.0f);
 
+	bool bKeepUnfadedForFoam = WaterFoamActive();
+	rMainLayout.fWaterLowAmplitudeScale = fLowAmplitudeScale;
+	rMainLayout.fWaterMediumAmplitudeScale = eWaterLevel == GraphicsQualityLevel::kMedium ? 0.0f : fMediumAmplitudeScale;
+
 	WaveBandTunables lowTunables {.iCount = gWaterLowCount.Get<int64_t>(), .fDirectionDegrees = gWaterLowDirectionDegrees.mfCurrent, .fSpreadDegrees = gWaterLowSpreadDegrees.mfCurrent, .fWavelengthShortest = gWaterLowWavelengthShortest.mfCurrent, .fWavelengthLongest = gWaterLowWavelengthLongest.mfCurrent, .fSlope = gWaterLowSlope.mfCurrent, .fScale = gWaterScale.mfCurrent};
-	PopulateGerstnerBand(lowTunables, sLowWaveTunables, sLowWaveStaging, rMainLayout.pf4LowWavesOne, rMainLayout.pf4LowWavesTwo, rMainLayout.iWaterLowCount, 0, fWaveTime, fWaveCameraX, fWaveCameraY, fLowAmplitudeScale, fQuadSize);
+	float fMeanLowAliasWeight = PopulateGerstnerBand(lowTunables, sLowWaveTunables, sLowWaveStaging, rMainLayout.pf4LowWavesOne, rMainLayout.pf4LowWavesTwo, rMainLayout.iWaterLowCount, 0, fWaveTime, fWaveCameraX, fWaveCameraY, fLowAmplitudeScale, bKeepUnfadedForFoam, fQuadSize);
+
+	if (bKeepUnfadedForFoam)
+	{
+		rMainLayout.fWaterFoamHighZoomBlend = std::clamp(1.0f - fMeanLowAliasWeight, 0.0f, 1.0f);
+		double fSpawnNoiseInverseTileSize = 1.0 / static_cast<double>(gWaterFoamSpawnNoiseTileSize.mfCurrent * gWaterScale.mfCurrent);
+		double fLowDirectionRadians = static_cast<double>(XMConvertToRadians(gWaterLowDirectionDegrees.mfCurrent));
+		double fMeanWavelength = std::sqrt(static_cast<double>(gWaterLowWavelengthShortest.mfCurrent) * static_cast<double>(gWaterLowWavelengthLongest.mfCurrent)) * static_cast<double>(gWaterScale.mfCurrent);
+		double fPhaseSpeed = std::sqrt(9.81 * fMeanWavelength / kfWaveTwoPi) * static_cast<double>(gWaterWaveTimeScale.mfCurrent);
+		double fScrollDistance = -fPhaseSpeed * fWaveTime * fSpawnNoiseInverseTileSize;
+		rMainLayout.f2WaterFoamHighZoomScroll.x = static_cast<float>(std::fmod(std::cos(fLowDirectionRadians) * fScrollDistance, 2.0));
+		rMainLayout.f2WaterFoamHighZoomScroll.y = static_cast<float>(std::fmod(std::sin(fLowDirectionRadians) * fScrollDistance, 2.0));
+	}
+	else
+	{
+		rMainLayout.fWaterFoamHighZoomBlend = 0.0f;
+		rMainLayout.f2WaterFoamHighZoomScroll.x = 0.0f;
+		rMainLayout.f2WaterFoamHighZoomScroll.y = 0.0f;
+	}
 
 	if (eWaterLevel == GraphicsQualityLevel::kMedium)
 	{
@@ -463,7 +500,7 @@ static void PopulateGerstnerWaves(shaders::MainLayout& rMainLayout, float fCurre
 	}
 
 	WaveBandTunables mediumTunables {.iCount = gWaterMediumCount.Get<int64_t>(), .fDirectionDegrees = gWaterMediumDirectionDegrees.mfCurrent, .fSpreadDegrees = gWaterMediumSpreadDegrees.mfCurrent, .fWavelengthShortest = gWaterMediumWavelengthShortest.mfCurrent, .fWavelengthLongest = gWaterMediumWavelengthLongest.mfCurrent, .fSlope = gWaterMediumSlope.mfCurrent, .fScale = gWaterScale.mfCurrent};
-	PopulateGerstnerBand(mediumTunables, sMediumWaveTunables, sMediumWaveStaging, rMainLayout.pf4MediumWavesOne, rMainLayout.pf4MediumWavesTwo, rMainLayout.iWaterMediumCount, 1, fWaveTime, fWaveCameraX, fWaveCameraY, fMediumAmplitudeScale, fQuadSize);
+	PopulateGerstnerBand(mediumTunables, sMediumWaveTunables, sMediumWaveStaging, rMainLayout.pf4MediumWavesOne, rMainLayout.pf4MediumWavesTwo, rMainLayout.iWaterMediumCount, 1, fWaveTime, fWaveCameraX, fWaveCameraY, fMediumAmplitudeScale, bKeepUnfadedForFoam, fQuadSize);
 }
 
 void RenderWaterMain(int64_t iCommandBuffer, std::chrono::duration<float> currentTime)

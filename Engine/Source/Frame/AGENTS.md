@@ -119,8 +119,7 @@ collision, terrain sampling, navigation, and generic collections.
   plane a height is nearest (an exact midpoint takes the lower plane).
   `OccupiedPlanes` is the one rule for which planes a height occupies.
   Construction asserts that the table holds 1 to `kiMaxFlightPlanes` planes with
-  positive, strictly ascending heights; the client additionally requires exactly
-  two, one per world-lighting layer (`CreateLightingTextures`).
+  positive, strictly ascending heights.
 
 ## Simulation and Visual State
 
@@ -238,8 +237,8 @@ collision, terrain sampling, navigation, and generic collections.
   parallel per-cell ticks cannot race terrain construction. Client render
   code may also call them on one cell's own static data, since render runs after
   the tick join. Render code reaches the other path through the client-only
-  `ProjectToFlightPlane`/`ProjectToBaseHeight`, whose elevation query walks
-  `mCells` and must never run from frame-tick code; it asserts on it.
+  `ProjectToBaseHeight`, whose elevation query walks `mCells` and must never
+  run from frame-tick code; it asserts on it.
 - `ResolveDiscAgainstTerrain`, the simulation's swept-disc terrain query,
   resolves an overlapped start with the navigation snap (its declaration comment
   in `TerrainCollisionUtils.h` owns the snap and cell-exclusion behavior), but

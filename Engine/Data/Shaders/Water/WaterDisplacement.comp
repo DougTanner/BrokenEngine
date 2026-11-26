@@ -71,16 +71,27 @@ void main()
 	float fMediumWeight = fMediumBoundaryWeight * fShoreEnvelope;
 
 	vec3 f3Displacement = vec3(0.0f);
-	// Jacobian accumulators (cross-product form — preserves N into high-steepness regime).
+	// Visual Jacobian accumulators (cross-product form — preserves N into high-steepness regime).
 	float fA = 0.0f;
 	float fB = 0.0f;
 	float fD = 0.0f;
 	float fG = 0.0f;
 	float fE = 0.0f;
+	// Un-faded horizontal compression accumulators so retained foam keeps generating after visual waves fade with zoom.
+	float fFoamA = 0.0f;
+	float fFoamB = 0.0f;
+	float fFoamD = 0.0f;
 
-	if (globalLayout.fWaterLowAmplitude > 0.0f && fLowWeight > 0.0f)
+	if (mainLayout.iWaterLowCount > 0 && globalLayout.fWaterLowAmplitude > 0.0f && fLowWeight > 0.0f)
 	{
 		float fLowSteepness = globalLayout.fWaterLowSteepness;
+		float fLowAmplitudeScale = mainLayout.fWaterLowAmplitudeScale;
+		vec3 f3BandDisplacement = vec3(0.0f);
+		float fBandA = 0.0f;
+		float fBandB = 0.0f;
+		float fBandD = 0.0f;
+		float fBandG = 0.0f;
+		float fBandE = 0.0f;
 		for (int i = 0; i < mainLayout.iWaterLowCount; ++i)
 		{
 			float fOmega = mainLayout.pf4LowWavesTwo[i].x;
@@ -94,21 +105,44 @@ void main()
 
 			float fWA = fOmega * fAmplitude;
 			float fQWASin = fLowSteepness * fWA * fSin;
-			float fWACos = fWA * fCos;
 
-			f3Displacement += fLowWeight * vec3(fLowSteepness * fAmplitude * f2Direction * fCos, fAmplitude * fSin);
+			fBandA += fQWASin * f2Direction.x * f2Direction.x;
+			fBandB += fQWASin * f2Direction.x * f2Direction.y;
+			fBandD += fQWASin * f2Direction.y * f2Direction.y;
 
-			fA += fLowWeight * fQWASin * f2Direction.x * f2Direction.x;
-			fB += fLowWeight * fQWASin * f2Direction.x * f2Direction.y;
-			fD += fLowWeight * fQWASin * f2Direction.y * f2Direction.y;
-			fG += fLowWeight * fWACos * f2Direction.x;
-			fE += fLowWeight * fWACos * f2Direction.y;
+			if (fLowAmplitudeScale > 0.0f)
+			{
+				float fWACos = fWA * fCos;
+				f3BandDisplacement += vec3(fLowSteepness * fAmplitude * f2Direction * fCos, fAmplitude * fSin);
+				fBandG += fWACos * f2Direction.x;
+				fBandE += fWACos * f2Direction.y;
+			}
+		}
+		fFoamA += fLowWeight * fBandA;
+		fFoamB += fLowWeight * fBandB;
+		fFoamD += fLowWeight * fBandD;
+		if (fLowAmplitudeScale > 0.0f)
+		{
+			float fLowVisualWeight = fLowWeight * fLowAmplitudeScale;
+			f3Displacement += fLowVisualWeight * f3BandDisplacement;
+			fA += fLowVisualWeight * fBandA;
+			fB += fLowVisualWeight * fBandB;
+			fD += fLowVisualWeight * fBandD;
+			fG += fLowVisualWeight * fBandG;
+			fE += fLowVisualWeight * fBandE;
 		}
 	}
 
-	if (globalLayout.fWaterMediumAmplitude > 0.0f && fMediumWeight > 0.0f)
+	if (mainLayout.iWaterMediumCount > 0 && globalLayout.fWaterMediumAmplitude > 0.0f && fMediumWeight > 0.0f)
 	{
 		float fMediumSteepness = globalLayout.fWaterMediumSteepness;
+		float fMediumAmplitudeScale = mainLayout.fWaterMediumAmplitudeScale;
+		vec3 f3BandDisplacement = vec3(0.0f);
+		float fBandA = 0.0f;
+		float fBandB = 0.0f;
+		float fBandD = 0.0f;
+		float fBandG = 0.0f;
+		float fBandE = 0.0f;
 		for (int i = 0; i < mainLayout.iWaterMediumCount; ++i)
 		{
 			float fOmega = mainLayout.pf4MediumWavesTwo[i].x;
@@ -122,15 +156,31 @@ void main()
 
 			float fWA = fOmega * fAmplitude;
 			float fQWASin = fMediumSteepness * fWA * fSin;
-			float fWACos = fWA * fCos;
 
-			f3Displacement += fMediumWeight * vec3(fMediumSteepness * fAmplitude * f2Direction * fCos, fAmplitude * fSin);
+			fBandA += fQWASin * f2Direction.x * f2Direction.x;
+			fBandB += fQWASin * f2Direction.x * f2Direction.y;
+			fBandD += fQWASin * f2Direction.y * f2Direction.y;
 
-			fA += fMediumWeight * fQWASin * f2Direction.x * f2Direction.x;
-			fB += fMediumWeight * fQWASin * f2Direction.x * f2Direction.y;
-			fD += fMediumWeight * fQWASin * f2Direction.y * f2Direction.y;
-			fG += fMediumWeight * fWACos * f2Direction.x;
-			fE += fMediumWeight * fWACos * f2Direction.y;
+			if (fMediumAmplitudeScale > 0.0f)
+			{
+				float fWACos = fWA * fCos;
+				f3BandDisplacement += vec3(fMediumSteepness * fAmplitude * f2Direction * fCos, fAmplitude * fSin);
+				fBandG += fWACos * f2Direction.x;
+				fBandE += fWACos * f2Direction.y;
+			}
+		}
+		fFoamA += fMediumWeight * fBandA;
+		fFoamB += fMediumWeight * fBandB;
+		fFoamD += fMediumWeight * fBandD;
+		if (fMediumAmplitudeScale > 0.0f)
+		{
+			float fMediumVisualWeight = fMediumWeight * fMediumAmplitudeScale;
+			f3Displacement += fMediumVisualWeight * f3BandDisplacement;
+			fA += fMediumVisualWeight * fBandA;
+			fB += fMediumVisualWeight * fBandB;
+			fD += fMediumVisualWeight * fBandD;
+			fG += fMediumVisualWeight * fBandG;
+			fE += fMediumVisualWeight * fBandE;
 		}
 	}
 
@@ -139,7 +189,7 @@ void main()
 	vec3 f3Bitangent = vec3(-fB, 1.0f - fD, fE);
 	vec3 f3WaveNormal = normalize(cross(f3Tangent, f3Bitangent));
 	vec3 f3Normal = normalize(mix(vec3(0.0f, 0.0f, 1.0f), f3WaveNormal, globalLayout.fWaterWaveNormalBlend));
-	float fJacobianDet = (1.0f - fA) * (1.0f - fD) - fB * fB; // → 0 as the surface compresses toward breaking
+	float fJacobianDet = (1.0f - fFoamA) * (1.0f - fFoamD) - fFoamB * fFoamB; // → 0 as the surface compresses toward breaking
 
 	imageStore(displacementImage, i2Coord, vec4(f3Displacement, 0.0f));
 	imageStore(normalImage,       i2Coord, vec4(f3Normal, fJacobianDet));

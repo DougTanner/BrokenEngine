@@ -623,9 +623,10 @@ function Get-FinalizeGitBlobBytes([string] $Repository, [string] $RevisionPath) 
 	}
 }
 
-# Splits a raw Plan blob into its parsed byte-zero broken-engine-plan/v1 header (exact two keys:
-# createdUtc string and dependsOn string array) and raw suffix bytes starting at the line-1
-# terminator so CRLF vs LF and raw body bytes remain exact. Returns $null for any other shape.
+# Splits a raw Plan blob into its parsed byte-zero broken-engine-plan/v2 header (required keys
+# createdUtc string and dependsOn string array, plus optional agentCli string) and raw suffix bytes
+# starting at the line-1 terminator so CRLF vs LF and raw body bytes remain exact. Returns $null for
+# any other shape.
 function Split-FinalizePlanBytes([byte[]] $Bytes) {
 	$lf = [Array]::IndexOf($Bytes, [byte] 0x0A)
 	if ($lf -lt 0) { $suffixStart = $Bytes.Length }
@@ -633,20 +634,20 @@ function Split-FinalizePlanBytes([byte[]] $Bytes) {
 	else { $suffixStart = $lf }
 	try { $line1 = $script:FinalizeUtf8.GetString($Bytes, 0, $suffixStart) }
 	catch { return $null }
-	$match = [regex]::Match($line1, '^<!-- broken-engine-plan/v1 (\{.*\}) -->\z')
+	$match = [regex]::Match($line1, '^<!-- broken-engine-plan/v2 (\{.*\}) -->\z')
 	if (-not $match.Success) { return $null }
 	$doc = $null
 	try {
 		$doc = [Text.Json.JsonDocument]::Parse($match.Groups[1].Value)
 		$root = $doc.RootElement
 		if ($root.ValueKind -ne [Text.Json.JsonValueKind]::Object) { return $null }
-		$propertyCount = 0
 		$hasCreatedUtc = $false
 		$hasDependsOn = $false
+		$hasAgentCli = $false
 		$createdUtc = $null
+		$agentCli = $null
 		$dependsOn = [Collections.Generic.List[string]]::new()
 		foreach ($property in $root.EnumerateObject()) {
-			$propertyCount++
 			if ($property.Name -ceq 'createdUtc') {
 				if ($hasCreatedUtc -or $property.Value.ValueKind -ne [Text.Json.JsonValueKind]::String) { return $null }
 				$hasCreatedUtc = $true
@@ -660,9 +661,14 @@ function Split-FinalizePlanBytes([byte[]] $Bytes) {
 					$dependsOn.Add($item.GetString())
 				}
 			}
+			elseif ($property.Name -ceq 'agentCli') {
+				if ($hasAgentCli -or $property.Value.ValueKind -ne [Text.Json.JsonValueKind]::String) { return $null }
+				$hasAgentCli = $true
+				$agentCli = $property.Value.GetString()
+			}
 			else { return $null }
 		}
-		if ($propertyCount -ne 2 -or -not $hasCreatedUtc -or -not $hasDependsOn) { return $null }
+		if (-not $hasCreatedUtc -or -not $hasDependsOn) { return $null }
 		$line1Bytes = [byte[]]::new($suffixStart)
 		if ($suffixStart -gt 0) { [Buffer]::BlockCopy($Bytes, 0, $line1Bytes, 0, $suffixStart) }
 		$suffixLength = $Bytes.Length - $suffixStart
@@ -671,6 +677,7 @@ function Split-FinalizePlanBytes([byte[]] $Bytes) {
 		return [pscustomobject]@{
 			CreatedUtc = $createdUtc
 			DependsOn = $dependsOn.ToArray()
+			AgentCli = $agentCli
 			Line1Bytes = $line1Bytes
 			SuffixBytes = $suffixBytes
 		}
@@ -680,7 +687,7 @@ function Split-FinalizePlanBytes([byte[]] $Bytes) {
 }
 
 # Rebase-stable review identity for a single-parent commit: inherits -U3 non-union / -U0 merge=union
-# patch-id semantics and separates broken-engine-plan/v1 line-1 dependsOn edge deltas from raw body
+# patch-id semantics and separates broken-engine-plan/v2 line-1 dependsOn edge deltas from raw body
 # diffs so concurrent dependsOn-only header merges preserve standing confirmation without relaxing
 # header-key, terminator, or raw-byte checks.
 function Get-FinalizeReviewIdentity([string] $Repository, [string] $Commit) {
@@ -700,7 +707,7 @@ function Get-FinalizeReviewIdentity([string] $Repository, [string] $Commit) {
 		$commitBytes = Get-FinalizeGitBlobBytes $Repository "${Commit}:$path"
 		$parentPlan = Split-FinalizePlanBytes $parentBytes
 		$commitPlan = Split-FinalizePlanBytes $commitBytes
-		if ($null -eq $parentPlan -or $null -eq $commitPlan -or $parentPlan.CreatedUtc -cne $commitPlan.CreatedUtc) { continue }
+		if ($null -eq $parentPlan -or $null -eq $commitPlan -or $parentPlan.CreatedUtc -cne $commitPlan.CreatedUtc -or -not ($parentPlan.AgentCli -ceq $commitPlan.AgentCli)) { continue }
 		$parentDeps = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
 		foreach ($dep in $parentPlan.DependsOn) { [void] $parentDeps.Add($dep) }
 		$commitDeps = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)

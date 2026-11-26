@@ -43,14 +43,20 @@ sampled normals, reflections, lighting, shadows, and smoke.
 ## Retained Foam
 
 - Foam is bounded coverage in the undisplaced visible-area footprint. Native
-  displacement-normal W supplies the Jacobian source: terrain masking and the
-  compression threshold apply at each native sample before bilinear source
-  interpolation. Coverage resolution does not increase native source detail.
+  displacement-normal W supplies the Jacobian source: foam compression must
+  survive visual framing fades while still respecting mesh-quad Nyquist
+  attenuation (`MainLayout` in `ShaderMainLayout.h` and `PopulateGerstnerBand`
+  in `WaterUniforms.cpp`). Terrain masking and the compression threshold apply
+  at each native sample before bilinear source interpolation. Coverage
+  resolution does not increase native source detail.
 - After terrain rejection, fixed Glass noise sampled at mip 0 at the undisplaced
   native position adds a signed offset to J before the compression threshold.
   Negative offsets promote emission and positive offsets suppress it; zero
   amplitude preserves the unmodified J source. Spawn amplitude and tile size
-  are independent of material breakup controls.
+  are independent of material breakup controls. As mesh quads outgrow low-band
+  wavelengths, the Jacobian source hands off to a procedural high-zoom whitecap
+  source (`NativeSource` in `WaterFoam.comp`), whose UV transform must keep CPU
+  origin and scroll wraps seamless (`NativeSource` and `ShaderMainLayout.h`).
 - Reproject history from mip 0, rejecting beyond its half-texel border before
   sampling. Integrate emission toward saturation and half-life decay with the
   exact exponential update, then write the whole allocation. Reset skips
@@ -60,16 +66,19 @@ sampled normals, reflections, lighting, shadows, and smoke.
   [Render Precision and History](../../../Source/Graphics/Render/AGENTS.md#precision-and-history).
 - Presentation samples generated history mips at the undisplaced position.
   Independently selected BC7 UNORM primary color and BC4 UNORM secondary noise
-  supply RGB albedo and linear red breakup, each with its own tile size
-  independent of color noise. Decode primary RGB with `pow(rgb, 2.2)`, matching
-  Model materials; secondary red remains undecoded. Primary RGB does not affect
-  opacity. Clamp coverage times the blend from one to secondary red times
-  strength to `[0, 1]` as foam opacity. Blend separately lit water and foam
-  after attenuating only the water base by reflection; foam opacity also
-  suppresses skybox specular. Keep mixed water/foam albedo for downstream EWNS
-  lighting. Breakup amount selects the noise blend. Sample both in undisplaced
-  material coordinates with no time scroll, so Gerstner geometry stretches and
-  squeezes the pattern. Material controls do not change coverage.
+  each have their own tile size independent of color noise: the primary read
+  supplies RGB albedo and a linear alpha erosion heightfield (with `.a == 1`
+  for opaque textures), and the secondary read supplies linear red breakup.
+  Decode primary RGB with `pow(rgb, 2.2)`, matching Model materials; primary
+  alpha and secondary red remain undecoded. Primary RGB does not affect
+  opacity. Erosion and opacity (`Water.frag`) must derive their UV gradients
+  before terrain discard for RTS-altitude mip safety (no post-discard
+  derivatives). Blend separately lit water and foam after attenuating only the
+  water base by reflection; foam opacity also suppresses skybox specular. Keep
+  mixed water/foam albedo for downstream EWNS lighting. Breakup amount selects
+  the noise blend. Sample both in undisplaced material coordinates with no time
+  scroll, so Gerstner geometry stretches and squeezes the pattern. Material
+  controls do not change coverage.
 
 ## Precision Contracts
 
@@ -103,11 +112,12 @@ sampled normals, reflections, lighting, shadows, and smoke.
 - View-dependent shading — the eye vector, reflected ray, and reflection Fresnel
   — reads `MainLayout.f4WaterEyePosition`, never `f4EyePosition`; base-height
   lighting and smoke projections keep the true eye line (`ToEyeLine`).
-- Lighting samples the low lighting layer at a base-height projection and smoke
-  at each flight plane's projection, both derived from the undisplaced world
-  position, keeping them stable under wave animation. Plane k's smoke is lit by
-  layer k's ambient at that plane's projection; the high layer is read only
-  where its plane's smoke shows.
+- Lighting samples the single lighting layer at the directional position from
+  `ProjectWaterReflection` and at `BaseHeightPosition` for ambient lighting
+  (`ReadAmbientLighting`, whose ambient sample smoke reuses per
+  `../Smoke/AGENTS.md`). `BaseHeightPosition` derives from the undisplaced world
+  position so ambient lighting and smoke coordinates stay stable under wave
+  animation.
 - Sun-driven energy and skybox sun/moon specular use full effective shadow. Sky
   ambient uses the separately controlled ambient-shadow mix; EWNS (defined in
   the shader hub) and ambient emitter deposits remain unshadowed.

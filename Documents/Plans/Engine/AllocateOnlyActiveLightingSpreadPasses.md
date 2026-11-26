@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-11-21T21:04:10.701Z","dependsOn":["Documents/Plans/Engine/MergeRenderTargetTexturesLighting.md","Documents/Plans/Engine/PrepareLightingSpreadTaps.md","Documents/Plans/Engine/SkipEmptyLightingSpread.md"]} -->
+<!-- broken-engine-plan/v2 {"createdUtc":"2026-11-21T21:04:10.701Z","dependsOn":["Documents/Plans/Engine/MergeRenderTargetTexturesLighting.md","Documents/Plans/Engine/PrepareLightingSpreadTaps.md","Documents/Plans/Engine/SkipEmptyLightingSpread.md"]} -->
 # Allocate lighting spread resources only for active passes
 
 ## Context

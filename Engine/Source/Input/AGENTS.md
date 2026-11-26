@@ -1,31 +1,29 @@
 # Input - Hardware Snapshot and Display Input
 
 `RawInputManager` publishes one coherent `RawInput` snapshot per display frame;
-`Input` turns that snapshot into menu commands and camera input.
-`RawInputManager` and `Input` are client-only. The deterministic per-tick
+`Input` turns that snapshot into menu commands, remappable key actions, and
+camera input. All files here are client-only. The deterministic per-tick
 `FrameInput` type is game-owned and lives in game `Source/Frame`, unrelated to
 this directory.
 
 Global: `gpInput` — constructed in `Main.cpp`, polled only from
-`engine::GameBase::ProcessInput`. `BeginPoll` fills `engine::MenuInput` and
-writes straight into `engine::gpCamera->mCameraInput`.
+`engine::GameBase::ProcessInput` through `engine::InputPoll`.
 
 ## Poll Lifetime
 
-- One `ProcessInput` call is one poll: `BeginPoll` publishes the snapshot and
-  produces this frame's values;
-  `gpInput->mPreviousRawInput = gpRawInputManager->mRawInput` copies the current
-  snapshot into the previous one and runs last — after every edge consumer
-  including the game's `ProcessGameMenuInput`, called by name through
-  `game::gpGame`, and also on the modal and open-chat-box paths, which skip that
-  call and every later engine policy. Moving it earlier silently breaks edge
-  detection.
-- `InputPoll` is a borrowed view of the current and previous snapshots plus this
-  poll's keyboard-ownership flag, so engine policy and the game's menu input
-  detect edges against the same pair. It allocates nothing and must never
-  outlive its `ProcessInput` call.
+- One `ProcessInput` call is one poll: `InputPoll` is a non-copyable RAII guard
+  that allocates nothing and must not outlive `ProcessInput`. Its constructor
+  publishes `RawInput`, resolves active keybind capture, and fills
+  `engine::MenuInput` and `engine::gpCamera->mCameraInput`; its destructor
+  advances private `Input::mPreviousRawInput` last — after every edge consumer
+  including `game::gpGame->ProcessGameMenuInput` and on the modal and open-chat
+  early-return paths.
+- `InputPoll::Pressed` and `InputPoll::Held` resolve `KeybindFor` through ADL so
+  engine `KeyAction` and game action enums share one poll API. Both return false
+  when unbound, during capture, or while the UI owns the keyboard (except
+  `VK_TAB` in `Pressed`).
 - `MenuInputFlags` is the generic menu vocabulary; game-specific actions poll
-  their own keys through `InputPoll` instead. `kSingleStep` (from Tab),
+  their own bindings through `InputPoll`. `kSingleStep` (from Tab),
   `kMouseIsDown`, `kMouseClick`, `kGamepadButton`, `MenuInput::f2Mouse`, and
   `MenuInput::f2Gamepad` are produced and intentionally unconsumed.
 
@@ -35,10 +33,12 @@ writes straight into `engine::gpCamera->mCameraInput`.
   scratch state and `Update()` publishes one coherent snapshot per display
   frame. The keyboard registers without `RIDEV_NOLEGACY`, so legacy keyboard and
   IME messages also reach ImGui for text entry; no binding reads them. Tab key
-  and character messages are withheld from ImGui, reserving Tab for the map.
-  ImGui keyboard navigation stays off, so arrows, Space, Enter, and Esc never
-  move, activate, or cancel menu focus. Gamepad navigation and agent-injected
-  ImGui events use separate explicit paths.
+  and character messages are withheld from ImGui (reserving Tab for the map),
+  and `mSuppressedChatOpenKey` withholds the chat-open key's key-down messages
+  and `TranslateMessage` calls until release or focus loss so opening chat does
+  not type into it. ImGui keyboard navigation stays off, so arrows, Space,
+  Enter, and Esc never move, activate, or cancel menu focus. Gamepad navigation
+  and agent-injected ImGui events use separate explicit paths.
 - Mouse state comes from DirectXTK's Win32 message path and gamepad state from
   XInput. The DirectXTK mouse object must exist before window creation, because
   synchronous window messages call its static processing path.
@@ -52,17 +52,39 @@ writes straight into `engine::gpCamera->mCameraInput`.
 
 ## Bindings and Mode
 
+- Remappable player-facing actions split across engine (`KeyAction` in
+  `Keybinds.h`, persisted in `EngineKeybinds.bin`) and game (`GameKeyAction` in
+  game `Input/GameKeybinds.h`, persisted in `GameKeybinds.bin`) versioned binary
+  files; fixed inputs (Esc, Alt+F4) and debug/profile/debug-render shortcuts
+  stay outside those tables. `IsBindableKey` is the single allowlist shared by
+  live capture and file validation; loaders reject invalid or duplicate keys to
+  defaults, and `Input::LoadAllKeybinds` resolves cross-domain startup conflicts
+  (loaded overrides default; engine wins when both load). `Input::RebindSlot`
+  unbinds any prior owner across both domains before assigning. During keybind
+  capture, normal keyboard bindings and menu-back are suppressed for the entire
+  capture frame (including completion/cancel) while raw Alt+F4 quit stays live;
+  Esc cancels and Backspace/Delete unbinds.
 - Debug/profile/screenshot/debug-render keys compile in via `if constexpr` on
-  `kbDebugInput` / `kbProfiling` / `kbScreenshots` / `kbDebugRender`,
-  free-camera WASD on `kbFreeCamera`. New debug-only keys belong inside those
-  blocks.
+  `kbDebugInput` / `kbProfiling` / `kbScreenshots` / `kbDebugRender`, and
+  free-camera movement on `kbFreeCamera`. New debug-only keys belong inside
+  those blocks.
+- Gameplay Observer mode (`CameraBase::ObserverState::kObserving`) reads arrow
+  keys and mouse edge-scroll into `mCameraInput.f2Move` and suppresses
+  `kDebugTextureNext`/`kDebugTexturePrevious`. Both require no open menu or
+  map; arrow keys also require UI-free keyboard ownership and window focus
+  (unless an agent script is active), while edge-scroll requires a positive
+  `gObserverEdgeScrollMargin` (its disable setting), retains proportional
+  strength, and is separately blocked by focus loss, physical-input suppression,
+  gamepad mode, or a hovered ImGui window. The combined vector scales down only
+  when its length exceeds 1.
 - Gamepad mode engages when either thumbstick's `|x| + |y|` exceeds the
-  threshold; mouse movement or a KBM whitelist key (WASD, arrows, numpad
-  1/2/3/5, LMB/RMB) flips back. New movement keys must extend the whitelist or
-  mode detection misses them.
+  threshold; mouse movement or a KBM whitelist key (configured camera-move
+  bindings, arrows, numpad 1/2/3/5, LMB/RMB) flips back. New movement keys must
+  extend the whitelist or mode detection misses them.
 - While a menu is up, gamepad buttons / d-pad / left stick are pushed into
   ImGui's IO so menus are pad-navigable. `GameBase` supplies menu visibility as
-  a `BeginPoll` argument, so the engine never reads a game global to decide it.
+  an `InputPoll` constructor argument, so the engine never reads a game global
+  to decide it.
 - While an ImGui text field is being edited
   (`ImGuiContext::PlatformImeData.WantTextInput` from the last rendered frame),
   the keyboard belongs to the UI: `KeyboardPressed` reports no press except for

@@ -4,6 +4,7 @@
 #include "Ui/Screens/ChatScreen.h"
 #include "Ui/Screens/GameSettingsScreen.h"
 #include "Ui/Screens/GraphicsMenuScreen.h"
+#include "Ui/Screens/KeybindsScreen.h"
 #include "Ui/Screens/MainMenuScreen.h"
 #include "Ui/Screens/ModalScreen.h"
 #include "Ui/Screens/PauseMenuScreen.h"
@@ -22,6 +23,7 @@ static std::unique_ptr<PauseMenuScreen> spPauseMenuScreen;
 static std::unique_ptr<GraphicsMenuScreen> spGraphicsMenuScreen;
 static std::unique_ptr<SoundMenuScreen> spSoundMenuScreen;
 static std::unique_ptr<GameSettingsScreen> spGameSettingsScreen;
+static std::unique_ptr<KeybindsScreen> spKeybindsScreen;
 static std::unique_ptr<game::HudScreen> spHudScreen;
 static std::unique_ptr<game::MapScreen> spMapScreen;
 static std::unique_ptr<ChatScreen> spChatScreen;
@@ -34,6 +36,7 @@ void CreateUiScreens()
 	spGraphicsMenuScreen = std::make_unique<GraphicsMenuScreen>();
 	spSoundMenuScreen = std::make_unique<SoundMenuScreen>();
 	spGameSettingsScreen = std::make_unique<GameSettingsScreen>();
+	spKeybindsScreen = std::make_unique<KeybindsScreen>();
 	spHudScreen = std::make_unique<game::HudScreen>();
 	spMapScreen = std::make_unique<game::MapScreen>();
 	spChatScreen = std::make_unique<ChatScreen>();
@@ -65,6 +68,7 @@ void RenderUiScreens()
 		spGraphicsMenuScreen->Render();
 		spSoundMenuScreen->Render();
 		spGameSettingsScreen->Render();
+		spKeybindsScreen->Render();
 	}
 
 	RenderImPlotGraphs();
@@ -79,6 +83,7 @@ void DestroyUiScreens()
 	spGraphicsMenuScreen.reset();
 	spSoundMenuScreen.reset();
 	spGameSettingsScreen.reset();
+	spKeybindsScreen.reset();
 	spHudScreen.reset();
 	spMapScreen.reset();
 	spChatScreen.reset();

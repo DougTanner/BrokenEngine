@@ -16,22 +16,29 @@ decision. When a Plan decision binds is in
 
 An executable plan starts at byte zero with exactly one metadata line:
 
-`<!-- broken-engine-plan/v1 {"createdUtc":"2026-07-22T18:24:31.042Z","dependsOn":["Documents/Plans/Area/Prerequisite.md"]} -->`
+`<!-- broken-engine-plan/v2 {"createdUtc":"2026-07-22T18:24:31.042Z","dependsOn":["Documents/Plans/Area/Prerequisite.md"]} -->`
 
-Both keys are mandatory. `createdUtc` is immutable after creation. `dependsOn`
-is a unique ordinal-sorted list of normalized `Documents/Plans/**/*.md` or
-`Projects/Coretide/Documents/Plans/**/*.md` paths. Every plan document in this
-tree carries the marker; a missing marker — including one preceded by a BOM, so
-it is not at byte zero — is a validation error naming the file. `AGENTS.md` is
-exempt at every level of the tree and must never carry metadata.
+`createdUtc` (immutable) and `dependsOn` (unique ordinal-sorted
+`Documents/Plans/**/*.md` or `Projects/Coretide/Documents/Plans/**/*.md` paths)
+are mandatory; optional `agentCli` (`claude`, `codex`, or `agy`) locks new
+claims to that CLI. Every plan in this tree carries the marker (a BOM breaks
+byte zero and fails validation); `AGENTS.md` is exempt at every level and never
+carries metadata.
 
-WorktreeCli is the only component that parses the scheduler and changes claims.
-It selects the newest eligible executable plan by
+WorktreeCli is the only component that parses the scheduler and changes claims,
+selecting the newest eligible plan by
 `(createdUtc descending, normalized path)`. Existing valid dependencies block a
-child; a missing dependency is a satisfied stale edge reported as a notice. A
-plan is excluded from selection — left out without affecting other plans, which
-stay claimable — when its metadata is invalid, its dependencies form a cycle, or
-it is not present and valid at the primary tip.
+child; a missing dependency is a satisfied stale edge notice. A plan is excluded
+without blocking other plans when its metadata is invalid, its dependencies form
+a cycle, or it is absent or invalid at the primary tip. WorktreeCli derives the
+active CLI from the worktree's `<cli>/<uuid>` session branch: a plan whose
+session or primary `agentCli` differs is marked `excluded` by `plan list` on
+session branches and refused for new claims (on non-session branches,
+`plan list` stays unfiltered while `plan claim-next` refuses tagged plans unless
+explicitly overridden on a targeted claim — syntax in
+`Tools/WorktreeCli/AGENTS.md`). `agentCli` filtering of valid metadata never
+invalidates a plan, never alters dependency blocking, cycle detection, or claim
+healing, and never blocks refreshing an already-held claim.
 
 For a scheduler health check, run
 `pwsh -NoProfile -File .agents/scripts/Invoke-PlanSchedulerStateCheck.ps1` — it
@@ -105,9 +112,9 @@ An executable plan provides metadata, `# Title`, context, design, critical
 files, a required `## In scope` section naming the specific functions, members,
 or regions to change, required `## Out of scope` boundaries, risk
 triggers/invariants, and observable acceptance criteria when a diff is not
-decisive. Put directional prerequisites and file-overlap dependencies in
+decisive. Put directional prerequisites and large same-system dependencies in
 `dependsOn` metadata (`.agents/references/new-plan-file.md` `## Invocation`),
-not prose.
+not prose; minor file overlap between independent Plans is accepted.
 
 A Plan permits at most two bounded open parts:
 

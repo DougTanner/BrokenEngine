@@ -147,7 +147,7 @@ public:
 
 	common::InTheLastSecond mRendersInTheLastSecond;
 
-	// One-shot capture mailboxes filled off the render path (agent Drain / F9 toggle), consumed once at the
+	// One-shot capture mailboxes filled off the render path (agent Drain / kToggleScreenshots), consumed once at the
 	// PresentAcquire capture site (between the UI submit and Present — see the deadlock note there).
 	std::optional<ScreenshotRequest> mOptionalScreenshotRequest;
 	std::optional<DumpRenderTargetRequest> mOptionalDumpRenderTargetRequest;

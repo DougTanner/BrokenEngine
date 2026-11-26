@@ -1,1 +1,28 @@
 !/Projects/Coretide/
+
+# Upstream third-party trees (keep ThirdParty/AGENTS.md and ThirdParty/Prebuilts/)
+/ThirdParty/*/
+!/ThirdParty/Prebuilts/
+
+# Raw and intermediate data assets (keep shaders, AGENTS.md, *.model.json, Island.json)
+*.gltf
+*.glb
+*.fbx
+*.bin
+*.MODEL
+*.PreExport
+*.BC4_UNORM_BLOCK
+*.BC5_UNORM_BLOCK
+*.BC7_UNORM_BLOCK
+*.R16G16B16A16_SFLOAT
+*.r32
+*.png
+*.jpg
+*.jpeg
+*.tga
+*.ktx
+*.wav
+*.otf
+*.zip
+*.terrain
+BakedIsland.json

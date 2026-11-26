@@ -46,7 +46,7 @@ public:
 	AudioManager();
 	~AudioManager() override;
 
-	void Update(const game::Frame* pFrame);
+	void Update(const game::Frame* pFrame, GridCoord emitterCoordinate = {});
 
 	void PlayOneShot(const game::Frame& rFrame, common::crc_t uiAudioCrc, float fVolume, float fPitch = 1.0f, float fPitchRange = 0.0f);
 	// vecLocalPosition is local to emitterCoordinate; the mix converts it against the listener's own cell.

@@ -825,8 +825,7 @@ void ModelViewerApplication::RenderModel(int64_t iCommandBuffer)
 				XMMATRIX matFlightRotation = XMMatrixRotationX(-0.2f * mFlightBody.fDeltaRotation) * XMMatrixRotationY(-mFlightBody.fClimbTilt) * common::RotationMatrixFromDirection(mFlightBody.vecDirection, XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f));
 				matInstanceTransform = matFlightRotation * XMMatrixTranslationFromVector(mFlightBody.vecPosition);
 				vecPosition = mFlightBody.vecPosition;
-				XMStoreFloat4(&rLayout.f4PositionLayer, mFlightBody.vecPosition);
-				rLayout.f4PositionLayer.w = static_cast<float>(engine::gpFlightPlanes->NearestPlaneIndex(XMVectorGetZ(mFlightBody.vecPosition)));
+				XMStoreFloat4(&rLayout.f4Position, mFlightBody.vecPosition);
 			}
 			XMMATRIX matTransform = mMatModelAlignment * matInstanceTransform;
 			rLayout.f2ShadowWorldXRange = {engine::ComputeModelShadowRange(shadowBounds, matAlignmentDelta * matInstanceTransform, vecPosition)};

@@ -52,9 +52,8 @@ cleanup, and Verify the acceptance table steps in that one dispatch.
 - `Scope` — first-round: untracked paths and, optionally in coherence mode after
   an earlier pass on prior non-C++ files, `PathPrefix` (comma-separated paths or
   directory prefixes for newly added or edited non-C++ files; see `## When to
-  use` for late-Plan sibling scope and
-  [`references/worker.md`](references/worker.md) `## Steps` for inventory
-  mechanics). Re-review: affected files, regions, `First-round findings`
+  use` for late-Plan sibling scope). Re-review: affected files, regions,
+  `First-round findings`
   (`../../references/subagent-reporting.md` `## Task brief`), and for Coretide
   paths `coretide` revisions from the inventory supplying those regions.
 - The tier and the mode; in combined mode, which Apply the triggered cleanup
@@ -64,6 +63,13 @@ cleanup, and Verify the acceptance table steps in that one dispatch.
   requires, such as a focused re-review's `First-round findings`, and, when the
   Verify the acceptance table step applies, every input `/verify-acceptance`
   `## Inputs` requires.
+
+First-round region inventory (`-Head` for a committed head;
+`-UntrackedPath`/`-IncludeUntracked` and `-PathPrefix` from `Scope`):
+
+```powershell
+pwsh -NoProfile -NonInteractive -Command 'Import-Module ./.agents/scripts/SessionChangeInventory.psm1; Get-SessionChangeInventory -RepositoryRoot (Get-Location).Path -Baseline <baseline SHA> -Regions -CoherenceOnly|Select-Object status,coretide,counts,entries,regions|ConvertTo-Json -Depth 5'
+```
 
 ## Handoff
 

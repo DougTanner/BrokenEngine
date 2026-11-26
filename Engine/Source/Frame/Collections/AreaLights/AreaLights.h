@@ -10,6 +10,15 @@ namespace engine
 
 struct CellStaticData;
 
+enum class AreaLightExpandSides : uint8_t
+{
+	kTop    = 0x01, // Corners 0-1 (forward edge)
+	kBottom = 0x02, // Corners 2-3 (back edge)
+	kLeft   = 0x04, // Corners 0-2 (left side edge)
+	kRight  = 0x08, // Corners 1-3 (right side edge)
+};
+using AreaLightExpandSides_t = common::Flags<AreaLightExpandSides>;
+
 struct AreaLightsType
 {
 	common::crc_t uiCrc = 0;
@@ -23,6 +32,8 @@ struct AreaLightsType
 	Wrapper* pVisibleIntensityWrapper = nullptr;
 	Wrapper* pLightingSizeWrapper = nullptr;
 	Wrapper* pLightingIntensityWrapper = nullptr;
+
+	AreaLightExpandSides_t expandSides {AreaLightExpandSides::kTop, AreaLightExpandSides::kBottom, AreaLightExpandSides::kLeft, AreaLightExpandSides::kRight};
 };
 
 struct AreaLightsInterpolate : public Collection<AreaLightsInterpolate, CollectionFlags::kIdToIndex>,

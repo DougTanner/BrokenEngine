@@ -185,6 +185,9 @@ void RenderWaterSection(TweaksScreen& rScreen)
 			rScreen.WrapperSlider("Water Foam Texture Tile Size", gWaterFoamTextureTileSize, iSection);
 			rScreen.WrapperSlider("Water Foam Texture Strength", gWaterFoamTextureStrength, iSection);
 			rScreen.WrapperSlider("Water Foam Texture Patch Blend", gWaterFoamTexturePatchBlend, iSection);
+			rScreen.WrapperSlider("Water Foam Edge Softness", gWaterFoamEdgeSoftness, iSection);
+			rScreen.WrapperSlider("Water Foam Erosion Curve", gWaterFoamErosionCurve, iSection);
+			rScreen.WrapperSlider("Water Foam Distance Soften", gWaterFoamDistanceSoften, iSection);
 			rScreen.ChevronIndexSelector("Water Foam Breakup Texture Index", gWaterFoamBreakupTextureIndex, TextureManager::kpWaterFoamBreakupNames);
 			rScreen.WrapperSlider("Water Foam Breakup Tile Size", gWaterFoamBreakupTileSize, iSection);
 			rScreen.WrapperSlider("Water Foam Breakup Amount", gWaterFoamBreakupAmount, iSection);

@@ -31,15 +31,10 @@ void main()
 		f4Area = globalLayout.f4VisibleArea;
 		fHeight = 0.0f;
 	}
-	else if (iFormat == kiDebugTextureFormatFloat16LinearVisibleArea || iFormat == kiDebugTextureFormatFloat16DepositDirectionCombined || iFormat == kiDebugTextureFormatFloat16SpreadDirectionCombined)
+	else if (iFormat == kiDebugTextureFormatFloat16LinearVisibleArea || iFormat == kiDebugTextureFormatFloat16DepositDirectionCombined || iFormat == kiDebugTextureFormatFloat16SpreadDirectionCombined || iFormat == kiDebugTextureFormatUnormLightingDirectional)
 	{
 		f4Area = globalLayout.f4LightingArea;
-		fHeight = globalLayout.pfFlightPlaneHeights[globalLayout.uiLightingRefreshLayer];
-	}
-	else if (iFormat == kiDebugTextureFormatUnormLightingDirectional)
-	{
-		f4Area = globalLayout.pf4LightingAreas[0];
-		fHeight = globalLayout.pfFlightPlaneHeights[0];
+		fHeight = globalLayout.fBaseHeight;
 	}
 	else
 	{

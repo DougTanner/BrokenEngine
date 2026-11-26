@@ -203,7 +203,6 @@ void GraphicsMenuScreen::Render()
 		}
 		ColumnSlider("Smoke Simulation Area", &gSmokeSimulationArea);
 		ColumnSlider("Smoke Update Cadence", &gSmokeUpdateCadence, "%.0f");
-		WrapperToggle("Stagger Smoke Layer Updates", &gSmokeLayerStagger);
 		ImGui::EndDisabled();
 
 		ImGui::Separator();

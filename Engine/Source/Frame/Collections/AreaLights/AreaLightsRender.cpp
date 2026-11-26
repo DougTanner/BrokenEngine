@@ -23,7 +23,17 @@ void AreaLightsInterpolate::GraphicsResources()
 }
 
 static int64_t siRendered = 0; // Visible-light cursor
-static int64_t siDepositsRendered = 0; // Deposit cursor for the refreshing lighting layer
+static int64_t siDepositsRendered = 0; // Deposit cursor
+
+static float ExpandSingleAxis(float fExtent, float fLightingSize, float fAreaMultiplier, AreaLightExpandSides_t axisSides)
+{
+	int64_t iSides = std::popcount(std::to_underlying(axisSides.meFlags));
+	if (iSides == 0)
+	{
+		return fExtent;
+	}
+	return (fExtent + static_cast<float>(iSides) * std::max(0.0f, fLightingSize - 0.5f * fExtent)) * fAreaMultiplier;
+}
 
 void AreaLightsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoordinates)
 {
@@ -40,7 +50,7 @@ void AreaLightsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer,
 		return;
 	}
 
-	if (giLightingRefreshLayer >= 0)
+	if (gbLightingRefreshFrame)
 	{
 		if (Buffer* pBuffer = gpBufferManager->ResizeDynamicBufferIfNeeded(kuiCrc, kBufferMain, kpcName, sizeof(shaders::QuadLayout), iTotalCapacity, iCommandBuffer); pBuffer != nullptr)
 		{
@@ -66,9 +76,8 @@ void AreaLightsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate
 	auto [pVisibleLightsLayouts, iVisibleLightsBufferCapacity] = gpBufferManager->GetDynamicStorageBuffer<shaders::VisibleLightQuadLayout>(kuiCrc, kBufferVisibleLights, iCommandBuffer);
 	ASSERT(siRendered + rCurrent.iCount <= iVisibleLightsBufferCapacity);
 
-	int64_t iRefreshLayer = giLightingRefreshLayer;
 	shaders::QuadLayout* pAreaLightsLayouts = nullptr;
-	if (iRefreshLayer >= 0)
+	if (gbLightingRefreshFrame)
 	{
 		auto [pLayouts, iAreaLightsBufferCapacity] = gpBufferManager->GetDynamicStorageBuffer<shaders::QuadLayout>(kuiCrc, kBufferMain, iCommandBuffer);
 		ASSERT(siDepositsRendered + rCurrent.iCount <= iAreaLightsBufferCapacity);
@@ -78,60 +87,79 @@ void AreaLightsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate
 	float fAreaMultiplier = gAreaLightAreaMultiplier.mfCurrent;
 	float fLinearMultiplier = std::sqrt(fAreaMultiplier);
 	float fForcedSquare = gAreaLightForcedSquare.mfCurrent;
+	XMVECTOR vecHorizontalMask = XMVectorSelectControl(1, 1, 0, 0);
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
 		// Every position below stays local to the rendered cell until it reaches the GPU
-		// layout, the frustum test, or ProjectToFlightPlane — the three conversion points of this renderer.
+		// layout, the frustum test, or ProjectToBaseHeight — the three conversion points of this renderer.
 		XMVECTOR vecVisiblePosition0 = rCurrent.pVecVisiblePositions[0][i];
 		XMVECTOR vecVisiblePosition1 = rCurrent.pVecVisiblePositions[1][i];
 		XMVECTOR vecVisiblePosition2 = rCurrent.pVecVisiblePositions[2][i];
 		XMVECTOR vecVisiblePosition3 = rCurrent.pVecVisiblePositions[3][i];
 
-		XMVECTOR vecCenter = XMVectorScale(XMVectorAdd(XMVectorAdd(vecVisiblePosition0, vecVisiblePosition1), XMVectorAdd(vecVisiblePosition2, vecVisiblePosition3)), 0.25f);
 		const AreaLightsType& rType = AreaLightsInterpolate::sTypes.at(rCurrent.puiTypeIndices[i]);
 		float fIntensityMultiplier = rCurrent.pfIntensityMultipliers[i];
 		float fVisibleIntensity = rType.pVisibleIntensityWrapper != nullptr ? rType.pVisibleIntensityWrapper->mfCurrent : rType.fVisibleIntensity;
 		float fLightingSize = rType.pLightingSizeWrapper != nullptr ? rType.pLightingSizeWrapper->mfCurrent : rType.fLightingSize;
 		float fLightingIntensity = rType.pLightingIntensityWrapper != nullptr ? rType.pLightingIntensityWrapper->mfCurrent : rType.fLightingIntensity;
 
-		// Lighting quads preserve the visible quad's orientation.
-		XMVECTOR vecOffset0 = XMVectorSubtract(vecVisiblePosition0, vecCenter);
-		float fVisibleExtent = XMVectorGetX(XMVector2Length(vecOffset0));
-		float fScale = (fVisibleExtent > 0.0f ? fLightingSize / fVisibleExtent : 1.0f) * fLinearMultiplier;
-		XMVECTOR vecScaleFactor = XMVectorReplicate(fScale);
+		XMVECTOR vecWidth = XMVectorSelect(XMVectorZero(), XMVectorSubtract(vecVisiblePosition1, vecVisiblePosition0), vecHorizontalMask);
+		XMVECTOR vecLength = XMVectorSelect(XMVectorZero(), XMVectorSubtract(vecVisiblePosition0, vecVisiblePosition2), vecHorizontalMask);
+		float fWidth = XMVectorGetX(XMVector2Length(vecWidth));
+		float fLength = XMVectorGetX(XMVector2Length(vecLength));
+		XMVECTOR vecWidthDirection = fWidth > 0.0f ? XMVectorScale(vecWidth, 1.0f / fWidth) : XMVectorZero();
+		XMVECTOR vecLengthDirection = fLength > 0.0f ? XMVectorScale(vecLength, 1.0f / fLength) : XMVectorZero();
 
-		XMVECTOR vecLightingPosition0 = XMVectorMultiplyAdd(vecOffset0, vecScaleFactor, vecCenter);
-		XMVECTOR vecLightingPosition1 = XMVectorMultiplyAdd(XMVectorSubtract(vecVisiblePosition1, vecCenter), vecScaleFactor, vecCenter);
-		XMVECTOR vecLightingPosition2 = XMVectorMultiplyAdd(XMVectorSubtract(vecVisiblePosition2, vecCenter), vecScaleFactor, vecCenter);
-		XMVECTOR vecLightingPosition3 = XMVectorMultiplyAdd(XMVectorSubtract(vecVisiblePosition3, vecCenter), vecScaleFactor, vecCenter);
+		bool bExpandTop = rType.expandSides & AreaLightExpandSides::kTop;
+		bool bExpandBottom = rType.expandSides & AreaLightExpandSides::kBottom;
+		bool bExpandLeft = rType.expandSides & AreaLightExpandSides::kLeft;
+		bool bExpandRight = rType.expandSides & AreaLightExpandSides::kRight;
+		bool bExpandWidth = bExpandLeft || bExpandRight;
+		bool bExpandLength = bExpandTop || bExpandBottom;
+
+		float fTargetWidth = fWidth;
+		float fTargetLength = fLength;
+		if (bExpandWidth && bExpandLength)
+		{
+			float fVisibleExtent = 0.5f * std::sqrt(fWidth * fWidth + fLength * fLength);
+			float fScale = (fVisibleExtent > 0.0f && fLightingSize > fVisibleExtent ? fLightingSize / fVisibleExtent : 1.0f) * fLinearMultiplier;
+			fTargetWidth = fWidth * fScale;
+			fTargetLength = fLength * fScale;
+		}
+		else
+		{
+			AreaLightExpandSides_t widthSides(static_cast<AreaLightExpandSides>(rType.expandSides.Mask({AreaLightExpandSides::kLeft, AreaLightExpandSides::kRight})));
+			AreaLightExpandSides_t lengthSides(static_cast<AreaLightExpandSides>(rType.expandSides.Mask({AreaLightExpandSides::kTop, AreaLightExpandSides::kBottom})));
+			fTargetWidth = ExpandSingleAxis(fWidth, fLightingSize, fAreaMultiplier, widthSides);
+			fTargetLength = ExpandSingleAxis(fLength, fLightingSize, fAreaMultiplier, lengthSides);
+		}
 
 		if (fForcedSquare > 0.0f)
 		{
-			XMVECTOR vecHorizontalMask = XMVectorSelectControl(1, 1, 0, 0);
-			XMVECTOR vecWidth = XMVectorSelect(XMVectorZero(), XMVectorSubtract(vecLightingPosition1, vecLightingPosition0), vecHorizontalMask);
-			XMVECTOR vecLength = XMVectorSelect(XMVectorZero(), XMVectorSubtract(vecLightingPosition2, vecLightingPosition0), vecHorizontalMask);
-			float fWidthSquared = XMVectorGetX(XMVector2LengthSq(vecWidth));
-			float fLengthSquared = XMVectorGetX(XMVector2LengthSq(vecLength));
-			if (fWidthSquared != fLengthSquared)
+			if (fTargetWidth < fTargetLength && bExpandWidth)
 			{
-				bool bStretchWidth = fWidthSquared < fLengthSquared;
-				XMVECTOR vecShortEdge = bStretchWidth ? vecWidth : vecLength;
-				XMVECTOR vecLongEdge = bStretchWidth ? vecLength : vecWidth;
-				XMVECTOR vecTargetEdge = XMVector3Cross(vecLongEdge, XMVectorSet(0.0f, 0.0f, bStretchWidth ? -1.0f : 1.0f, 0.0f));
-				if (XMVectorGetX(XMVector2Dot(vecTargetEdge, vecShortEdge)) < 0.0f)
-				{
-					vecTargetEdge = XMVectorNegate(vecTargetEdge);
-				}
-
-				XMVECTOR vecOffset = XMVectorScale(XMVectorSubtract(vecTargetEdge, vecShortEdge), 0.5f * fForcedSquare);
-				XMVECTOR vecMiddleOffset = bStretchWidth ? vecOffset : XMVectorNegate(vecOffset);
-				vecLightingPosition0 = XMVectorSelect(vecLightingPosition0, XMVectorSubtract(vecLightingPosition0, vecOffset), vecHorizontalMask);
-				vecLightingPosition1 = XMVectorSelect(vecLightingPosition1, XMVectorAdd(vecLightingPosition1, vecMiddleOffset), vecHorizontalMask);
-				vecLightingPosition2 = XMVectorSelect(vecLightingPosition2, XMVectorSubtract(vecLightingPosition2, vecMiddleOffset), vecHorizontalMask);
-				vecLightingPosition3 = XMVectorSelect(vecLightingPosition3, XMVectorAdd(vecLightingPosition3, vecOffset), vecHorizontalMask);
+				fTargetWidth += (fTargetLength - fTargetWidth) * fForcedSquare;
+			}
+			else if (fTargetLength < fTargetWidth && bExpandLength)
+			{
+				fTargetLength += (fTargetWidth - fTargetLength) * fForcedSquare;
 			}
 		}
+
+		float fWidthDelta = fTargetWidth - fWidth;
+		float fLengthDelta = fTargetLength - fLength;
+		XMVECTOR vecWidthOffset = XMVectorScale(vecWidthDirection, (bExpandLeft && bExpandRight) ? (0.5f * fWidthDelta) : fWidthDelta);
+		XMVECTOR vecLengthOffset = XMVectorScale(vecLengthDirection, (bExpandTop && bExpandBottom) ? (0.5f * fLengthDelta) : fLengthDelta);
+		XMVECTOR vecTopOffset = bExpandTop ? vecLengthOffset : XMVectorZero();
+		XMVECTOR vecBottomOffset = bExpandBottom ? XMVectorNegate(vecLengthOffset) : XMVectorZero();
+		XMVECTOR vecLeftOffset = bExpandLeft ? XMVectorNegate(vecWidthOffset) : XMVectorZero();
+		XMVECTOR vecRightOffset = bExpandRight ? vecWidthOffset : XMVectorZero();
+
+		XMVECTOR vecLightingPosition0 = XMVectorAdd(XMVectorAdd(vecVisiblePosition0, vecTopOffset), vecLeftOffset);
+		XMVECTOR vecLightingPosition1 = XMVectorAdd(XMVectorAdd(vecVisiblePosition1, vecTopOffset), vecRightOffset);
+		XMVECTOR vecLightingPosition2 = XMVectorAdd(XMVectorAdd(vecVisiblePosition2, vecBottomOffset), vecLeftOffset);
+		XMVECTOR vecLightingPosition3 = XMVectorAdd(XMVectorAdd(vecVisiblePosition3, vecBottomOffset), vecRightOffset);
 
 		// Rebasing translates the bounding box, so converting its two corners preserves the rectangle.
 		auto [vecMinimum, vecMaximum] = common::ComputeAxisAlignedBoundingBox(vecVisiblePosition0, vecVisiblePosition1, vecVisiblePosition2, vecVisiblePosition3, vecLightingPosition0, vecLightingPosition1, vecLightingPosition2, vecLightingPosition3);
@@ -163,15 +191,15 @@ void AreaLightsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate
 
 		// Deposits emit independently of visible-sprite culling so offscreen lights overlapping GlobalLayout::f4LightingArea
 		// contribute; Vulkan clipping discards off-area quads.
-		if (iRefreshLayer >= 0 && gpFlightPlanes->NearestPlaneIndex(XMVectorGetZ(vecCenter)) == iRefreshLayer)
+		if (gbLightingRefreshFrame)
 		{
 			float fBlurredTextureIndex = gpTextureManager->mTextureDescriptors.CrcToBlurredIndex(rType.uiCrc);
 			shaders::QuadLayout& rAreaLayout = pAreaLightsLayouts[siDepositsRendered];
 
-			XMVECTOR vecBaseLighting0 = ProjectToFlightPlane(vecLightingPosition0, rBasis, iRefreshLayer);
-			XMVECTOR vecBaseLighting1 = ProjectToFlightPlane(vecLightingPosition1, rBasis, iRefreshLayer);
-			XMVECTOR vecBaseLighting2 = ProjectToFlightPlane(vecLightingPosition2, rBasis, iRefreshLayer);
-			XMVECTOR vecBaseLighting3 = ProjectToFlightPlane(vecLightingPosition3, rBasis, iRefreshLayer);
+			XMVECTOR vecBaseLighting0 = ProjectToBaseHeight(vecLightingPosition0, rBasis);
+			XMVECTOR vecBaseLighting1 = ProjectToBaseHeight(vecLightingPosition1, rBasis);
+			XMVECTOR vecBaseLighting2 = ProjectToBaseHeight(vecLightingPosition2, rBasis);
+			XMVECTOR vecBaseLighting3 = ProjectToBaseHeight(vecLightingPosition3, rBasis);
 
 			XMFLOAT4A f4Base {};
 			XMStoreFloat4A(&f4Base, vecBaseLighting0);
@@ -183,9 +211,10 @@ void AreaLightsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate
 			XMStoreFloat4A(&f4Base, vecBaseLighting3);
 			rAreaLayout.pf4VerticesTextureCoordinates[3] = {f4Base.x, f4Base.y, rType.pf2TextureCoordinates[3].x, rType.pf2TextureCoordinates[3].y};
 
+			float fEffectiveAreaMultiplier = (bExpandWidth || bExpandLength) ? fAreaMultiplier : 1.0f;
 			XMFLOAT4A f4Parameters {};
 			f4Parameters.x = fBlurredTextureIndex;
-			f4Parameters.y = fLightingIntensity * fIntensityMultiplier / fAreaMultiplier;
+			f4Parameters.y = fLightingIntensity * fIntensityMultiplier / fEffectiveAreaMultiplier;
 			rAreaLayout.pf4Parameters[0] = f4Parameters;
 			rAreaLayout.pf4Parameters[1] = f4Parameters;
 			rAreaLayout.pf4Parameters[2] = f4Parameters;

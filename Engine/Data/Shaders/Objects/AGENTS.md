@@ -15,8 +15,7 @@ lighting-deposit passes.
   center-normal XY rather than a source-to-fragment offset. A nearly up-facing
   normal produces zero directional deposit instead of an omnidirectional
   fallback.
-- The lighting pass places each vertex where its eye line meets the refreshing
-  lighting layer's flight plane (`uiLightingRefreshLayer`), the plane that
-  layer's readers sample, at any camera tilt.
+- The lighting pass places each vertex where its eye line meets the base flight
+  plane (`fBaseHeight`), the plane lighting readers sample, at any camera tilt.
 
 Shared shader layout and EWNS conventions live in the shader hub.

@@ -38,28 +38,33 @@ never build or modify that output; source changes use the `/compile`
   no healing, so `healedClaims` is an empty array; every other plan operation
   rejects the switch as a usage error. `list` previews the scheduler row states
   from the session tree without changing anything — no guard, no healing, no
-  storage — and reports every executable Plan of that tree in selection order as
-  `eligible`, `blocked` naming its unmet prerequisites, `excluded` with its
+  storage — and reports every executable Plan of that tree in selection order
+  (with optional `agentCli` and `agentCliMismatch` under those scheduler rules)
+  as `eligible`, `blocked` naming its unmet prerequisites, `excluded` with its
   diagnostic, or `claimed` with the live claim's session, worktree, and expiry;
   documents whose metadata never parsed stay in the diagnostics instead of
   becoming rows, and a claim record it cannot use is ignored rather than
   deleted. `list` requires session `HEAD` to be on the primary line — an
   ancestor of, equal to, or a descendant of the primary tip, the last being the
   shape a prepared landing candidate has — and reports `git-identity-mismatch`
-  for a session related in neither direction. `claim-next` requires session
-  `HEAD` to be an ancestor of (or equal to) the primary tip, and evaluates
-  eligibility, dependency blocking, and healing against the primary tip so a
-  behind session never heals a peer's claim or claims past a prerequisite landed
-  after its baseline, while reading the exact bytes the selector uses from the
-  session tree. A session Coretide clone's `HEAD` must stand in the same
-  relation to the primary Coretide `HEAD`, whose Plans join the primary tip
-  whether or not the session holds a clone. WorktreeCli alone compares a
-  targeted request with an existing session claim: `claim-status --plan` and
-  `claim-next --plan` return `claim-plan-mismatch` with the differing
-  normalized `requestedPlan` and `heldPlan`, leaving the claim unchanged.
-  `complete` and `reject` rewrite the markers of direct dependency children,
-  delete the target Plan file, and report every changed path; `reject`
-  additionally requires `--user-authorized-rejection`.
+  for a session related in neither direction.
+  `claim-next` requires session `HEAD` to be an ancestor of (or equal to) the
+  primary tip, and evaluates eligibility, dependency blocking, and healing
+  against the primary tip so a behind session never heals a peer's claim or
+  claims past a prerequisite landed after its baseline, while reading the exact
+  bytes the selector uses from the session tree. A session Coretide clone's
+  `HEAD` must stand in the same relation to the primary Coretide `HEAD`, whose
+  Plans join the primary tip whether or not the session holds a clone.
+  WorktreeCli alone compares a targeted request with an existing session claim:
+  `claim-status --plan` and `claim-next --plan` return `claim-plan-mismatch`
+  with the differing normalized `requestedPlan` and `heldPlan`, leaving the
+  claim unchanged. Targeted `claim-next --plan` accepts
+  `--allow-agent-cli-mismatch` to override an `agentCli` lock under those
+  scheduler rules (otherwise reporting `agentCliLock` on `none` only when the
+  CLI lock caused the refusal). `complete` and `reject` rewrite the markers of
+  direct dependency children (preserving `agentCli`), delete the target Plan
+  file, and report every changed path; `reject` additionally requires
+  `--user-authorized-rejection`.
 - `build` prints one `broken-engine-build-result/v1` JSON object to stdout;
   human progress goes to stderr. It retains the combined MSBuild stream in the
   invoking worktree's ignored `Temp\AgentBuildLogs\` path and parses structured

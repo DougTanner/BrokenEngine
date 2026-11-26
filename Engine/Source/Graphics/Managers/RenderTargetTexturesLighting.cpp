@@ -5,18 +5,13 @@
 #include "Ui/LightingWrappersBase.h"
 #include "TextureManager.h"
 
-#include "Frame/FlightPlaneTable.h"
-
 namespace engine
 {
 
-// Lighting layer k is flight plane k's layer, and every lighting reader assumes exactly two planes.
-static_assert(std::ssize(game::kFlightPlanes) == shaders::kiLightingLayers);
-
-// TextureInfo keeps the name view and Vulkan object naming reads its data(), so per-layer and per-pass names need static storage.
-constexpr std::string_view kppCombineNames[shaders::kiLightingLayers][3] {{"CombineRed0", "CombineGreen0", "CombineBlue0"}, {"CombineRed1", "CombineGreen1", "CombineBlue1"}};
-constexpr std::string_view kpAmbientCombineNames[shaders::kiLightingLayers] {"CombineAmbient0", "CombineAmbient1"};
-constexpr std::string_view kppHistoryNames[shaders::kiLightingLayers][3] {{"LightingHistoryRed0", "LightingHistoryGreen0", "LightingHistoryBlue0"}, {"LightingHistoryRed1", "LightingHistoryGreen1", "LightingHistoryBlue1"}};
+// TextureInfo keeps the name view and Vulkan object naming reads its data(), so per-pass names need static storage.
+constexpr std::string_view kpCombineNames[3] {"CombineRed", "CombineGreen", "CombineBlue"};
+constexpr std::string_view kAmbientCombineName = "CombineAmbient";
+constexpr std::string_view kpHistoryNames[3] {"LightingHistoryRed", "LightingHistoryGreen", "LightingHistoryBlue"};
 static std::string sppSpreadNames[shaders::kiMaxSpreadPasses][3];
 static std::string sppSpreadOnlyNames[shaders::kiMaxSpreadPasses][3];
 
@@ -24,15 +19,12 @@ void RenderTargetTextures::DestroyLightingTextures()
 {
 	miDebugTextureCount = 0;
 
-	for (int64_t i = 0; i < shaders::kiLightingLayers; ++i)
+	for (int64_t i = 0; i < 3; ++i)
 	{
-		for (int64_t j = 0; j < 3; ++j)
-		{
-			mpCombineTextures[i][j].Destroy();
-			mpLightingHistoryTextures[i][j].Destroy();
-		}
-		mpAmbientCombineTextures[i].Destroy();
+		mpCombineTextures[i].Destroy();
+		mpLightingHistoryTextures[i].Destroy();
 	}
+	mAmbientCombineTexture.Destroy();
 
 	for (int64_t i = 0; i < shaders::kiMaxSpreadPasses; ++i)
 	{
@@ -330,7 +322,7 @@ void RenderTargetTextures::CreateLightingTextures()
 	TextureInfo combineTextureInfo
 	{
 		.textureFlags = {},
-		.name = kppCombineNames[0][0],
+		.name = kpCombineNames[0],
 		.vkImageCreateFlags = 0,
 		.vkFormat = shaders::kVkFormatCombine,
 		.vkExtent3D = VkExtent3D {.width = static_cast<uint32_t>(iCombineX), .height = static_cast<uint32_t>(iCombineY), .depth = 1},
@@ -343,32 +335,22 @@ void RenderTargetTextures::CreateLightingTextures()
 		.eTextureLayout = TextureLayout::kShaderReadOnly,
 	};
 
-	for (int64_t i = 0; i < shaders::kiLightingLayers; ++i)
+	for (int64_t i = 0; i < 3; ++i)
 	{
-		for (int64_t j = 0; j < 3; ++j)
-		{
-			combineTextureInfo.name = kppCombineNames[i][j];
-			mpCombineTextures[i][j].Create(combineTextureInfo);
-			combineTextureInfo.name = kppHistoryNames[i][j];
-			mpLightingHistoryTextures[i][j].Create(combineTextureInfo);
-		}
-		combineTextureInfo.name = kpAmbientCombineNames[i];
-		mpAmbientCombineTextures[i].Create(combineTextureInfo);
+		combineTextureInfo.name = kpCombineNames[i];
+		mpCombineTextures[i].Create(combineTextureInfo);
+		combineTextureInfo.name = kpHistoryNames[i];
+		mpLightingHistoryTextures[i].Create(combineTextureInfo);
 	}
+	combineTextureInfo.name = kAmbientCombineName;
+	mAmbientCombineTexture.Create(combineTextureInfo);
 
 	ClearLightingTextures();
 
 	// Final output points to combine textures (tone-mapped UNORM)
-	for (int64_t i = 0; i < shaders::kiLightingLayers; ++i)
-	{
-		for (int64_t j = 0; j < 3; ++j)
-		{
-			mppLightingFinalTextures[i * 3 + j] = &mpCombineTextures[i][j];
-		}
-		mppAmbientCombineTextures[i] = &mpAmbientCombineTextures[i];
-	}
 	for (int64_t i = 0; i < 3; ++i)
 	{
+		mppLightingFinalTextures[i] = &mpCombineTextures[i];
 		mppLightingDepositTextures[i] = &mpLightingTextures[i];
 	}
 
@@ -393,7 +375,7 @@ void RenderTargetTextures::RegisterDebugTextures(int64_t iPassCount)
 		mppDebugTexturesC[kiTerrainDebugSlotCount + 2 + i] = &mpSpreadTextures[i][2];
 		mpiDebugTextureFormats[kiTerrainDebugSlotCount + 2 + i] = shaders::kiDebugTextureFormatFloat16SpreadDirectionCombined;
 	}
-	mppDebugTextures[kiTerrainDebugSlotCount + 2 + iPassCount] = &mpCombineTextures[0][0];
+	mppDebugTextures[kiTerrainDebugSlotCount + 2 + iPassCount] = &mpCombineTextures[0];
 	mpiDebugTextureFormats[kiTerrainDebugSlotCount + 2 + iPassCount] = shaders::kiDebugTextureFormatUnormLightingDirectional;
 	miDebugTextureCount = kiTerrainDebugSlotCount + 3 + iPassCount;
 

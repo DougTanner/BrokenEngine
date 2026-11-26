@@ -1,12 +1,12 @@
 [CmdletBinding()]
 param(
-	[Parameter(Mandatory)][string] $Client,
-	[Parameter(Mandatory)][string] $RepositoryRoot,
+	[Parameter(Mandatory, Position = 0)][string] $Client,
 	[string[]] $ClientArguments = @(switch -CaseSensitive ($Client) {
 		'agy' { '--dangerously-skip-permissions' }
+		'claude' { '--dangerously-skip-permissions' }
 		'codex' { '--no-daemon', '--dangerously-bypass-approvals-and-sandbox', '--dangerously-bypass-hook-trust' }
 	}),
-	[string] $ReattachWorktree,
+	[ValidatePattern('\S')][string] $ReattachWorktree,
 	[int] $WaitSeconds = 500
 )
 
@@ -22,22 +22,11 @@ if ($Client -cnotin $supportedClients) {
 	throw "Client must be lowercase: $clientList."
 }
 
-# Claude carries client arguments out of band because -File treats a leading dash as a
-# PowerShell parameter. Do not clear the transport variable until reattach validation succeeds:
-# rejected reattach attempts must leave the caller environment unchanged.
-$clearClaudeArgumentTransport = $false
-if ($Client -ceq 'claude' -and -not [string]::IsNullOrEmpty($env:BROKEN_ENGINE_CLIENT_ARGUMENTS))
-{
-	$decoded = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($env:BROKEN_ENGINE_CLIENT_ARGUMENTS))
-	$parts = @($decoded -split "`0")
-	if ($parts.Count -ge 2) { $ClientArguments = @($parts[0..($parts.Count - 2)]) }
-	$clearClaudeArgumentTransport = $true
-}
-
+$repositoryRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $worktreeCreated = $false
 $exitCode = 1
 try {
-	$primary = Get-AgentWorktreePrimaryCheckout $RepositoryRoot
+	$primary = Get-AgentWorktreePrimaryCheckout $repositoryRoot
 	$root = $primary.Root
 	$identity = $null
 	$rebaseInProgress = $false
@@ -46,7 +35,9 @@ try {
 		# Reattach identity is Git-derived: the worktree must be uniquely registered against this primary
 		# checkout and sit on a session branch whose uuid is the session owner. An in-progress rebase is
 		# reported, not repaired - the session resolves it itself.
-		$reattachTarget = Get-AgentCanonicalPath $ReattachWorktree
+		$resolvedReattach = @(Resolve-Path -LiteralPath $ReattachWorktree -ErrorAction Stop)[0].ProviderPath
+		$reattachTarget = Get-AgentCanonicalPath $resolvedReattach
+		if ($reattachTarget.Equals($root, [StringComparison]::OrdinalIgnoreCase)) { throw "Worktree '$reattachTarget' is the primary checkout and cannot be reattached." }
 		$records = @(Get-AgentWorktreeRecords $root | Where-Object { -not $_.Bare -and $_.Path.Equals($reattachTarget, [StringComparison]::OrdinalIgnoreCase) })
 		if ($records.Count -ne 1 -or $records[0].Prunable) { throw "Worktree '$reattachTarget' is not uniquely registered against '$root', or is prunable." }
 		$branch = $records[0].Branch
@@ -63,7 +54,7 @@ try {
 		$identity = [pscustomobject]@{ Worktree = $reattachTarget; Branch = $branch }
 	}
 	else {
-		$primary = Get-AgentWorktreePrimaryIdentity $RepositoryRoot
+		$primary = Get-AgentWorktreePrimaryIdentity $repositoryRoot
 		$repositoryName = Split-Path -Leaf $root
 		$uuid = [guid]::NewGuid().ToString()
 		$branch = "$Client/$uuid"
@@ -109,7 +100,8 @@ try {
 	if ($worktreeCreated) {
 		& (Join-Path $PSScriptRoot 'Initialize-AgentWorktreeSession.ps1') -RepositoryRoot $root -Worktree $identity.Worktree -TargetBranch $identity.TargetBranch -Baseline $identity.Baseline -WaitSeconds $WaitSeconds
 	}
-	if ($clearClaudeArgumentTransport) { $env:BROKEN_ENGINE_CLIENT_ARGUMENTS = $null }
+	# Reattach restores worktree identity only; open Claude Code's session picker for that directory.
+	if ($Client -ceq 'claude' -and -not $worktreeCreated) { $ClientArguments += '--resume' }
 	# Each session opens a directory agy has not trusted; trust it for this session only.
 	if ($Client -ceq 'agy') { $ClientArguments += @('--settings', (ConvertTo-Json -Compress @{ trustedWorkspaces = @($identity.Worktree) })) }
 	$clientExecutable = (Get-Command $Client -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
@@ -117,7 +109,13 @@ try {
 	$banner = if ($worktreeCreated) { "Created worktree $($identity.Worktree) on branch $($identity.Branch) at baseline $($identity.Baseline)." }
 		else { "Reattached worktree $($identity.Worktree) on branch $($identity.Branch)." }
 	if ($rebaseInProgress) { $banner += "`nThis worktree has a rebase in progress." }
+	$reattachCommand = Format-AgentWorktreeReattachCommand -Client $Client -Worktree $identity.Worktree
+	$banner += "`nReattach: $reattachCommand"
 	Write-Host $banner
+	if ($null -ne (Get-Module PSReadLine)) {
+		try { [Microsoft.PowerShell.PSConsoleReadLine]::AddToHistory($reattachCommand) }
+		catch {}
+	}
 	$exitCode = Invoke-WorktreeCliTrackedProcess -Executable $clientExecutable -ArgumentList $ClientArguments -WorkingDirectory $identity.Worktree
 }
 catch {

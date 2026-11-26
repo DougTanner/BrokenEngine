@@ -30,17 +30,44 @@ float NativeSource(ivec2 i2Coord, ivec2 i2Active)
 	{
 		return 0.0f;
 	}
-	float fJEffective = texelFetch(normalTextureSampler, i2Coord, 0).w;
-	// Zero spawn amplitude leaves J unmodified, so the noise read is skipped.
-	if (globalLayout.fWaterFoamSpawnNoiseAmount != 0.0f)
+	float fHighZoomBlend = mainLayout.fWaterFoamHighZoomBlend;
+	vec2 f2WorldPosition = vec2(0.0f);
+	vec2 f2NoiseUv = vec2(0.0f);
+	if (globalLayout.fWaterFoamSpawnNoiseAmount != 0.0f || fHighZoomBlend > 0.0f)
 	{
-		vec2 f2WorldPosition = VisibleAreaToWorld(f2NativeUv, globalLayout.f4VisibleArea);
+		f2WorldPosition = VisibleAreaToWorld(f2NativeUv, globalLayout.f4VisibleArea);
 		vec2 f2LocalPosition = f2WorldPosition - vec2(globalLayout.fWaterOriginX, globalLayout.fWaterOriginY);
-		vec2 f2NoiseUv = globalLayout.fWaterFoamSpawnNoiseInverseTileSize * f2LocalPosition + globalLayout.f2WaterFoamSpawnNoiseReducedOrigin;
-		float fSignedNoise = 2.0f * TextureLodPatched(globalLayout, spawnNoiseTextureSampler, f2NoiseUv, 0.0f, globalLayout.waterFoamSpawnNoisePatchLattice, f2WorldPosition, globalLayout.fWaterFoamSpawnNoisePatchBlend).r - 1.0f;
-		fJEffective += globalLayout.fWaterFoamSpawnNoiseAmount * fSignedNoise;
+		f2NoiseUv = globalLayout.fWaterFoamSpawnNoiseInverseTileSize * f2LocalPosition + globalLayout.f2WaterFoamSpawnNoiseReducedOrigin;
 	}
-	return clamp((globalLayout.fWaterFoamJStart - fJEffective) * globalLayout.fWaterFoamJInverseRange, 0.0f, 1.0f);
+
+	float fJacobianSource = 0.0f;
+	if (fHighZoomBlend < 1.0f)
+	{
+		float fJEffective = texelFetch(normalTextureSampler, i2Coord, 0).w;
+		// Zero spawn amplitude leaves J unmodified, so the noise read is skipped.
+		if (globalLayout.fWaterFoamSpawnNoiseAmount != 0.0f)
+		{
+			float fSignedNoise = 2.0f * TextureLodPatched(globalLayout, spawnNoiseTextureSampler, f2NoiseUv, 0.0f, globalLayout.waterFoamSpawnNoisePatchLattice, f2WorldPosition, globalLayout.fWaterFoamSpawnNoisePatchBlend).r - 1.0f;
+			fJEffective += globalLayout.fWaterFoamSpawnNoiseAmount * fSignedNoise;
+		}
+		fJacobianSource = clamp((globalLayout.fWaterFoamJStart - fJEffective) * globalLayout.fWaterFoamJInverseRange, 0.0f, 1.0f);
+	}
+
+	if (fHighZoomBlend <= 0.0f)
+	{
+		return fJacobianSource;
+	}
+
+	// Second octave uses an integral 2x scale and 90-degree rotation so modulo-2 CPU origin and scroll wraps stay
+	// exact multiples of the mirrored sampler's 2-tile period.
+	vec2 f2UvOne = f2NoiseUv + mainLayout.f2WaterFoamHighZoomScroll;
+	vec2 f2UvTwo = 2.0f * vec2(-f2NoiseUv.y, f2NoiseUv.x) + vec2(0.37f, 0.71f) - mainLayout.f2WaterFoamHighZoomScroll;
+	float fOctaveOne = TextureLodPatched(globalLayout, spawnNoiseTextureSampler, f2UvOne, 0.0f, globalLayout.waterFoamSpawnNoisePatchLattice, f2WorldPosition, globalLayout.fWaterFoamSpawnNoisePatchBlend).r;
+	float fOctaveTwo = TextureLodPatched(globalLayout, spawnNoiseTextureSampler, f2UvTwo, 0.0f, globalLayout.waterFoamSpawnNoisePatchLattice, f2WorldPosition, globalLayout.fWaterFoamSpawnNoisePatchBlend).r;
+	float fCrest = sqrt(fOctaveOne * fOctaveTwo);
+	float fSyntheticJ = 1.0f - fCrest;
+	float fHighZoomSource = clamp((globalLayout.fWaterFoamJStart - fSyntheticJ) * globalLayout.fWaterFoamJInverseRange, 0.0f, 1.0f);
+	return mix(fJacobianSource, fHighZoomSource, fHighZoomBlend);
 }
 
 void main()

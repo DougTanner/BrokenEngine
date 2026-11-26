@@ -14,7 +14,7 @@ class RenderInterpolation
 public:
 
 	void ResetRenderClock();
-	void UpdateRenderInterpolation(GameBase& rGame, const std::vector<GridCoord>& rActiveCoordinates, GridCoord cameraCoordinate, bool bHaveRenderableCamera);
+	bool UpdateRenderInterpolation(GameBase& rGame, const std::vector<GridCoord>& rActiveCoordinates, GridCoord cameraCoordinate, bool bHaveRenderableCamera);
 
 	// Pulls the game camera's target, runs the display-rate camera update for the coord the camera renders, and sets
 	// controller vibration from the decayed shake; shared by GameBase::Render() and the Main.cpp boot render.

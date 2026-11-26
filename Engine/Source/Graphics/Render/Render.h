@@ -51,14 +51,12 @@ inline XMFLOAT2 XM_CALLCONV ComputeModelShadowRange(const ModelShadowBounds& rBo
 	return f2Range;
 }
 
-// vecPosition is in the camera cell's frame. The caller passes its nearest flight plane because FlightPlanes.h follows
-// this header in Engine.h. A null pAnimationData leaves the instance unskinned.
-inline void XM_CALLCONV FillModelLayout(const ModelShadowBounds& rShadowBounds, FXMMATRIX matAlignment, CXMMATRIX matInstanceTransform, FXMVECTOR vecPosition, int64_t iPlane, const AnimationData* pAnimationData, const SkinningReservation& rReservation, int64_t iInstance, std::chrono::duration<float> animationTime, shaders::ModelLayout& rModelLayout)
+// vecPosition is in the camera cell's frame. A null pAnimationData leaves the instance unskinned.
+inline void XM_CALLCONV FillModelLayout(const ModelShadowBounds& rShadowBounds, FXMMATRIX matAlignment, CXMMATRIX matInstanceTransform, FXMVECTOR vecPosition, const AnimationData* pAnimationData, const SkinningReservation& rReservation, int64_t iInstance, std::chrono::duration<float> animationTime, shaders::ModelLayout& rModelLayout)
 {
 	XMMATRIX matTransform = matAlignment * matInstanceTransform;
-	XMStoreFloat4(&rModelLayout.f4PositionLayer, vecPosition);
+	XMStoreFloat4(&rModelLayout.f4Position, vecPosition);
 	rModelLayout.f2ShadowWorldXRange = {ComputeModelShadowRange(rShadowBounds, matInstanceTransform, vecPosition)};
-	rModelLayout.f4PositionLayer.w = static_cast<float>(iPlane);
 	XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(&rModelLayout.f3x4Transform[0]), matTransform);
 	XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(&rModelLayout.f3x4TransformNormal[0]), XMMatrixTranspose(XMMatrixInverse(nullptr, matTransform)));
 	rModelLayout.f4ColorAdd = {0.0f, 0.0f, 0.0f, 0.0f};
@@ -104,8 +102,8 @@ inline WorldSizedTexelArea XM_CALLCONV ComputeWorldSizedTexelArea(float fExtraAr
 	};
 }
 
-// Retained world rectangles (shadow, lighting, and water foam history, the held object-shadow area, and each smoke
-// plane's held area) are expressed in the camera cell's frame, so they follow the camera when it changes cell. The
+// Retained world rectangles (shadow, lighting, and water foam history, the held object-shadow area, and the smoke
+// field's held area) are expressed in the camera cell's frame, so they follow the camera when it changes cell. The
 // whole-cell shift applies at any step distance, so GPU history stays usable wherever the camera's view still overlaps
 // it.
 struct RetainedAreaBasis
@@ -190,7 +188,7 @@ struct TemporalAreaLatch
 
 // What the last published frame actually sent, for the read-only presentation_continuity_probe agent command; nothing
 // in rendering reads it back. Every field is written on the client main loop thread inside RenderFrameGlobal, each by
-// its own owner: GlobalUniforms.cpp writes shadow and f4ObjectShadowArea, LightingUniforms.cpp writes pLighting,
+// its own owner: GlobalUniforms.cpp writes shadow and f4ObjectShadowArea, LightingUniforms.cpp writes lighting,
 // SmokeUniforms.cpp writes smoke, and WaterUniforms.cpp writes the camera basis, the water origins, fNoiseFrequency, the
 // water lattices, and — because it is populated last — iPublishedFrames, so the counter advances only for a frame whose
 // whole snapshot is complete.
@@ -218,7 +216,7 @@ struct PresentationContinuitySnapshot
 	float fNoiseFrequency = 0.0f;
 	RetainedAreaReport shadow {};
 	XMFLOAT4 f4ObjectShadowArea {};
-	RetainedAreaReport pLighting[shaders::kiLightingLayers] {}; // Per lighting layer
+	RetainedAreaReport lighting {};
 	RetainedAreaReport smoke {};
 	LatticeReport pWaterNormalLattices[std::extent_v<decltype(shaders::GlobalLayout::pWaterNormalPatchLattices)>] {}; // In GlobalLayout order
 	LatticeReport pWaterColorNoiseLattices[std::extent_v<decltype(shaders::GlobalLayout::pWaterColorNoisePatchLattices)>] {};
@@ -234,13 +232,6 @@ inline PresentationContinuitySnapshot gPresentationContinuity {};
 // supported range, or 0 for zero frequency, anchored at the camera cell. Returns what it wrote, without the seed.
 LatticeReport PopulatePatchLattice(shaders::PatchLatticeLayout& rLattice, double fFrequency, uint32_t uiSeed);
 
-// Lerps from fBottom at the lowest flight plane to fTop at the highest by plane index; a single plane takes fBottom.
-inline float FlightPlaneLerp(float fBottom, float fTop, int64_t i, int64_t iPlaneCount)
-{
-	float fPlaneFraction = iPlaneCount > 1 ? static_cast<float>(i) / static_cast<float>(iPlaneCount - 1) : 0.0f;
-	return std::lerp(fBottom, fTop, fPlaneFraction);
-}
-
 float MoonAmount(float fSunAngle);
 
 void RenderFrameGlobal(int64_t iCommandBuffer, std::chrono::duration<float> currentTime);
@@ -255,12 +246,11 @@ inline bool gbObjectShadowsReset = true;
 inline bool gbObjectShadowsRefreshFrame = false;
 
 // Set by RenderTargetTextures::ClearLightingTextures on creation and disable; re-arms the PopulateLightingParameters
-// first-frame guard so neither blends stale history for one frame.
+// first-frame guard so lighting does not blend stale history for one frame.
 inline bool gbLightingTemporalReset = false;
-// The active lighting layer whose deposit, spread, combine, temporal, and history-copy work runs this frame, or -1
-// when skipped or when Lighting is disabled. PopulateLightingParameters writes it once per frame in Global; lighting
-// deposit collections and RenderLightingSpreadIndirect read it in Main.
-inline int64_t giLightingRefreshLayer = -1;
+// Enables indirect draws and dispatches for lighting refresh. PopulateLightingParameters writes it once per frame in
+// Global; lighting deposit collections and RenderLightingSpreadIndirect read it in Main.
+inline bool gbLightingRefreshFrame = false;
 void RenderLightingGlobal(int64_t iCommandBuffer);
 void RenderLightingMain(int64_t iCommandBuffer);
 void RenderWaterMain(int64_t iCommandBuffer, std::chrono::duration<float> currentTime);

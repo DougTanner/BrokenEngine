@@ -53,12 +53,13 @@ Do not add unit tests or unsupported implementation detail.
 
 Derive the future implementation's Change Workflow Tier 1/2/3 from the highest
 risk trigger in [`risk-tiers.md`](../../../references/risk-tiers.md) and record
-that trigger in the Plan. Pass directional prerequisites via `-DependsOn`; for a
-`## Unresolved decisions` follow-up, pass `-UnresolvedFollowUp`
-([`new-plan-file.md`](../../../references/new-plan-file.md#invocation)). Put
-other mandatory nondirectional constraints in reciprocal `## Coordination`
-sections. Never name a completing `/next-plan` Plan in the body or pass it via
-`-DependsOn`
+that trigger in the Plan. Pass dependencies via `-DependsOn` per
+[`Documents/Plans/AGENTS.md`](../../../../Documents/Plans/AGENTS.md)
+`## Plan files` and
+[`new-plan-file.md`](../../../references/new-plan-file.md#invocation), omitting
+`-DependsOn` for a `## Unresolved decisions` follow-up. Put other mandatory
+nondirectional constraints in reciprocal `## Coordination` sections. Never name
+a completing `/next-plan` Plan in the body or pass it via `-DependsOn`
 ([`claim-results.md`](../../next-plan/references/claim-results.md#claim-exit-result-fields)).
 Do not add score, effort ranking, queue tier, queue row, request file, or claim
 data.
@@ -69,7 +70,7 @@ For a tooling-friction proposal, draft the body from
 Create the file with the repository-owned `.agents/scripts/New-PlanFile.ps1`:
 
 ```powershell
-pwsh -NoProfile -File .agents/scripts/New-PlanFile.ps1 -Area <area> -Name <PascalCase.md> -Body <body file path> [-DependsOn <plan paths as one comma-separated token> | -UnresolvedFollowUp]
+pwsh -NoProfile -File .agents/scripts/New-PlanFile.ps1 -Area <area> -Name <PascalCase.md> -Body <body file path> [-DependsOn <plan paths as one comma-separated token>]
 ```
 
 Its parameters, the `-DependsOn` single-token rule, its result shape, and its

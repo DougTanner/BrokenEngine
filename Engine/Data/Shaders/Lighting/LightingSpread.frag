@@ -57,20 +57,15 @@ void main()
 	float fDistanceFalloff = mix(globalLayout.fSpreadDistanceFalloffStart, globalLayout.fSpreadDistanceFalloffEnd, fT);
 	float fOutputCompress = mix(globalLayout.fSpreadOutputCompressStart, globalLayout.fSpreadOutputCompressEnd, fT);
 
-	// Height fade: attenuate spread above base height. Only the low layer spreads over terrain; the high layer's plane lies
-	// above every island, so it keeps the unfaded distance and decay.
-	if (globalLayout.uiLightingRefreshLayer == 0u)
-	{
-		// World position of this spread texel and its on-screen (visible-area) UV for the height-fade elevation sample.
-		vec2 f2WorldPos = VisibleAreaToWorld(f2InTexcoord, globalLayout.f4LightingArea);
-		vec2 f2ElevTexcoord = WorldToVisibleArea(vec3(f2WorldPos, 0.0f), globalLayout.visibleAreaToUv);
+	// Height fade: attenuate spread above base height.
+	vec2 f2WorldPos = VisibleAreaToWorld(f2InTexcoord, globalLayout.f4LightingArea);
+	vec2 f2ElevTexcoord = WorldToVisibleArea(vec3(f2WorldPos, 0.0f), globalLayout.visibleAreaToUv);
 
-		float fElevation = texture(elevationSampler, f2ElevTexcoord).x;
-		float fHeightT = clamp((fElevation - globalLayout.fBaseHeight) * globalLayout.fSpreadHeightEndHeightInverse, 0.0f, 1.0f);
-		float fHeightFade = pow(fHeightT, globalLayout.fSpreadHeightPower) * globalLayout.fSpreadHeightMultiplier;
-		fSpreadDistance *= 1.0f - fHeightFade;
-		fDecay *= 1.0f - fHeightFade;
-	}
+	float fElevation = texture(elevationSampler, f2ElevTexcoord).x;
+	float fHeightT = clamp((fElevation - globalLayout.fBaseHeight) * globalLayout.fSpreadHeightEndHeightInverse, 0.0f, 1.0f);
+	float fHeightFade = pow(fHeightT, globalLayout.fSpreadHeightPower) * globalLayout.fSpreadHeightMultiplier;
+	fSpreadDistance *= 1.0f - fHeightFade;
+	fDecay *= 1.0f - fHeightFade;
 
 	// World-to-texcoord conversion: texcoord 0-1 covers the lighting area. The mapping's y scale carries the Y flip, so
 	// its negation is the positive reciprocal extent.

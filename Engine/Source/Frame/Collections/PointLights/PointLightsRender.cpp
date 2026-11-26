@@ -22,7 +22,7 @@ void PointLightsInterpolate::GraphicsResources()
 }
 
 static int64_t siRendered = 0; // Visible-sprite cursor
-static int64_t siDepositsRendered = 0; // Active-layer deposit cursor
+static int64_t siDepositsRendered = 0; // Deposit cursor
 
 void PointLightsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords)
 {
@@ -39,7 +39,7 @@ void PointLightsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer
 		return;
 	}
 
-	if (giLightingRefreshLayer >= 0)
+	if (gbLightingRefreshFrame)
 	{
 		if (Buffer* pBuffer = gpBufferManager->ResizeDynamicBufferIfNeeded(kCrc, kBufferMain, kpcName, sizeof(shaders::AxisAlignedQuadLayout), iTotalCapacity, iCommandBuffer); pBuffer != nullptr)
 		{
@@ -62,9 +62,8 @@ void PointLightsInterpolate::Render([[maybe_unused]] const game::FrameInterpolat
 		return;
 	}
 
-	int64_t iRefreshLayer = giLightingRefreshLayer;
 	shaders::AxisAlignedQuadLayout* pPointLightsLayouts = nullptr;
-	if (iRefreshLayer >= 0)
+	if (gbLightingRefreshFrame)
 	{
 		auto [pLayouts, iPointLightsBufferCapacity] = gpBufferManager->GetDynamicStorageBuffer<shaders::AxisAlignedQuadLayout>(kCrc, kBufferMain, iCommandBuffer);
 		ASSERT(siDepositsRendered + rCurrent.iCount <= iPointLightsBufferCapacity);
@@ -93,7 +92,7 @@ void PointLightsInterpolate::Render([[maybe_unused]] const game::FrameInterpolat
 			fLightingIntensity = rType.pLightingIntensityWrapper != nullptr ? rType.pLightingIntensityWrapper->mfCurrent : rType.fLightingIntensity;
 		}
 
-		// The visible sprite uses the position in the camera cell's frame before flight-plane projection.
+		// The visible sprite uses the position in the camera cell's frame before base-height projection.
 		XMFLOAT4A f4VisiblePosition {};
 		if (IsPointVisible(Rebase(rBasis, vecLocalPosition), f4VisiblePosition))
 		{
@@ -142,11 +141,11 @@ void PointLightsInterpolate::Render([[maybe_unused]] const game::FrameInterpolat
 			++siRendered;
 		}
 
-		// Deposits for the refreshing layer bypass visible-sprite culling. Vulkan clips the quads after the vertex shader maps f4LightingArea to clip space.
-		if (iRefreshLayer >= 0 && fLightingArea > 0.0f && gpFlightPlanes->NearestPlaneIndex(XMVectorGetZ(vecLocalPosition)) == iRefreshLayer)
+		// Deposits bypass visible-sprite culling. Vulkan clips the quads after the vertex shader maps f4LightingArea to clip space.
+		if (gbLightingRefreshFrame && fLightingArea > 0.0f)
 		{
 			XMFLOAT4A f4ProjectedPosition {};
-			XMStoreFloat4A(&f4ProjectedPosition, ProjectToFlightPlane(vecLocalPosition, rBasis, iRefreshLayer));
+			XMStoreFloat4A(&f4ProjectedPosition, ProjectToBaseHeight(vecLocalPosition, rBasis));
 
 			float fBlurredTextureIndex = gpTextureManager->mTextureDescriptors.CrcToBlurredIndex(rType.uiCrc);
 			XMFLOAT4A f4Parameters {};

@@ -11,10 +11,10 @@ layout (set = 0, binding = kiGlobalBindingGlobalUniform) uniform globalUniform
 };
 
 layout (set = 1, binding = 1) uniform sampler2D objectShadowsTextureSampler;
-layout (set = 1, binding = 2, rgba16f) uniform writeonly image2D objectShadowsBlurIntermediateTexture; // kVkFormatObjectShadows
+layout (set = 1, binding = 2, r16f) uniform writeonly image2D objectShadowsBlurIntermediateTexture; // kVkFormatObjectShadows
 
 // The workgroup's row strip plus iRadius taps on each side, each texel fetched once.
-shared vec4 sf4Taps[kiObjectShadowsBlurStripLength + 2 * kiMaxObjectShadowsBlurRadius];
+shared float sfTaps[kiObjectShadowsBlurStripLength + 2 * kiMaxObjectShadowsBlurRadius];
 
 void main()
 {
@@ -32,20 +32,18 @@ void main()
 	for (int i = iLocal; i < kiObjectShadowsBlurStripLength + 2 * iRadius; i += kiObjectShadowsBlurStripLength)
 	{
 		float fU = (float(iStripStart - iRadius + i) + 0.5f) * f2InvOutputSize.x;
-		sf4Taps[i] = textureLod(objectShadowsTextureSampler, vec2(fU, fV), 0.0f);
+		sfTaps[i] = textureLod(objectShadowsTextureSampler, vec2(fU, fV), 0.0f).x;
 	}
 	barrier();
 
 	if (iX >= i2OutputSize.x)
 		return;
 
-	// Each channel blurs with its own sigma, so taps are discrete: bilinear pairing would need one shared offset per
-	// tap pair.
-	vec4 f4Total = vec4(0.0f);
+	float fTotal = 0.0f;
 	for (int i = -iRadius; i <= iRadius; ++i)
 	{
-		f4Total += globalLayout.pf4ObjectShadowsBlurWeights[abs(i)] * sf4Taps[iLocal + iRadius + i];
+		fTotal += globalLayout.pfObjectShadowsBlurWeights[abs(i)] * sfTaps[iLocal + iRadius + i];
 	}
 
-	imageStore(objectShadowsBlurIntermediateTexture, ivec2(iX, iY), f4Total);
+	imageStore(objectShadowsBlurIntermediateTexture, ivec2(iX, iY), vec4(fTotal, 0.0f, 0.0f, 0.0f));
 }

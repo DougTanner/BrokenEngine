@@ -38,6 +38,12 @@ Original AI-generated images made with OpenAI image generation, without an
 external reference. Resized from 1254x1254 to opaque RGB 1024x1024 PNG using
 bicubic resampling. These are generated images, not licensed photographs.
 
+  [BC7]FoamTurbulentBands.png
+Original AI-generated image without an external reference. Converted from
+1024x1024 RGB to 1024x1024 8-bit RGBA PNG with a monotonic luminance erosion
+heightfield in the alpha channel and edge-dilated foam/plume RGB in zero-alpha
+regions. This is a generated image, not a licensed photograph.
+
   [BC7]FoamAmbientCGWhite.png
 AI-generated brightened derivative referencing ambientCG Foam001's Color map.
 Reference author: ambientCG / Lennart Demes

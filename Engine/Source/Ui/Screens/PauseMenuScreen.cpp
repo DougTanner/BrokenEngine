@@ -34,7 +34,7 @@ void PauseMenuScreen::Render()
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 
 	// Share the Main Menu's restrained title scale and primary action tier.
-	float fButtonWidth = std::max(MenuButtonsWidth({TranslatedString(StandardString::kStringResume), TranslatedString(StandardString::kStringGraphics), TranslatedString(StandardString::kStringAudio), TranslatedString(StandardString::kStringGameSettings), TranslatedString(StandardString::kStringMainMenu), TranslatedString(StandardString::kStringQuit)}), kfPrimaryButtonMinimumWidthPixels * UiScale());
+	float fButtonWidth = std::max(MenuButtonsWidth({TranslatedString(StandardString::kStringResume), TranslatedString(StandardString::kStringGraphics), TranslatedString(StandardString::kStringAudio), TranslatedString(StandardString::kStringGameSettings), TranslatedString(StandardString::kStringKeybinds), TranslatedString(StandardString::kStringMainMenu), TranslatedString(StandardString::kStringQuit)}), kfPrimaryButtonMinimumWidthPixels * UiScale());
 	float fHeadingWidth = 0.0f;
 	{
 		ScopedMenuFont headingFont(kfMenuUiScale * kfMainMenuHeadingScale);
@@ -66,13 +66,18 @@ void PauseMenuScreen::Render()
 		game::gpGame->meUiState = UiState::kGameSettings;
 	}
 
-	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringMainMenu)).mpData, ImVec2(fButtonWidth, 0.0f), mpfButtonHoverAnimations[4]))
+	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringKeybinds)).mpData, ImVec2(fButtonWidth, 0.0f), mpfButtonHoverAnimations[4]))
+	{
+		game::gpGame->meUiState = UiState::kKeybinds;
+	}
+
+	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringMainMenu)).mpData, ImVec2(fButtonWidth, 0.0f), mpfButtonHoverAnimations[5]))
 	{
 		game::gpGame->ApplyStandardMenuAction(StandardMenuAction::kChangeFrameToMainMenu);
 		game::gpGame->meUiState = UiState::kPause;
 	}
 
-	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringQuit)).mpData, ImVec2(fButtonWidth, 0.0f), mpfButtonHoverAnimations[5]))
+	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringQuit)).mpData, ImVec2(fButtonWidth, 0.0f), mpfButtonHoverAnimations[6]))
 	{
 		game::gpGame->mGameFlags.Set(GameFlags::kQuit);
 	}

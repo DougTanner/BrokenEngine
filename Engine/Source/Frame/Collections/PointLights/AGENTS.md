@@ -9,12 +9,11 @@ lifecycles.
   world position; deposits pack into one shared deposit buffer, pipeline, and
   cursor (`kCrc`), independent of the sprite cursor.
 - Deposits bypass visible-sprite culling (see `PointLightsRender.cpp` for
-  off-area clipping): when `giLightingRefreshLayer` (`Render.h`) is active, each
-  light with positive lighting area whose nearest flight plane
-  (`NearestPlaneIndex`) matches that layer projects onto that plane and emits
-  into the deposit buffer. When no layer is active, deposit buffer resizing and
-  emission are skipped and the deposit indirect count is zero, while visible
-  sprites keep their full rendered count.
+  off-area clipping): when `gbLightingRefreshFrame` (`Render.h`) is true, each
+  light with positive lighting area projects through `ProjectToBaseHeight`
+  (`../../../Graphics/GraphicsUtils.h`) and emits into the deposit buffer. When
+  it is false, deposit buffer resizing and emission are skipped and the deposit
+  indirect count is zero, while visible sprites keep their full rendered count.
 - The visible sprite may be world-axis-aligned or camera-facing by type. The
   deposit is always world-axis-aligned and samples the blurred texture; the
   sprite samples the unblurred texture.

@@ -22,6 +22,13 @@ void RenderMiscellaneousSection(TweaksScreen& rScreen)
 	rScreen.WrapperSlider("Field of View", gFieldOfView, iSection);
 	rScreen.WrapperSlider("Camera Tilt", gCameraTilt, iSection);
 	ImGui::EndDisabled();
+
+	rScreen.WrapperSeparatorText("Observer Camera");
+	rScreen.WrapperSlider("Observer Pan Speed", gObserverPanSpeed, iSection);
+	rScreen.WrapperSlider("Observer Pan Acceleration", gObserverPanAcceleration, iSection);
+	rScreen.WrapperSlider("Observer Pan Deceleration", gObserverPanDeceleration, iSection);
+	rScreen.WrapperSlider("Observer Edge Scroll Margin", gObserverEdgeScrollMargin, iSection);
+	rScreen.WrapperSlider("Observer Zoom Speed Scaling", gObserverZoomSpeedScaling, iSection);
 }
 
 } // namespace engine

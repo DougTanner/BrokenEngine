@@ -197,6 +197,8 @@ preparation dispatch recovers `primary.path-overlap` itself under
      remaining operation.
    - Retain all existing summary fields and do not state
      `Primary has not advanced.` when the live tip is newer.
+   - When [`agenttools.md`](agenttools.md) requires a pause warning (including a
+     Plan-marker format bump), include that warning in the handoff.
    - Main decides launch, summary presentation, and pause `(d)` per `SKILL.md`
      `### Landing confirmation`. That handoff is a terminal return: the worker
      ends its turn with it as its final answer.
@@ -365,13 +367,14 @@ preparation dispatch recovers `primary.path-overlap` itself under
     step 5 after the step-4 recheck.
   - Any other exit leaving a rebase in progress (conflict): resolve under
     `Reconciliation conflict` and finish the rebase. When every conflict was a
-    `broken-engine-plan/v1` `dependsOn` merge, `rebuildProjects` is empty, and
-    this is not standalone Plan rejection, re-invoke approval preparation with
-    the re-resolved inputs above and continue through step 3 (`plan validate`)
-    and steps 4-6, where `Test-FinalizeApprovalReviewReceipt` verifies the
-    resolved commit's dependency deltas and preserved bytes and decides `none`
-    vs refreshed review. Any other conflict returns resolved regions as the
-    meaning-change handoff (with `Build required`) before candidate preparation.
+    Plan metadata (`Documents/Plans/AGENTS.md`) `dependsOn` merge,
+    `rebuildProjects` is empty, and this is not standalone Plan rejection,
+    re-invoke approval preparation with the re-resolved inputs above and
+    continue through step 3 (`plan validate`) and steps 4-6, where
+    `Test-FinalizeApprovalReviewReceipt` verifies the resolved commit's
+    dependency deltas and preserved bytes and decides `none` vs refreshed
+    review. Any other conflict returns resolved regions as the meaning-change
+    handoff (with `Build required`) before candidate preparation.
   - Abort instead when approved decisions, including any user answer the
     continuation capsule carries, do not determine a valid resolution (such as
     contradicting intents): run `git rebase --abort`. After that abort, or any

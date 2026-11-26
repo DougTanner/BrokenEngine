@@ -7,28 +7,19 @@ step owns.
 
 1. Read the source client, if supplied, before resolving or invoking any
    transcript helper. Done when the source client is fixed or unspecified.
-2. Resolve the repository root, then run the finder exactly once as
-   `pwsh -NoProfile -File .agents/skills/next-plan-review/scripts/Find-AgentSessionTranscript.ps1 -RepositoryRoot '<absolute repository root>' -Commit <requested commit>`
-   where `<requested commit>` is the requested commit-ish (default `HEAD`),
-   adding `-SessionId <exact-id>` when one was supplied.
+2. Resolve the repository root, then obtain the finder result per
+   [`../SKILL.md`](../SKILL.md) `## Inputs`. For bridge evidence see
+   [`codex-bridge.md`](../../../references/codex-bridge.md) step 2.
    - Do not use `rg`, a home-directory sweep, or any broader discovery fallback
      when this exact helper is missing, blocked, or returns no result; a
      transcript the default commit-window search cannot reach requires an exact
      session ID from the user.
-   - Done when the root is resolved and that single invocation has run once and
-     its exit code and parsed object are captured.
 3. Act only on the finder's result and classify it.
-   - Assign that single documented invocation's parsed output to a variable
-     (`$finder = pwsh -NoProfile -File ... | ConvertFrom-Json`), and read the
-     finder's native exit code from that same invocation before any further
-     processing.
-   - Take `status`, the candidates, and every other field from the parsed object
-     — never from formatted or raw console text, so candidate boundaries survive
-     host output limits.
-   - `status: pass` and `status: needs-selection` proceed; anything else —
-     `transcript.not-found`, a structured read error, or a result that disagrees
-     with the exit code — is `BLOCKED`, and never a reason to broaden into a
-     home-directory content search.
+   - Capture the native exit code and `ConvertFrom-Json` result from the same
+     invocation, or read the supplied pair. Proceed only if the parsed status
+     is `pass` or `needs-selection` and its exit code matches the mapping in the
+     [finder](../scripts/Find-AgentSessionTranscript.ps1). Missing, failed, or
+     inconsistent results are `BLOCKED`.
    - `needs-selection` is not itself provenance and not automatically `BLOCKED`:
      choose among the listed roots on Step 6's proof, and report `BLOCKED` only
      when no candidate can be proven.
@@ -53,22 +44,16 @@ step owns.
    - Treat legacy commit-keyed artifacts as optional corroboration, never
      required or authoritative evidence.
    - Done when the commit facts and those contracts are in hand.
-5. Build the transcript path from the finder's result: a locator is
-   store-relative with its first segment naming the store, so join the remaining
-   segments to that store's root. The result exposes no store root, so derive
-   every other store from the user profile as the finder defaults, and `brain`
-   via `Get-AgentAgyBrainRoot` in `.agents/scripts/AgentTranscriptCommon.psm1`.
-   Never guess an ID from timestamps, prescribe a private local path, or sweep
-   client data. Read a Claude or `agy` transcript through the projection
-   invocation documented in [`measurement.md`](measurement.md) `## Measure
-   main-session token efficiency`, opening only the records that projection
-   selects; never hand-compose a projection or read a transcript whole. Done
-   when the transcript to read is fixed or the review is `BLOCKED` for want of
-   an exact ID.
+5. Use supplied candidate evidence for inaccessible stores. For direct reads,
+   join the locator segments after the store name to that store's root. Use the
+   finder's user-profile defaults and `Get-AgentAgyBrainRoot` in
+   `.agents/scripts/AgentTranscriptCommon.psm1` for `brain`. Never guess IDs
+   from timestamps, prescribe private paths, or sweep client data. For Claude
+   or `agy`, run the projection from `## Inputs` and open only its selected
+   records.
 6. Prove production of the commit, then build the routing inventory.
-   - Prove the parent started before and covered the commit and recorded
-     finalization producing the full hash. An exact ID or filename is selection
-     evidence, not production proof.
+   - Apply `## Inputs` parent production proof. An exact ID or filename is
+     selection evidence, not production proof.
    - Claude or `agy`, on a bounded result: the finder's commit-time span and
      full-hash mention select the transcript and are not production proof by
      themselves.
@@ -98,8 +83,7 @@ step owns.
      proven invoking parent/main attempted, including planning, attempts with no
      meaningful effect, failed, and aborted attempts; the invoking parent/main
      is not an inventory row.
-   - An ordinary child relationship requires both its parent delegation event
-     and fixed return window.
+   - Apply `## Inputs` child relationship proof to each ordinary child.
    - Do not use the finder or its `descendants` list as inventory authority: it
      is discovery metadata recording a *claimed* relationship, while the parent
      delegation event this step requires lives in the parent's own delegation
@@ -139,23 +123,13 @@ step owns.
    - Measure the main session's context entries per
      [`measurement.md`](measurement.md) `## Measure main-session token
      efficiency` before assessing concern 4.
-   - Only when the usage-analysis request was supplied and provenance is
-     proven, run once per proven Claude or `agy` transcript (parent and Step 6
-     child rows):
-     `pwsh -NoProfile -File .agents/skills/next-plan-review/scripts/Get-TranscriptUsage.ps1 -TranscriptPath '<path>'`,
-     assigning its output to a variable and piping it to `ConvertFrom-Json`.
-     A Claude child's path is
-     `<parent transcript dir>/<parent session ID>/subagents/agent-<agentId>.jsonl`
-     with `<agentId>` (`^[A-Za-z0-9]+$`) from the parent tool-result's
-     `toolUseResult.agentId`, else `unsupported (no agent ID)`. An `agy`
-     child's path is
-     `<brain root>/<childId>/.system_generated/logs/transcript_full.jsonl`
-     with lowercase-UUID `<childId>` from `invoke_subagent`'s `GENERIC`
-     `"conversationId"`, else `unsupported (no conversation ID)`. Never glob
-     child directories. Codex transcripts get `unsupported (codex)` with no
-     helper run. Report rows per [`measurement.md`](measurement.md) `## Report
-     observed usage`; a derived path is a helper argument only. Without the
-     request this bullet runs nothing.
+   - With proven provenance and an explicit usage request in a full review,
+     obtain the result per [`../SKILL.md`](../SKILL.md) `## Inputs` for the
+     parent and children established in Step 6. Use the matching supplied
+     result for inaccessible stores. Otherwise run the helper. Report
+     `unsupported (no agent ID)` or `unsupported (no conversation ID)` for a
+     child without the required ID, and `unsupported (codex)` for Codex.
+     Report rows per [`measurement.md`](measurement.md) `## Report observed usage`.
    - Done when every requirement above has been completed for the proven parent
      and every routing-inventory row.
 9. Use the shared handoff form and extension block in

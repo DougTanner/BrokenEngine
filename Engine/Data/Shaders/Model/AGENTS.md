@@ -40,31 +40,17 @@ texture with this shader family.
   relative to the model centre, independent of light;
   [Model Alignment](../../../../DataPacker/Source/ExportJobs/AGENTS.md#model-alignment)
   owns alignment.
-  The shadow-mode vertex
-  samples the terrain elevation render target at the model centre for the
-  blur height (`../Shadow/AGENTS.md` `## Overview`); the vertex shader is
-  shared, so every model pipeline binds that texture.
 - Object shadow coverage uses each surface point's original interpolated world
   Z: full at and above sea level, fading linearly to zero at the configured
-  depth below Z=0. Scale all RGBA coverage channels before MAX blending;
+  depth below Z=0, written in `kVkFormatObjectShadows` before MAX blending;
   model-centre height and displaced water waves do not determine this fade.
-- A model's height above the lowest flight plane fades the terrain shadow it
-  receives and moves its lighting sample: each lighting layer is sampled along
-  the eye line by the model centre's height above that layer's plane. The
-  fragment blends the low and high layers by its own height between the two
-  planes, reading only the layers its weight needs, and plane k's smoke is lit
-  by layer k, a skipped layer being read only where that plane's smoke shows.
-- A model takes no smoke from planes below its own flight plane, smoke faded by
-  the fragment's height above its own plane so it pokes through, and full smoke
-  from every plane above. Its own plane is the one nearest its centre height
-  (`FlightPlanes::NearestPlaneIndex`), stored per instance by every CPU writer
-  of the model layout, because instances in one draw can sit on different
-  planes.
-- A model receives object shadow only from planes above its own (channel
-  layout: `../Shadow/AGENTS.md` `## Overview`): it takes the darker of the B
-  and A planes above `iInLayer`, or 1 when no plane lies above. That value
-  multiplies into `fShadow`, reaching sun direct, IBL diffuse, and IBL
-  specular, and is `fShadowMoon` for the moon terms.
+- A model's height above base height fades the terrain shadow it receives and
+  moves its single lighting-layer sample along the eye line by the model
+  centre's height above base height (shared smoke reuse:
+  `../Smoke/AGENTS.md`).
+- A model samples the single base-height smoke field faded by the fragment's
+  height above base height (`SmokeObjectHeightFade`) so it pokes through;
+  `../Smoke/AGENTS.md` owns how object shadow affects that smoke's lighting.
 - Material output remains linear HDR for the fullscreen resolve. Engine cubemaps
   use Y-up sampling, so model shaders perform the Z-up/Y-up conversion at the
   sampling boundary.

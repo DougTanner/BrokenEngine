@@ -8,20 +8,8 @@
 #include "Ui/ShadowWrappersBase.h"
 #include "TextureManager.h"
 
-#include "Frame/FlightPlaneTable.h"
-
 namespace engine
 {
-
-static_assert(shaders::kiMaxFlightPlanes == kiMaxFlightPlanes);
-
-// Object shadows: two RGBA channels split ground coverage by height, and one each holds flight planes 1 and 2.
-static_assert(std::ssize(game::kFlightPlanes) <= 3);
-
-// TextureInfo keeps the name view and Vulkan object naming reads its data(), so per-plane names need static storage.
-constexpr std::string_view kpSmokeOneNames[] = {"SmokeOne0", "SmokeOne1", "SmokeOne2", "SmokeOne3", "SmokeOne4", "SmokeOne5", "SmokeOne6", "SmokeOne7"};
-constexpr std::string_view kpSmokeTwoNames[] = {"SmokeTwo0", "SmokeTwo1", "SmokeTwo2", "SmokeTwo3", "SmokeTwo4", "SmokeTwo5", "SmokeTwo6", "SmokeTwo7"};
-static_assert(std::ssize(kpSmokeOneNames) == shaders::kiMaxFlightPlanes && std::ssize(kpSmokeTwoNames) == shaders::kiMaxFlightPlanes);
 
 void RenderTargetTextures::Create()
 {
@@ -193,7 +181,7 @@ void RenderTargetTextures::CreateSmokeTextures()
 	TextureInfo smokeTextureInfo
 	{
 		.textureFlags = {TextureFlags::kRenderPass},
-		.name = kpSmokeOneNames[0],
+		.name = "SmokeOne",
 		.vkImageCreateFlags = 0,
 		.vkFormat = shaders::kVkFormatSmoke,
 		.vkExtent3D = VkExtent3D {.width = static_cast<uint32_t>(SmokeSimulationPixels()), .height = static_cast<uint32_t>(SmokeSimulationPixelsY()), .depth = 1},
@@ -208,29 +196,15 @@ void RenderTargetTextures::CreateSmokeTextures()
 		.vkRenderPassFinalImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 		.eTextureLayout = TextureLayout::kShaderReadOnly,
 	};
-	// Every plane's pair comes from this one TextureInfo with only the name changed, so each plane's render passes
-	// stay compatible with the shared smoke clear pipelines created against plane 0.
-	TextureInfo smokeTextureTwoInfo = smokeTextureInfo;
-	smokeTextureTwoInfo.vkRenderPassInitialImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	for (int64_t i = 0; i < gpFlightPlanes->Count(); ++i)
-	{
-		smokeTextureInfo.name = kpSmokeOneNames[i];
-		mSmokeTexturesOne[i].Create(smokeTextureInfo);
-		smokeTextureTwoInfo.name = kpSmokeTwoNames[i];
-		mSmokeTexturesTwo[i].Create(smokeTextureTwoInfo);
-	}
-	for (int64_t i = 0; i < shaders::kiMaxFlightPlanes; ++i)
-	{
-		mppSmokeTexturesOne[i] = &mSmokeTexturesOne[i < gpFlightPlanes->Count() ? i : 0];
-	}
+	mSmokeTextureOne.Create(smokeTextureInfo);
+	smokeTextureInfo.name = "SmokeTwo";
+	smokeTextureInfo.vkRenderPassInitialImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	mSmokeTextureTwo.Create(smokeTextureInfo);
 
-	// Smoke spread only rewrites occupancy-active tiles, so every ping-pong texture must start at zero.
+	// Smoke spread only rewrites occupancy-active tiles, so both ping-pong textures must start at zero.
 	OneShotCommandBuffer oneShotCommandBuffer;
-	for (int64_t i = 0; i < gpFlightPlanes->Count(); ++i)
-	{
-		mSmokeTexturesOne[i].RecordClearColor(oneShotCommandBuffer.mVkCommandBuffer);
-		mSmokeTexturesTwo[i].RecordClearColor(oneShotCommandBuffer.mVkCommandBuffer);
-	}
+	mSmokeTextureOne.RecordClearColor(oneShotCommandBuffer.mVkCommandBuffer);
+	mSmokeTextureTwo.RecordClearColor(oneShotCommandBuffer.mVkCommandBuffer);
 	oneShotCommandBuffer.Execute();
 }
 
@@ -283,7 +257,7 @@ void RenderTargetTextures::ClearWindTextures()
 
 void RenderTargetTextures::ClearLightingTextures()
 {
-	// Re-arm the temporal first-frame guard so both layers blend pure current on their first refresh after creation or re-enable.
+	// Re-arm the temporal first-frame guard so the lighting layer blends pure current on its first refresh after creation or re-enable.
 	gbLightingTemporalReset = true;
 
 	static constexpr VkClearColorValue kVkAmbientClearColor {{0.0f, 0.0f, 0.0f, 1.0f}};
@@ -300,15 +274,12 @@ void RenderTargetTextures::ClearLightingTextures()
 			rSpreadTexture.RecordClearColor(oneShotCommandBuffer.mVkCommandBuffer);
 		}
 	}
-	for (int64_t i = 0; i < shaders::kiLightingLayers; ++i)
+	for (int64_t i = 0; i < 3; ++i)
 	{
-		for (int64_t j = 0; j < 3; ++j)
-		{
-			mpCombineTextures[i][j].RecordClearColor(oneShotCommandBuffer.mVkCommandBuffer);
-			mpLightingHistoryTextures[i][j].RecordClearColor(oneShotCommandBuffer.mVkCommandBuffer);
-		}
-		mpAmbientCombineTextures[i].RecordClearColor(oneShotCommandBuffer.mVkCommandBuffer, kVkAmbientClearColor);
+		mpCombineTextures[i].RecordClearColor(oneShotCommandBuffer.mVkCommandBuffer);
+		mpLightingHistoryTextures[i].RecordClearColor(oneShotCommandBuffer.mVkCommandBuffer);
 	}
+	mAmbientCombineTexture.RecordClearColor(oneShotCommandBuffer.mVkCommandBuffer, kVkAmbientClearColor);
 	oneShotCommandBuffer.Execute();
 }
 

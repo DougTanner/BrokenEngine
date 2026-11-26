@@ -11,10 +11,10 @@ layout (set = 0, binding = kiGlobalBindingGlobalUniform) uniform globalUniform
 };
 
 layout (set = 1, binding = 1) uniform sampler2D objectShadowsBlurIntermediateSampler;
-layout (set = 1, binding = 2, rgba16f) uniform writeonly image2D objectShadowsBlurTexture; // kVkFormatObjectShadows
+layout (set = 1, binding = 2, r16f) uniform writeonly image2D objectShadowsBlurTexture; // kVkFormatObjectShadows
 
 // The workgroup's column strip plus iRadius taps on each side, as in ObjectShadowsBlurH.comp.
-shared vec4 sf4Taps[kiObjectShadowsBlurStripLength + 2 * kiMaxObjectShadowsBlurRadius];
+shared float sfTaps[kiObjectShadowsBlurStripLength + 2 * kiMaxObjectShadowsBlurRadius];
 
 void main()
 {
@@ -32,21 +32,18 @@ void main()
 	for (int j = iLocal; j < kiObjectShadowsBlurStripLength + 2 * iRadius; j += kiObjectShadowsBlurStripLength)
 	{
 		float fV = (float(iStripStart - iRadius + j) + 0.5f) * f2InvSize.y;
-		sf4Taps[j] = textureLod(objectShadowsBlurIntermediateSampler, vec2(fU, fV), 0.0f);
+		sfTaps[j] = textureLod(objectShadowsBlurIntermediateSampler, vec2(fU, fV), 0.0f).x;
 	}
 	barrier();
 
 	if (iY >= i2Size.y)
 		return;
 
-	// Per-channel sigma rules out bilinear tap pairing, as in ObjectShadowsBlurH.comp.
-	vec4 f4Total = vec4(0.0f);
+	float fTotal = 0.0f;
 	for (int j = -iRadius; j <= iRadius; ++j)
 	{
-		f4Total += globalLayout.pf4ObjectShadowsBlurWeights[abs(j)] * sf4Taps[iLocal + iRadius + j];
+		fTotal += globalLayout.pfObjectShadowsBlurWeights[abs(j)] * sfTaps[iLocal + iRadius + j];
 	}
-	// R takes the whole ground coverage so terrain and water read R alone; overlapping ships cap at full coverage.
-	f4Total.x = min(f4Total.x + f4Total.y, 1.0f);
 
-	imageStore(objectShadowsBlurTexture, ivec2(iX, iY), 1.0f - globalLayout.fObjectShadowsIntensity * f4Total);
+	imageStore(objectShadowsBlurTexture, ivec2(iX, iY), vec4(1.0f - globalLayout.fObjectShadowsIntensity * min(fTotal, 1.0f), 0.0f, 0.0f, 0.0f));
 }

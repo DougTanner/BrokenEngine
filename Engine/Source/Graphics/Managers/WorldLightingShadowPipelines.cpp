@@ -9,12 +9,6 @@
 namespace engine
 {
 
-// PipelineInfo::name is a string_view that Pipeline::mInfo keeps for the pipeline's lifetime, so per-layer names
-// need static storage.
-constexpr std::string_view kpCombinePipelineNames[shaders::kiLightingLayers] {"LightCombine0", "LightCombine1"};
-constexpr std::string_view kpLightingTemporalPipelineNames[shaders::kiLightingLayers] {"LightingTemporal0", "LightingTemporal1"};
-constexpr std::string_view kpLightingHistoryCopyPipelineNames[shaders::kiLightingLayers] {"LightingHistoryCopy0", "LightingHistoryCopy1"};
-
 void WorldLightingShadowPipelines::CreateLightingPipelines()
 {
 	RenderTargetTextures& rTextures = gpTextureManager->mRenderTargetTextures;
@@ -58,64 +52,59 @@ void WorldLightingShadowPipelines::CreateLightingPipelines()
 		ppSpreadGreen[i] = &rTextures.mpSpreadOnlyTextures[i][1];
 		ppSpreadBlue[i] = &rTextures.mpSpreadOnlyTextures[i][2];
 	}
-	// Each layer's combine pipeline reads the shared spread outputs; its combine, temporal, and history-copy pipelines
-	// write only that layer's combine outputs and history.
-	for (int64_t i = 0; i < shaders::kiLightingLayers; ++i)
+	gpPipelineManager->mCombinePipeline.Create(
 	{
-		gpPipelineManager->mpCombinePipelines[i].Create(
+		.name = "LightCombine",
+		.flags = {PipelineFlags::kCompute, PipelineFlags::kIndirectHostVisible},
+		.ppShaders = {&gpPipelineManager->mShaders.at(data::kShadersLightingLightCombinecompCrc)},
+		.descriptorInfos =
 		{
-			.name = kpCombinePipelineNames[i],
-			.flags = {PipelineFlags::kCompute, PipelineFlags::kIndirectHostVisible},
-			.ppShaders = {&gpPipelineManager->mShaders.at(data::kShadersLightingLightCombinecompCrc)},
-			.descriptorInfos =
-			{
-				{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
-				{.flags = DescriptorFlags::kCombinedSamplers, .iCount = shaders::kiMaxSpreadPasses, .ppTextures = ppSpreadRed},
-				{.flags = DescriptorFlags::kCombinedSamplers, .iCount = shaders::kiMaxSpreadPasses, .ppTextures = ppSpreadGreen},
-				{.flags = DescriptorFlags::kCombinedSamplers, .iCount = shaders::kiMaxSpreadPasses, .ppTextures = ppSpreadBlue},
-				{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpCombineTextures[i][0]},
-				{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpCombineTextures[i][1]},
-				{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpCombineTextures[i][2]},
-			},
-		});
+			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
+			{.flags = DescriptorFlags::kCombinedSamplers, .iCount = shaders::kiMaxSpreadPasses, .ppTextures = ppSpreadRed},
+			{.flags = DescriptorFlags::kCombinedSamplers, .iCount = shaders::kiMaxSpreadPasses, .ppTextures = ppSpreadGreen},
+			{.flags = DescriptorFlags::kCombinedSamplers, .iCount = shaders::kiMaxSpreadPasses, .ppTextures = ppSpreadBlue},
+			{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpCombineTextures[0]},
+			{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpCombineTextures[1]},
+			{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpCombineTextures[2]},
+		},
+	});
 
-		// The temporal shader gets its extent from imageSize() and EMA-blends reprojected history into the directional
-		// storage images in place.
-		gpPipelineManager->mpLightingTemporalPipelines[i].Create(
+	// The temporal shader gets its extent from imageSize() and EMA-blends reprojected history into the directional
+	// storage images in place.
+	gpPipelineManager->mLightingTemporalPipeline.Create(
+	{
+		.name = "LightingTemporal",
+		.flags = {PipelineFlags::kCompute, PipelineFlags::kIndirectHostVisible},
+		.ppShaders = {&gpPipelineManager->mShaders.at(data::kShadersLightingLightingTemporalcompCrc)},
+		.descriptorInfos =
 		{
-			.name = kpLightingTemporalPipelineNames[i],
-			.flags = {PipelineFlags::kCompute, PipelineFlags::kIndirectHostVisible},
-			.ppShaders = {&gpPipelineManager->mShaders.at(data::kShadersLightingLightingTemporalcompCrc)},
-			.descriptorInfos =
-			{
-				{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
-				{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &rTextures.mpLightingHistoryTextures[i][0]},
-				{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &rTextures.mpLightingHistoryTextures[i][1]},
-				{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &rTextures.mpLightingHistoryTextures[i][2]},
-				{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpCombineTextures[i][0]},
-				{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpCombineTextures[i][1]},
-				{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpCombineTextures[i][2]},
-			},
-		});
+			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
+			{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &rTextures.mpLightingHistoryTextures[0]},
+			{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &rTextures.mpLightingHistoryTextures[1]},
+			{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &rTextures.mpLightingHistoryTextures[2]},
+			{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpCombineTextures[0]},
+			{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpCombineTextures[1]},
+			{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpCombineTextures[2]},
+		},
+	});
 
-		gpPipelineManager->mpLightingHistoryCopyPipelines[i].Create(
+	gpPipelineManager->mLightingHistoryCopyPipeline.Create(
+	{
+		.name = "LightingHistoryCopy",
+		.flags = {PipelineFlags::kCompute, PipelineFlags::kIndirectHostVisible},
+		.ppShaders = {&gpPipelineManager->mShaders.at(data::kShadersLightingLightingHistoryCopycompCrc)},
+		.descriptorInfos =
 		{
-			.name = kpLightingHistoryCopyPipelineNames[i],
-			.flags = {PipelineFlags::kCompute, PipelineFlags::kIndirectHostVisible},
-			.ppShaders = {&gpPipelineManager->mShaders.at(data::kShadersLightingLightingHistoryCopycompCrc)},
-			.descriptorInfos =
-			{
-				{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
-				{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpCombineTextures[i][0]},
-				{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpCombineTextures[i][1]},
-				{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpCombineTextures[i][2]},
-				{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpAmbientCombineTextures[i]},
-				{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpLightingHistoryTextures[i][0]},
-				{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpLightingHistoryTextures[i][1]},
-				{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpLightingHistoryTextures[i][2]},
-			},
-		});
-	}
+			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
+			{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpCombineTextures[0]},
+			{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpCombineTextures[1]},
+			{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpCombineTextures[2]},
+			{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mAmbientCombineTexture},
+			{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpLightingHistoryTextures[0]},
+			{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpLightingHistoryTextures[1]},
+			{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpLightingHistoryTextures[2]},
+		},
+	});
 }
 
 void WorldLightingShadowPipelines::CreatePipelineShadows()
@@ -203,7 +192,7 @@ void WorldLightingShadowPipelines::CreateLightingBlurPipelines()
 		.descriptorInfos =
 		{
 			{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &gpTextureManager->mWhiteTexture},
-			{.flags = DescriptorFlags::kStorageImages, .pTexture = &gpTextureManager->mRenderTargetTextures.mpCombineTextures[0][0]},
+			{.flags = DescriptorFlags::kStorageImages, .pTexture = &gpTextureManager->mRenderTargetTextures.mpCombineTextures[0]},
 		},
 	});
 
@@ -215,7 +204,7 @@ void WorldLightingShadowPipelines::CreateLightingBlurPipelines()
 		.descriptorInfos =
 		{
 			{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &gpTextureManager->mWhiteTexture},
-			{.flags = DescriptorFlags::kStorageImages, .pTexture = &gpTextureManager->mRenderTargetTextures.mpCombineTextures[0][0]},
+			{.flags = DescriptorFlags::kStorageImages, .pTexture = &gpTextureManager->mRenderTargetTextures.mpCombineTextures[0]},
 		},
 	});
 }
@@ -259,7 +248,7 @@ void WorldLightingShadowPipelines::CreateLightingShadowDependentPipelines()
 			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp, DescriptorFlags::kBindlessArrayConsumer}, .iCount = shaders::kiMaxIslands, .ppTextures = gpTextureManager->mRenderTargetTextures.mColorTextures.data()}, // set=1 binding 6 (color)
 			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp, DescriptorFlags::kBindlessArrayConsumer}, .iCount = shaders::kiMaxIslands, .ppTextures = gpTextureManager->mRenderTargetTextures.mNormalsTextures.data()}, // set=1 binding 7 (normals)
 			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp, DescriptorFlags::kBindlessArrayConsumer}, .iCount = shaders::kiMaxIslands, .ppTextures = gpTextureManager->mRenderTargetTextures.mAmbientOcclusionTextures.data()}, // set=1 binding 8 (ambient occlusion)
-			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerSmoke}, .iCount = shaders::kiMaxFlightPlanes, .ppTextures = gpTextureManager->mRenderTargetTextures.mppSmokeTexturesOne},
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerSmoke}, .pTexture = &gpTextureManager->mRenderTargetTextures.mSmokeTextureOne},
 			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerRepeat}, .textureCrc = data::kTexturesTerrainBC7Rock0jpgCrc},
 			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerRepeat}, .textureCrc = data::kTexturesTerrainBC5SandNormal0jpgCrc},
 			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerRepeat}, .textureCrc = data::kTexturesTerrainBC5SandNormal1pngCrc},
@@ -268,7 +257,7 @@ void WorldLightingShadowPipelines::CreateLightingShadowDependentPipelines()
 			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerRepeat}, .textureCrc = data::kTexturesTerrainBC5RockNormal1jpgCrc},
 			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerRepeat}, .textureCrc = data::kTexturesTerrainBC5RockNormal2jpgCrc},
 			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerRepeat}, .textureCrc = data::kTexturesTerrainBC5RockNormal4jpgCrc},
-			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerBorder}, .iCount = static_cast<int64_t>(std::size(gpTextureManager->mRenderTargetTextures.mppAmbientCombineTextures)), .ppTextures = gpTextureManager->mRenderTargetTextures.mppAmbientCombineTextures},
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerBorder}, .pTexture = &gpTextureManager->mRenderTargetTextures.mAmbientCombineTexture},
 			// AxisAlignedQuadLayout instance buffer used by Terrain.vert to transform island-local
 			// mesh vertices into world space (set=1 binding=19). Mirrors kPipelineShadowElevation's
 			// SSBO usage; gl_InstanceIndex is supplied per-island via firstInstance at draw time.
@@ -338,8 +327,8 @@ void WorldLightingShadowPipelines::CreateLightingShadowDependentPipelines()
 			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerRepeat}, .textureCrc = data::kTexturesWaterBC4NoisepngCrc},
 			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerMirroredRepeat}, .iCount = TextureManager::kiWaterNormalCount, .ppTextures = gpPipelineManager->mppWaterNormalTextures},
 			{.flags = DescriptorFlags::kCombinedSamplers, .textureCrc = data::kTexturesWaterDepthLutpngCrc},
-			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerSmoke}, .iCount = shaders::kiMaxFlightPlanes, .ppTextures = gpTextureManager->mRenderTargetTextures.mppSmokeTexturesOne},
-			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerBorder}, .iCount = static_cast<int64_t>(std::size(gpTextureManager->mRenderTargetTextures.mppAmbientCombineTextures)), .ppTextures = gpTextureManager->mRenderTargetTextures.mppAmbientCombineTextures},
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerSmoke}, .pTexture = &gpTextureManager->mRenderTargetTextures.mSmokeTextureOne},
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerBorder}, .pTexture = &gpTextureManager->mRenderTargetTextures.mAmbientCombineTexture},
 			// Compute-pre-computed Gerstner displacement + normal sampled in Water.vert via texelFetch.
 			// Explicit bindings keep the shader-side numbers at 13/14 — binding 12 is intentionally
 			// unused.

@@ -21,7 +21,9 @@ public:
 
 	float SunAngle() const;
 
-	engine::CameraTarget PullTarget(const engine::FrameInterpolateBase& rFrameInterpolate);
+	engine::CameraTarget PullTarget(const engine::FrameInterpolateBase& rFrameInterpolate, const std::unordered_map<engine::GridCoord, FrameInterpolate>& rRenderInterpolates);
+	std::optional<XMVECTOR> PullSubscriptionCenter(const std::unordered_map<engine::GridCoord, FrameInterpolate>& rRenderInterpolates, engine::GridCoord basisCoordinate);
+	void ClearSubscriptionAnchor();
 
 	// The main menu and gameplay each keep their own pose. Free-camera builds remember the menu pose, saved in
 	// ClientState.bin; other builds never store it, so the menu always opens at the default pose.
@@ -30,6 +32,9 @@ public:
 	void ResetMenuPose();
 
 	engine::GlobalId mLastTrackedOwnedEntityIdentifier {};
+	engine::GlobalId mRetainedSubscriptionAnchorGlobalId {};
+	engine::GridCoord mRetainedSubscriptionAnchorCoordinate {};
+	XMVECTOR mVecRetainedSubscriptionAnchorLocal {};
 
 	XMFLOAT2 mf2MenuPosition {};
 	float mfMenuFraming = kfMenuCameraFraming;

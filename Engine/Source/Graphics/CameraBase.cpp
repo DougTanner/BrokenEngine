@@ -4,6 +4,7 @@
 
 #include "Ui/GraphicsSettingsWrappersBase.h"
 #include "Ui/LightingWrappersBase.h"
+#include "Ui/MiscWrappersBase.h"
 #include "Ui/ShadowWrappersBase.h"
 #include "Ui/WrapperBase.h"
 
@@ -120,6 +121,13 @@ CameraBase::CameraBase(const CameraSetup& rCameraSetup)
 	mVecPosition = XMVectorSetZ(rCameraSetup.vecInitialPosition, gpFlightPlanes->Lowest().fHeightMeters);
 }
 
+void CameraBase::ClearCellLoadedArea()
+{
+	mf4CellLoadedArea = {std::numeric_limits<float>::max(), std::numeric_limits<float>::lowest(), std::numeric_limits<float>::lowest(), std::numeric_limits<float>::max()};
+	mbPreviousCellLoadedAreaValid = false;
+	mOptionalSubscriptionCenter = std::nullopt;
+}
+
 void CameraBase::DiscardTrackingCaches()
 {
 	mVecLastKnownTargetPosition = {};
@@ -129,7 +137,206 @@ void CameraBase::DiscardTrackingCaches()
 	mVecPreviousTargetPosition = {};
 	mfJumpStartTime = 0.0f;
 	mbJumping = false;
-	mbPreviousCellLoadedAreaValid = false;
+	if (meObserverState == ObserverState::kAwaitingReturn)
+	{
+		meObserverState = ObserverState::kFollowing;
+	}
+	ClearCellLoadedArea();
+}
+
+void CameraBase::SetObserverMode(bool bEnabled)
+{
+	if (bEnabled)
+	{
+		meObserverState = ObserverState::kObserving;
+		mbJumping = false;
+	}
+	else if (meObserverState == ObserverState::kObserving)
+	{
+		meObserverState = ObserverState::kAwaitingReturn;
+	}
+	mVecObserverVelocity = {};
+}
+
+void CameraBase::StepObserverPan(float fDeltaTime, std::span<const GridCoord> allowedCoordinates)
+{
+	auto IsAllowedCell = [&](GridCoord coordinate)
+	{
+		return std::ranges::contains(allowedCoordinates, coordinate);
+	};
+
+	if (!IsInsideCell(mVecPosition))
+	{
+		for (GridCoord coordinate : allowedCoordinates)
+		{
+			if (IsInsideCell(XMVectorSubtract(mVecPosition, CellCenterOffset(mBasisCoordinate, coordinate))))
+			{
+				ShiftToRenderedCell(coordinate);
+				break;
+			}
+		}
+	}
+
+	float fBaseHeight = gpFlightPlanes->Lowest().fHeightMeters;
+	if (!IsAllowedCell(mBasisCoordinate))
+	{
+		GridCoord nearestCoordinate = allowedCoordinates.front();
+		float fNearestDistanceSquared = XMVectorGetX(XMVector2LengthSq(XMVectorSubtract(mVecPosition, CellCenterOffset(mBasisCoordinate, nearestCoordinate))));
+		for (GridCoord coordinate : allowedCoordinates.subspan(1))
+		{
+			float fDistanceSquared = XMVectorGetX(XMVector2LengthSq(XMVectorSubtract(mVecPosition, CellCenterOffset(mBasisCoordinate, coordinate))));
+			if (fDistanceSquared < fNearestDistanceSquared)
+			{
+				fNearestDistanceSquared = fDistanceSquared;
+				nearestCoordinate = coordinate;
+			}
+		}
+
+		ShiftToRenderedCell(nearestCoordinate);
+		if (!IsInsideCell(mVecPosition))
+		{
+			SegmentHit exitHit = TracePointToCellExit(XMVectorSet(0.0f, 0.0f, fBaseHeight, 1.0f), mVecPosition);
+			mVecPosition = XMVectorSetW(XMVectorSetZ(NudgeIntoCell(exitHit.vecPosition), fBaseHeight), 1.0f);
+		}
+		mVecObserverVelocity = {};
+	}
+
+	if (fDeltaTime <= 0.0f)
+	{
+		return;
+	}
+
+	float fZoomScale = std::max(0.1f, 1.0f + gObserverZoomSpeedScaling.mfCurrent * ((mfCameraFraming / kfCameraFramingDefault) - 1.0f));
+	float fMaximumSpeed = gObserverPanSpeed.mfCurrent * fZoomScale;
+	bool bHasInput = mCameraInput.f2Move.x != 0.0f || mCameraInput.f2Move.y != 0.0f;
+	XMVECTOR vecTargetVelocity = XMVectorSet(mCameraInput.f2Move.x * fMaximumSpeed, mCameraInput.f2Move.y * fMaximumSpeed, 0.0f, 0.0f);
+
+	float fRate = bHasInput ? gObserverPanAcceleration.mfCurrent : gObserverPanDeceleration.mfCurrent;
+	float fWeight = -std::expm1(-fRate * fDeltaTime);
+	XMVECTOR vecVelocityDelta = XMVectorSubtract(mVecObserverVelocity, vecTargetVelocity);
+	XMVECTOR vecDisplacement = XMVectorAdd(XMVectorScale(vecTargetVelocity, fDeltaTime), XMVectorScale(vecVelocityDelta, fWeight / fRate));
+	mVecObserverVelocity = XMVectorAdd(mVecObserverVelocity, XMVectorScale(XMVectorSubtract(vecTargetVelocity, mVecObserverVelocity), fWeight));
+	if (!bHasInput && XMVectorGetX(XMVector2Length(mVecObserverVelocity)) < 0.05f)
+	{
+		mVecObserverVelocity = {};
+	}
+
+	XMVECTOR vecPosition = mVecPosition;
+	if (!IsInsideCell(vecPosition))
+	{
+		SegmentHit clampHit = TracePointToCellExit(XMVectorSet(0.0f, 0.0f, fBaseHeight, 1.0f), vecPosition);
+		vecPosition = XMVectorSetW(XMVectorSetZ(NudgeIntoCell(clampHit.vecPosition), fBaseHeight), 1.0f);
+	}
+
+	auto PassesEdge = [](int64_t iDirection, FXMVECTOR vecDot, FXMVECTOR vecThreshold)
+	{
+		if (iDirection >= 1 && iDirection <= 3)
+		{
+			return XMVector2LessOrEqual(vecDot, vecThreshold);
+		}
+		return XMVector2Less(vecDot, vecThreshold);
+	};
+
+	GridCoord currentCoordinate = mBasisCoordinate;
+	XMVECTOR vecRemaining = vecDisplacement;
+	int64_t iBlockedDirection = -1;
+	for (int64_t i = 0; i < 16; ++i)
+	{
+		XMVECTOR vecEnd = XMVectorSetW(XMVectorSetZ(XMVectorAdd(vecPosition, vecRemaining), fBaseHeight), 1.0f);
+		if (IsInsideCell(vecEnd))
+		{
+			vecPosition = vecEnd;
+			break;
+		}
+
+		// Find the first hex edge crossed along vecPosition -> vecEnd in travel order.
+		int64_t iExitDirection = -1;
+		float fBestTime = 2.0f;
+		float fBestEndDot = std::numeric_limits<float>::lowest();
+		for (int64_t k = 0; k < common::kiHexDirectionCount; ++k)
+		{
+			XMVECTOR vecNormal = XMLoadFloat2(&kCellDirections.pEntries[k].f2CenterOffset);
+			XMVECTOR vecThreshold = XMVectorScale(XMVector2Dot(vecNormal, vecNormal), 0.5f);
+			XMVECTOR vecEndDot = XMVector2Dot(vecEnd, vecNormal);
+			if (PassesEdge(k, vecEndDot, vecThreshold))
+			{
+				continue;
+			}
+
+			float fStartDot = XMVectorGetX(XMVector2Dot(vecPosition, vecNormal));
+			float fEndDot = XMVectorGetX(vecEndDot);
+			float fDeltaDot = fEndDot - fStartDot;
+			float fTime = fDeltaDot > 0.0f ? std::clamp((XMVectorGetX(vecThreshold) - fStartDot) / fDeltaDot, 0.0f, 1.0f) : 0.0f;
+			if (iExitDirection < 0 || fTime < fBestTime || (fTime == fBestTime && fEndDot > fBestEndDot))
+			{
+				iExitDirection = k;
+				fBestTime = fTime;
+				fBestEndDot = fEndDot;
+			}
+		}
+
+		XMVECTOR vecHit = XMVectorLerp(vecPosition, vecEnd, fBestTime);
+		vecRemaining = XMVectorScale(vecRemaining, 1.0f - fBestTime);
+
+		const common::HexDirection& rDirection = kCellDirections.pEntries[iExitDirection];
+		GridCoord neighborCoordinate {};
+		if (TryAddGridCoordinate(currentCoordinate, rDirection.iDeltaQ, rDirection.iDeltaR, neighborCoordinate) && IsAllowedCell(neighborCoordinate))
+		{
+			currentCoordinate = neighborCoordinate;
+			iBlockedDirection = -1;
+			vecPosition = XMVectorSetW(XMVectorSetZ(NudgeIntoCell(XMVectorSubtract(vecHit, XMLoadFloat2(&rDirection.f2CenterOffset))), fBaseHeight), 1.0f);
+			if (!IsInsideCell(vecPosition))
+			{
+				SegmentHit clampHit = TracePointToCellExit(XMVectorSet(0.0f, 0.0f, fBaseHeight, 1.0f), vecPosition);
+				vecPosition = XMVectorSetW(XMVectorSetZ(NudgeIntoCell(clampHit.vecPosition), fBaseHeight), 1.0f);
+			}
+			continue;
+		}
+
+		vecPosition = XMVectorSetW(XMVectorSetZ(NudgeIntoCell(vecHit), fBaseHeight), 1.0f);
+		if (!IsInsideCell(vecPosition))
+		{
+			SegmentHit clampHit = TracePointToCellExit(XMVectorSet(0.0f, 0.0f, fBaseHeight, 1.0f), vecPosition);
+			vecPosition = XMVectorSetW(XMVectorSetZ(NudgeIntoCell(clampHit.vecPosition), fBaseHeight), 1.0f);
+		}
+
+		// Two distinct blocked edges in the same cell meet at a convex corner; stop there instead of
+		// projecting sequentially and bouncing back along the second border.
+		if (iBlockedDirection >= 0 && iExitDirection != iBlockedDirection)
+		{
+			mVecObserverVelocity = {};
+			break;
+		}
+		iBlockedDirection = iExitDirection;
+
+		XMVECTOR vecEdgeNormal = XMVector2Normalize(XMLoadFloat2(&rDirection.f2CenterOffset));
+		float fOutwardSpeed = XMVectorGetX(XMVector2Dot(mVecObserverVelocity, vecEdgeNormal));
+		if (fOutwardSpeed > 0.0f)
+		{
+			mVecObserverVelocity = XMVectorSubtract(mVecObserverVelocity, XMVectorScale(vecEdgeNormal, fOutwardSpeed));
+		}
+
+		float fRemainingOutward = XMVectorGetX(XMVector2Dot(vecRemaining, vecEdgeNormal));
+		if (fRemainingOutward > 0.0f)
+		{
+			vecRemaining = XMVectorSubtract(vecRemaining, XMVectorScale(vecEdgeNormal, fRemainingOutward));
+		}
+		else if (fBestTime <= 0.0f)
+		{
+			break;
+		}
+
+		if (XMVectorGetX(XMVector2LengthSq(vecRemaining)) <= 1.0e-8f)
+		{
+			break;
+		}
+	}
+
+	if (currentCoordinate != mBasisCoordinate)
+	{
+		ShiftToRenderedCell(currentCoordinate);
+	}
+	mVecPosition = vecPosition;
 }
 
 void CameraBase::ShiftToRenderedCell(GridCoord cameraCoordinate)
@@ -153,10 +360,14 @@ void CameraBase::ShiftToRenderedCell(GridCoord cameraCoordinate)
 	mVecJumpStartPosition = XMVectorAdd(mVecJumpStartPosition, vecShift);
 	mVecPreviousTargetPosition = XMVectorAdd(mVecPreviousTargetPosition, vecShift);
 	mVecLastKnownTargetPosition = XMVectorAdd(mVecLastKnownTargetPosition, vecShift);
+	if (mOptionalSubscriptionCenter.has_value())
+	{
+		*mOptionalSubscriptionCenter = XMVectorAdd(*mOptionalSubscriptionCenter, vecShift);
+	}
 	ShiftArea(mf4PreviousCellLoadedArea, previousBasis.f2Offset);
 }
 
-void CameraBase::Update(const FrameInterpolateBase& rFrameInterpolate, float fDeltaTime, float fSunDeltaTime, bool bMainMenuFrame, const CameraTarget& rPulledTarget)
+void CameraBase::Update(const FrameInterpolateBase& rFrameInterpolate, float fDeltaTime, float fSunDeltaTime, bool bMainMenuFrame, const CameraTarget& rPulledTarget, std::optional<XMVECTOR> optionalSubscriptionCenter)
 {
 	// fDeltaTime is the sim-scaled render delta the engine just measured: wall delta multiplied by the active time
 	// ratio (equal to wall time at ratio 1.0). Driving camera blend, shake decay, and mfTime off the same source
@@ -164,9 +375,14 @@ void CameraBase::Update(const FrameInterpolateBase& rFrameInterpolate, float fDe
 	// produce visible relative stutter at high zoom.
 	mfTime += fDeltaTime;
 
-	// Before any position is read or written this frame: the camera lives in its own cell's local frame, so a change
-	// of rendered cell must move every cached position into the new frame first.
-	ShiftToRenderedCell(rFrameInterpolate.renderBasis.coordinate);
+	// Rebase cached camera positions before using them in a new rendered cell. In Observer mode, StepObserverPan owns
+	// mBasisCoordinate and handles rebasing before render interpolation.
+	if (!(meObserverState == ObserverState::kObserving && !bMainMenuFrame))
+	{
+		ShiftToRenderedCell(rFrameInterpolate.renderBasis.coordinate);
+	}
+
+	mOptionalSubscriptionCenter = optionalSubscriptionCenter;
 
 	mfShake = std::max(mfShake - fDeltaTime * 2.0f, 0.0f);
 
@@ -191,10 +407,15 @@ void CameraBase::Update(const FrameInterpolateBase& rFrameInterpolate, float fDe
 		}
 	}
 
-	// Main-menu WASD moves the camera when kbFreeCamera is enabled and drives the pose directly, ignoring the pulled target.
+	// Observer mode and main-menu kbFreeCamera drive the pose directly, ignoring the pulled target.
 	// Movement has W=0 so it preserves the position's W=1.
 	bool bFreeCameraActive = false;
-	if constexpr (kbFreeCamera)
+	if (meObserverState == ObserverState::kObserving && !bMainMenuFrame)
+	{
+		bFreeCameraActive = true;
+		mbJumping = false;
+	}
+	else if constexpr (kbFreeCamera)
 	{
 		if (bMainMenuFrame)
 		{
@@ -209,17 +430,34 @@ void CameraBase::Update(const FrameInterpolateBase& rFrameInterpolate, float fDe
 
 	if (!bFreeCameraActive)
 	{
-		// Until the first tracked target after DiscardTrackingCaches the position holds; that target sets it, no jump.
-		bool bHolding = mfLastKnownTargetTime == 0.0f;
-		XMVECTOR vecTargetPosition = ResolveTarget(rPulledTarget);
-		if (!bHolding)
+		// Hold the panned pose across ship-data gaps; resume normal following on any non-extrapolated target.
+		bool bReturningFromObserver = false;
+		if (meObserverState == ObserverState::kAwaitingReturn && rPulledTarget.meKind != CameraTarget::Kind::kExtrapolate)
 		{
-			UpdatePosition(vecTargetPosition, fDeltaTime);
+			meObserverState = ObserverState::kFollowing;
+			bReturningFromObserver = true;
 		}
-		else if (rPulledTarget.meKind == CameraTarget::Kind::kTracked)
+		if (meObserverState != ObserverState::kAwaitingReturn)
 		{
-			mVecPosition = vecTargetPosition;
-			mVecPreviousTargetPosition = vecTargetPosition;
+			// Until the first tracked target after DiscardTrackingCaches the position holds; that target sets it, no jump.
+			// Leaving Observer mode always resumes through UpdatePosition from the panned pose.
+			bool bHolding = mfLastKnownTargetTime == 0.0f && !bReturningFromObserver;
+			XMVECTOR vecTargetPosition = ResolveTarget(rPulledTarget);
+			if (bReturningFromObserver && mfLastKnownTargetTime == 0.0f)
+			{
+				mVecLastKnownTargetPosition = vecTargetPosition;
+				mVecLastKnownTargetVelocity = {};
+				mfLastKnownTargetTime = mfTime;
+			}
+			if (!bHolding)
+			{
+				UpdatePosition(vecTargetPosition, fDeltaTime);
+			}
+			else if (rPulledTarget.meKind == CameraTarget::Kind::kTracked)
+			{
+				mVecPosition = vecTargetPosition;
+				mVecPreviousTargetPosition = vecTargetPosition;
+			}
 		}
 	}
 	UpdateFraming();
@@ -436,6 +674,8 @@ void CameraBase::ReleaseFramingOverride(float fBlendDuration)
 void CameraBase::ResetForSession()
 {
 	mfSunAngle = kfDefaultSunAngle;
+	meObserverState = ObserverState::kFollowing;
+	mVecObserverVelocity = {};
 	DiscardTrackingCaches();
 	// Reinitialize both references directly to the new session's live zoom on the next camera update; do not carry
 	// contraction across sessions.
@@ -529,34 +769,28 @@ void CameraBase::CalculateMatricesAndVisibleArea()
 	float fLookAtY = XMVectorGetY(mVecPosition);
 	mf4LargeVisibleArea = XMFLOAT4 {fLookAtX + f4Footprint.x, fLookAtY + f4Footprint.y, fLookAtX + f4Footprint.z, fLookAtY + f4Footprint.w};
 
-	// The cell loaded areas read the world framing's footprint, so an override loads no extra cells. During a jump the
-	// cell loaded area sits at the destination, and the previous cell loaded area holds the footprint at the jump's
-	// start, through any re-anchor or retarget, until the jump ends.
-	XMFLOAT4 f4LoadedFootprint = f4Footprint;
-	if (mbFramingOverride)
+	// The cell loaded area uses the world framing's footprint at the subscription center's height so a framing override
+	// or camera height change loads no extra cells, and stays empty when no subscription center is supplied.
+	if (mOptionalSubscriptionCenter.has_value())
 	{
-		float fWorldHalfHeight = mfCameraFraming * std::tan(0.5f * XMConvertToRadians(kfFramingFieldOfView));
-		float fWorldEyeDistance = fWorldHalfHeight / std::tan(0.5f * XMConvertToRadians(fEyeFieldOfView));
-		f4LoadedFootprint = TiltedFootprint(fTilt, mbOrthographicProjection, fWorldEyeDistance, fWorldHalfHeight, fTangentHalfFieldOfView, fAspectRatio, fLookAtHeight);
-	}
-	auto LoadedFootprintAt = [&](FXMVECTOR vecCenter)
-	{
+		float fLoadedHeight = XMVectorGetZ(*mOptionalSubscriptionCenter);
+		XMFLOAT4 f4LoadedFootprint = f4Footprint;
+		if (mbFramingOverride || fLoadedHeight != fLookAtHeight)
+		{
+			float fWorldHalfHeight = mfCameraFraming * std::tan(0.5f * XMConvertToRadians(kfFramingFieldOfView));
+			float fWorldEyeDistance = fWorldHalfHeight / std::tan(0.5f * XMConvertToRadians(fEyeFieldOfView));
+			f4LoadedFootprint = TiltedFootprint(fTilt, mbOrthographicProjection, fWorldEyeDistance, fWorldHalfHeight, fTangentHalfFieldOfView, fAspectRatio, fLoadedHeight);
+		}
 		XMFLOAT2 f2Center {};
-		XMStoreFloat2(&f2Center, vecCenter);
-		XMFLOAT4 f4Area = f4LoadedFootprint;
-		ShiftArea(f4Area, f2Center);
-		return f4Area;
-	};
-	mf4CellLoadedArea = LoadedFootprintAt(mbJumping ? mVecPreviousTargetPosition : mVecPosition);
-	if (!mbJumping)
-	{
-		mbPreviousCellLoadedAreaValid = false;
+		XMStoreFloat2(&f2Center, *mOptionalSubscriptionCenter);
+		ShiftArea(f4LoadedFootprint, f2Center);
+		mf4CellLoadedArea = f4LoadedFootprint;
 	}
-	else if (!mbPreviousCellLoadedAreaValid)
+	else
 	{
-		mf4PreviousCellLoadedArea = LoadedFootprintAt(mVecJumpStartPosition);
-		mbPreviousCellLoadedAreaValid = true;
+		mf4CellLoadedArea = XMFLOAT4 {std::numeric_limits<float>::max(), std::numeric_limits<float>::lowest(), std::numeric_limits<float>::lowest(), std::numeric_limits<float>::max()};
 	}
+	mbPreviousCellLoadedAreaValid = false;
 
 	if (gpGraphics->mFramebufferVkExtent2D.width > gpGraphics->mFramebufferVkExtent2D.height) [[likely]]
 	{

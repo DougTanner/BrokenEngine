@@ -34,8 +34,6 @@ struct GlobalLayout
 	float fElapsedTime INIT;
 	float fBaseHeight INIT;
 	float fBaseHeightInverse INIT; // 1 / max(fBaseHeight, 0.001) (Terrain.frag below-base height ratio)
-	float pfFlightPlaneHeights[kiMaxFlightPlanes] INIT; // Ascending flight-plane heights in meters; [0] == fBaseHeight (smoke per-plane projection and terrain decay)
-	uint32_t uiFlightPlaneCount INIT; // Live plane count, at most kiMaxFlightPlanes; shaders never read a plane at or beyond it
 	float fAspectRatioInverse INIT; // 1 / aspect ratio (Billboards.vert screen-space width divide, folded CPU-side)
 
 	vec2 f2CameraPosition INIT;
@@ -82,18 +80,18 @@ struct GlobalLayout
 	vec4 f4PhysicallyBasedRenderingSunColorObjectsImageBasedLighting INIT;  // (dot(vecSunMoon.rgb, kRec709) / fPbrDayBrightness) * f4PhysicallyBasedRenderingSunColorObjects (Model.frag IBL specular sun term)
 	vec4 f4PhysicallyBasedRenderingMoonColorObjectsImageBasedLighting INIT; // (dot(vecMoon.rgb, kRec709) / fPbrDayBrightness) * f4PhysicallyBasedRenderingMoonColorObjects (Model.frag IBL specular moon term)
 
-	vec4 pf4SmokeAreas[kiMaxFlightPlanes] INIT; // Per flight plane: the world area its smoke texture lies in this frame; wind reads [0]
-	vec4 pf4PreviousSmokeAreas[kiMaxFlightPlanes] INIT; // Per flight plane: the area held before this frame's refresh, equal to pf4SmokeAreas on a skip; wind reads [0]
-	vec2 pf2PreviousSmokeAreaSizeInverses[kiMaxFlightPlanes] INIT; // (1/(z-x), 1/(w-y)) of each pf4PreviousSmokeAreas entry (Smoke/Wind OccupancyDilate previous-area remap)
+	vec4 f4SmokeArea INIT; // The world area the smoke texture lies in this frame; wind shares it
+	vec4 f4PreviousSmokeArea INIT; // The area held before this frame's refresh, equal to f4SmokeArea on a skip; wind shares it
+	vec2 f2PreviousSmokeAreaSizeInverse INIT; // (1/(z-x), 1/(w-y)) of f4PreviousSmokeArea (Smoke/Wind OccupancyDilate previous-area remap)
 	float fSmokeMax INIT;
 	float fSmokePower INIT;
-	float pfSmokeDecays[kiMaxFlightPlanes] INIT; // Per flight plane: gSmokeDecay^pfSmokeStepCounts: one refresh decays for every frame since that plane's previous refresh
-	float pfSmokeStepCounts[kiMaxFlightPlanes] INIT; // Per flight plane: frames since its previous smoke refresh; scales spread offsets and edge decay
+	float fSmokeDecay INIT; // gSmokeDecay^fSmokeStepCount: one refresh decays for every frame since the previous refresh
+	float fSmokeStepCount INIT; // Frames since the previous smoke refresh; scales spread offsets and edge decay
 	float fSmokeColorMin INIT;
 	float fSmokeColorMultiplier INIT;
 	float fSmokeIntensityFalloff INIT;
 	float fSmokeWindNoiseScale INIT;
-	float pfSmokeWindNoiseQuantities[kiMaxFlightPlanes] INIT; // CPU-resolved bottom/top blend over normalized plane index; a single plane uses bottom
+	float fSmokeWindNoiseQuantity INIT;
 	float fSmokeNoiseQuantity INIT;
 	float fSmokeNoiseScaleOne INIT;
 	float fSmokeNoiseScaleTwo INIT;
@@ -101,7 +99,7 @@ struct GlobalLayout
 	vec2 f2SmokeSwirlTimeOffset INIT; // Circular time offset of the swirl noise in noise UV, from fElapsedTime only (SmokeSpread)
 	vec2 f2SmokeWindTimeOffset INIT; // (sin, cos) of 0.5 * fElapsedTime: the wind-noise world-position offset in meters, from fElapsedTime only (SmokeSpread)
 	vec2 f2SmokeCurlTimeOffset INIT; // gSmokeCurlSpeed-scaled circular time offset in noise UV, from fElapsedTime only (SmokeCurlOffset)
-	vec2 f2SmokeCurlOffsetScale INIT; // Finer smoke texel in meters / signed extents of any pf4SmokeAreas entry (all share one construction, so the size cancels): smoke UV per unit curl per unit strength per step; 0 (both curl strengths 0) disables (SmokeCurlOffset)
+	vec2 f2SmokeCurlOffsetScale INIT; // Finer smoke texel in meters / signed extents of f4SmokeArea: smoke UV per unit curl per unit strength per step; 0 (both curl strengths 0) disables (SmokeCurlOffset)
 	float fSmokeCurlStrengthLow INIT; // Calm-wind curl strength; left raw because SmokeCurlOffset blends it toward High by the per-invocation wind factor
 	float fSmokeCurlStrengthHigh INIT; // Strong-wind curl strength; left raw for the same per-invocation blend
 	float fSmokeObjectHeightInverse INIT;
@@ -164,14 +162,10 @@ struct GlobalLayout
 
 	float fLightingAddTerrain INIT;
 	float fSpreadDirectionalityStart INIT;
-	vec4 f4LightingArea INIT; // The refreshing layer's current area (deposit, spread, temporal)
+	vec4 f4LightingArea INIT; // Current lighting area (deposit, spread, combine, temporal, consumer reads)
 	AreaToUvLayout lightingAreaToUv INIT; // f4LightingArea's world-to-UV mapping
-	AreaToUvLayout lightingAreaPreviousToUv INIT; // World-to-UV mapping of the refreshing layer's area before this refresh, for LightingTemporal.comp reprojection
-	float fLightingTemporalBlend INIT; // The refreshing layer's EMA weight toward current; 1.0 on its first refresh so seeded history is never shown
-	uint32_t uiLightingRefreshLayer INIT; // The layer the deposit/spread/combine chain refreshes this frame; 0 on a frame with no refresh
-	vec4 pf4LightingAreas[kiLightingLayers] INIT; // Per lighting layer: the area its combine outputs cover
-	AreaToUvLayout pLightingAreaToUvs[kiLightingLayers] INIT; // Per lighting layer: pf4LightingAreas' world-to-UV mapping (consumer reads)
-	float fLightingLayerHeightInverse INIT; // 1 / (pfFlightPlaneHeights[1] - pfFlightPlaneHeights[0]) (Terrain/Model layer blend weight)
+	AreaToUvLayout lightingAreaPreviousToUv INIT; // World-to-UV mapping of the lighting area before this refresh, for LightingTemporal.comp reprojection
+	float fLightingTemporalBlend INIT; // EMA weight toward current; 1.0 on the first refresh so seeded history is never shown
 	vec2 f2LightingDepositSizeInverse INIT; // 1 / (lightTiles * kiComputeTileSize) (LightingDepositEdgeFade)
 
 	// Spread Start (radial directional spread)
@@ -203,7 +197,7 @@ struct GlobalLayout
 	float pfShadowBlurWeights[kiShadowBlurRadius + 1] INIT; // Symmetric Gaussian half-kernel: ShadowBlurH/V index by abs(offset), scale by fShadowBlurWeightSumInverse.
 	float fShadowBlurWeightSumInverse INIT;
 	float fShadowAngleOffsetSum INIT; // Shadow sun angle + noon + sunset feather offsets, summed CPU-side (Shadow.comp feather term).
-	vec4 pf4ObjectShadowsBlurWeights[kiMaxObjectShadowsBlurRadius + 1] INIT; // Per object-shadow channel, pre-normalized Gaussian half-kernel: ObjectShadowsBlurH/V index by abs(offset); entries past iObjectShadowsBlurRadius are unused
+	float pfObjectShadowsBlurWeights[kiMaxObjectShadowsBlurRadius + 1] INIT; // Pre-normalized Gaussian half-kernel: ObjectShadowsBlurH/V index by abs(offset); entries past iObjectShadowsBlurRadius are unused
 	float fObjectShadowsIntensity INIT;
 	float fObjectShadowsExtension INIT; // max(sunrise stretch cube, sunset stretch cube); the vertex supplies the world-X box width and power profile.
 	float fObjectShadowsStretchPower INIT; // Positive exponent of normalized world-X distance from the sun-facing box edge.
@@ -211,7 +205,6 @@ struct GlobalLayout
 	float fObjectShadowsAwayLightX INIT; // Opposite active sun/moon X sign; zero leaves world X unchanged.
 	float fObjectShadowsTerrainShadowFadeInverse INIT; // 1 / gObjectShadowsTerrainShadowFade (Model.frag terrain-shadow fade by height above fBaseHeight)
 	float fObjectShadowsUnderwaterFadeInverse INIT; // 1 / gObjectShadowsUnderwaterFade (1/meters); surface height remains per-fragment.
-	float fObjectShadowsBlurHeightRangeInverse INIT; // 1 / (highest - lowest flight-plane height) (ModelShadow.frag ground-coverage height split)
 	float fShadowAffectAmbient INIT;
 	float fWaterReducedNoiseOriginX INIT;
 	int32_t iShadowElevationSize INIT;
@@ -225,6 +218,9 @@ struct GlobalLayout
 	vec2 f2WaterFoamReducedTextureOrigin INIT;
 	float fWaterFoamTextureInverseTileSize INIT; // 1 / tile size; material position and derivatives remain per-fragment
 	float fWaterFoamTextureStrength INIT;
+	float fWaterFoamEdgeSoftness INIT;
+	float fWaterFoamErosionCurve INIT;
+	float fWaterFoamDistanceSoften INIT;
 	vec2 f2WaterFoamBreakupReducedTextureOrigin INIT;
 	float fWaterFoamBreakupInverseTileSize INIT; // 1 / breakup tile size; material position and derivatives remain per-fragment
 	float fWaterFoamBreakupAmount INIT;

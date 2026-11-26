@@ -458,38 +458,22 @@ static void XM_CALLCONV PopulateShadowParameters(int64_t iCommandBuffer, shaders
 	}
 	rGlobalLayout.fShadowBlurWeightSumInverse = 1.0f / fShadowBlurWeightSum;
 
-	// Object-shadow R and G hold ground coverage weighted toward the lowest and highest flight planes, so they blur with
-	// Low and High; B and A hold flight planes 1 and 2, whose sigma lerps Low to High by the same height fraction.
-	float fLowestPlaneHeight = gpFlightPlanes->Lowest().fHeightMeters;
-	float fObjectShadowsBlurHeightRangeInverse = 1.0f / (gpFlightPlanes->Highest().fHeightMeters - fLowestPlaneHeight);
-	rGlobalLayout.fObjectShadowsBlurHeightRangeInverse = fObjectShadowsBlurHeightRangeInverse;
-	float fObjectShadowsBlurSigmaLow = gObjectShadowsBlurSigmaLow.mfCurrent;
-	float fObjectShadowsBlurSigmaHigh = gObjectShadowsBlurSigmaHigh.mfCurrent;
-	float pfObjectShadowsBlurSigmas[4] {fObjectShadowsBlurSigmaLow, fObjectShadowsBlurSigmaHigh, fObjectShadowsBlurSigmaLow, fObjectShadowsBlurSigmaLow};
-	for (int64_t i = 1; i < gpFlightPlanes->Count(); ++i)
-	{
-		float fPlaneHeightFraction = (gpFlightPlanes->Plane(i).fHeightMeters - fLowestPlaneHeight) * fObjectShadowsBlurHeightRangeInverse;
-		pfObjectShadowsBlurSigmas[i + 1] = std::lerp(fObjectShadowsBlurSigmaLow, fObjectShadowsBlurSigmaHigh, fPlaneHeightFraction);
-	}
-	// Per-channel half-kernel for ObjectShadowsBlurH/V: offset i of radius R weighs exp(-0.5 * (i * sigma / R)^2), normalized
-	// over the full span (center counts once, each side twice). Weights are staged locally because the layout is write-only.
+	// ObjectShadowsBlurH/V read a radius-scaled Gaussian half-kernel normalized over the full span.
+	// The weights are staged locally because the uniform layout is write-only.
+	float fObjectShadowsBlurSigma = gObjectShadowsBlurSigma.mfCurrent;
 	int64_t iObjectShadowsBlurRadius = std::lround(fDayPercent * gObjectShadowsBlurRadiusNoon.mfCurrent + (1.0f - fDayPercent) * gObjectShadowsBlurRadiusSunset.mfCurrent);
-	float pfObjectShadowsBlurWeights[shaders::kiMaxObjectShadowsBlurRadius + 1][4] {};
-	float pfObjectShadowsBlurWeightSums[4] {};
+	float pfObjectShadowsBlurWeights[shaders::kiMaxObjectShadowsBlurRadius + 1] {};
+	float fObjectShadowsBlurWeightSum = 0.0f;
 	for (int64_t i = 0; i <= iObjectShadowsBlurRadius; ++i)
 	{
-		for (int64_t j = 0; j < 4; ++j)
-		{
-			float fNormalizedOffset = static_cast<float>(i) * pfObjectShadowsBlurSigmas[j] / static_cast<float>(iObjectShadowsBlurRadius);
-			float fWeight = std::exp(-0.5f * fNormalizedOffset * fNormalizedOffset);
-			pfObjectShadowsBlurWeights[i][j] = fWeight;
-			pfObjectShadowsBlurWeightSums[j] += (i == 0) ? fWeight : 2.0f * fWeight;
-		}
+		float fNormalizedOffset = static_cast<float>(i) * fObjectShadowsBlurSigma / static_cast<float>(iObjectShadowsBlurRadius);
+		float fWeight = std::exp(-0.5f * fNormalizedOffset * fNormalizedOffset);
+		pfObjectShadowsBlurWeights[i] = fWeight;
+		fObjectShadowsBlurWeightSum += (i == 0) ? fWeight : 2.0f * fWeight;
 	}
 	for (int64_t i = 0; i <= iObjectShadowsBlurRadius; ++i)
 	{
-		const float* pfWeights = pfObjectShadowsBlurWeights[i];
-		rGlobalLayout.pf4ObjectShadowsBlurWeights[i] = shaders::vec4(pfWeights[0] / pfObjectShadowsBlurWeightSums[0], pfWeights[1] / pfObjectShadowsBlurWeightSums[1], pfWeights[2] / pfObjectShadowsBlurWeightSums[2], pfWeights[3] / pfObjectShadowsBlurWeightSums[3]);
+		rGlobalLayout.pfObjectShadowsBlurWeights[i] = pfObjectShadowsBlurWeights[i] / fObjectShadowsBlurWeightSum;
 	}
 	rGlobalLayout.iObjectShadowsBlurRadius = static_cast<int32_t>(iObjectShadowsBlurRadius);
 	rGlobalLayout.fObjectShadowsTerrainShadowFadeInverse = 1.0f / gObjectShadowsTerrainShadowFade.mfCurrent;
@@ -624,12 +608,6 @@ void RenderFrameGlobal(int64_t iCommandBuffer, std::chrono::duration<float> curr
 	float fBaseHeight = gpFlightPlanes->Lowest().fHeightMeters;
 	rGlobalLayout.fBaseHeight = fBaseHeight;
 	rGlobalLayout.fBaseHeightInverse = 1.0f / std::max(fBaseHeight, 0.001f);
-	for (int64_t i = 0; i < gpFlightPlanes->Count(); ++i)
-	{
-		rGlobalLayout.pfFlightPlaneHeights[i] = gpFlightPlanes->Plane(i).fHeightMeters;
-	}
-	rGlobalLayout.uiFlightPlaneCount = static_cast<uint32_t>(gpFlightPlanes->Count());
-	rGlobalLayout.fLightingLayerHeightInverse = 1.0f / (gpFlightPlanes->Plane(1).fHeightMeters - fBaseHeight);
 	rGlobalLayout.fAspectRatioInverse = 1.0f / gpSwapchainManager->mfAspectRatio;
 
 	XMFLOAT4A f4CameraPositionGlobal {};

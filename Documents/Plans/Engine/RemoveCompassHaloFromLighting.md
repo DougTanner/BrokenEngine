@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-11-21T21:04:04.470Z","dependsOn":["Documents/Plans/Engine/RemoveFlightPlanes.md"]} -->
+<!-- broken-engine-plan/v2 {"createdUtc":"2026-11-21T21:04:04.470Z","dependsOn":[]} -->
 # Remove the compass-shaped world lighting halo
 
 ## Context

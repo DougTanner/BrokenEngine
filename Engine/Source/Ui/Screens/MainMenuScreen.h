@@ -11,8 +11,8 @@ public:
 
 	void Render();
 
-	// Local Server / Remote Server / Graphics / Audio / Game Settings / Quit
-	static constexpr int64_t kiMenuButtonCount = 6;
+	// Local Server / Remote Server / Graphics / Audio / Game Settings / Keybinds / Quit
+	static constexpr int64_t kiMenuButtonCount = 7;
 
 	float mpfButtonHoverAnimations[kiMenuButtonCount] {};
 };

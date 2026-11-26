@@ -91,11 +91,6 @@ existing smoke behaviors, which a plan has to accept or counter:
 - Client-only; no determinism or CRC exposure.
 - Gust noise must be sampled by world position, like the existing swirl, so it
   stays put under camera motion.
-- `Documents/Plans/Engine/SmokePerFlightPlane.md` keeps one wind field for every
-  flight plane. Island peaks may exceed the fixed highest plane. Deflection
-  baked into the stored field would deflect every plane alike; deflection at the
-  read site can use plane-relative elevation, the way that plan measures its
-  per-plane terrain decay, so only planes below the peaks bend.
 - References:
   - Stam, "Stable Fluids" (SIGGRAPH 1999), DOI 10.1145/311535.311548 — the stock
     solver treats obstacles as blocked cells whose velocity is zeroed.

@@ -1,5 +1,7 @@
 #pragma once
 
+#if defined(BT_CLIENT)
+
 #include "HeightLerpWrapperQuartet.h"
 #include "WrapperBase.h"
 
@@ -46,3 +48,5 @@ inline HeightLerpWrapperQuartet gListenerAudibleFloor // mfManualFadeVolume
 };
 
 } // namespace engine
+
+#endif // BT_CLIENT

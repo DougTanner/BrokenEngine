@@ -59,16 +59,19 @@ resumes the work.
    - `Baseline`, as the commit every recorded build and check ran against.
    - Each pending user question, verbatim.
    - The next action.
-6. Build the resume command from the `Branch` prefix with the table below,
-   copying `Worktree` from step 4; for `claude/`, convert it with `cygpath -u`.
-   Done when the command is built, or `Branch` has none of these prefixes and
-   the message will say no reattach command applies.
+6. When `Branch` starts with `claude/`, `codex/`, or `agy/`, take the client
+   name before `/` (`<client>`) and `Worktree` (`<path>`, doubling any
+   embedded apostrophe for the single-quoted argument) from step 4 to build the
+   resume command for PowerShell 7 at `PrimaryRoot`:
 
-   | Prefix | Shell at `PrimaryRoot` | Command | Conversation |
-   | --- | --- | --- | --- |
-   | `claude/` | Git Bash | `.claude/claude-worktree.sh --reattach-worktree '<path>'` | The wrapper adds `--resume`; pick this conversation. |
-   | `codex/` | PowerShell 7 | `.\.codex\codex-worktree.ps1 -ReattachWorktree '<path>'` | Starts a new conversation. |
-   | `agy/` | PowerShell 7 | `.\.antigravity\agy-worktree.ps1 -ReattachWorktree '<path>'` | Starts a new conversation. |
+   ```powershell
+   .\.agents\scripts\Start-AgentWorktreeSession.ps1 <client> -ReattachWorktree '<path>'
+   ```
+
+   For `claude/`, the wrapper adds `--resume` to pick this conversation; for
+   `codex/` and `agy/`, it starts a new conversation. Done when the command is
+   built, or `Branch` has none of those prefixes and the message will say no
+   reattach command applies.
 
 7. End the turn. Done when its final message names what stopped, step 5's
    landing outcome, uncommitted files, open builds or checks, pending questions,
@@ -81,8 +84,7 @@ resumes the work.
   committing, and worktree removal wait for the resumed session, apart from
   what a `/finalize-changes` worker left running in step 2 completes.
 - Keep the resume state in `Temp/eod-resume.md`: `Temp/` is gitignored and
-  survives reattach, and the Codex wrapper starts a new
-  conversation, which the final message alone would not reach.
+  survives reattach so the next session can read it.
 - Write the final message under
   [`change-workflow.md`](../../references/change-workflow.md)
   `### User Interaction`.

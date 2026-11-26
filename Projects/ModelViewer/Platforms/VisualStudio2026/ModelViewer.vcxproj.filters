@@ -279,6 +279,7 @@
     <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Render\Render.h"><Filter>Engine\Graphics\Render</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Screenshot.h"><Filter>Engine\Graphics</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Input\Input.h"><Filter>Engine\Input</Filter></ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Input\Keybinds.h"><Filter>Engine\Input</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Input\RawInputManager.h"><Filter>Engine\Input</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\LaunchOptions.h"><Filter>Engine</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Memory\GlobalAllocator.h"><Filter>Engine\Memory</Filter></ClInclude>

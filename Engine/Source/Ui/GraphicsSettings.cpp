@@ -21,12 +21,11 @@ enum class GraphicsSettingsFlags : uint8_t
 	kSmoke             = 1 << 4,
 	kWind              = 1 << 5,
 	kLighting          = 1 << 6,
-	kSmokeLayerStagger = 1 << 7,
 };
 
 struct GraphicsSettings
 {
-	static constexpr int64_t kiVersion = 29;
+	static constexpr int64_t kiVersion = 30;
 
 	common::Flags<GraphicsSettingsFlags> flags {};
 	uint8_t puiPadding[3] {};
@@ -122,7 +121,6 @@ void SaveGraphicsSettings()
 	graphicsSettings.flags.Set(GraphicsSettingsFlags::kAnisotropy, gAnisotropy.Get<bool>());
 	graphicsSettings.flags.Set(GraphicsSettingsFlags::kSampleShading, gSampleShading.Get<bool>());
 	graphicsSettings.flags.Set(GraphicsSettingsFlags::kSmoke, gSmokeEnabled.Get<bool>());
-	graphicsSettings.flags.Set(GraphicsSettingsFlags::kSmokeLayerStagger, gSmokeLayerStagger.Get<bool>());
 	graphicsSettings.flags.Set(GraphicsSettingsFlags::kWind, gWindEnabled.Get<bool>());
 	graphicsSettings.flags.Set(GraphicsSettingsFlags::kLighting, gLightingEnabled.Get<bool>());
 
@@ -132,6 +130,12 @@ void SaveGraphicsSettings()
 // Returns the first invalid field's name, or nullptr when every checked field is valid.
 static const char* FindInvalidGraphicsSetting(const GraphicsSettings& rGraphicsSettings)
 {
+	static constexpr uint8_t kuiValidFlags = std::to_underlying(GraphicsSettingsFlags::kFullscreen) | std::to_underlying(GraphicsSettingsFlags::kMultisampling) | std::to_underlying(GraphicsSettingsFlags::kAnisotropy) | std::to_underlying(GraphicsSettingsFlags::kSampleShading) | std::to_underlying(GraphicsSettingsFlags::kSmoke) | std::to_underlying(GraphicsSettingsFlags::kWind) | std::to_underlying(GraphicsSettingsFlags::kLighting);
+	if ((std::to_underlying(rGraphicsSettings.flags.meFlags) & ~kuiValidFlags) != 0)
+	{
+		return "flags";
+	}
+
 	if (!gPresentMode.IsAllowed(static_cast<float>(rGraphicsSettings.vkPresentMode)))
 	{
 		return "vkPresentMode";
@@ -280,7 +284,6 @@ void LoadGraphicsSettings()
 		gFieldOfView.Set(graphicsSettings.fFieldOfView);
 		gCameraTilt.Set(graphicsSettings.fCameraTilt);
 		gSmokeEnabled.Set(graphicsSettings.flags & GraphicsSettingsFlags::kSmoke);
-		gSmokeLayerStagger.Set(graphicsSettings.flags & GraphicsSettingsFlags::kSmokeLayerStagger);
 		gSmokeSimulationArea.Set(graphicsSettings.fSmokeSimulationArea);
 		gSunMoonDayMinimumAmbient.Set(graphicsSettings.fDayMinimumAmbient);
 		gSunMoonNightMinimumAmbient.Set(graphicsSettings.fNightMinimumAmbient);
@@ -321,7 +324,6 @@ void ResetGraphicsSettings()
 	gSmokeEnabled.mfCurrent = gSmokeEnabled.mfDefault;
 	gWaterFoamSystemEnabled.mfCurrent = gWaterFoamSystemEnabled.mfDefault;
 	gBreakRepetition.mfCurrent = gBreakRepetition.mfDefault;
-	gSmokeLayerStagger.mfCurrent = gSmokeLayerStagger.mfDefault;
 	gSmokeSimulationArea.mfCurrent = gSmokeSimulationArea.mfDefault;
 	gSunMoonDayMinimumAmbient.mfCurrent = gSunMoonDayMinimumAmbient.mfDefault;
 	gSunMoonNightMinimumAmbient.mfCurrent = gSunMoonNightMinimumAmbient.mfDefault;

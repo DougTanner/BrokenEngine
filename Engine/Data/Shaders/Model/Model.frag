@@ -58,9 +58,9 @@ layout (scalar, set = 1, binding = kiModelBindingMaterials) buffer readonly pbrM
 };
 
 // Engine-specific textures
-layout (set = 1, binding = kiModelBindingLighting) uniform sampler2D pLightingSamplers[kiLightingLayers * 3];
+layout (set = 1, binding = kiModelBindingLighting) uniform sampler2D pLightingSamplers[3];
 layout (set = 1, binding = kiModelBindingShadow) uniform sampler2D shadowTextureSampler;
-layout (set = 1, binding = kiModelBindingSmoke) uniform sampler2D pSmokeSamplers[kiMaxFlightPlanes];
+layout (set = 1, binding = kiModelBindingSmoke) uniform sampler2D smokeSampler;
 layout (set = 1, binding = kiModelBindingObjectShadows) uniform sampler2D objectShadowsTextureSampler;
 
 // Vertex inputs
@@ -73,7 +73,6 @@ layout (location = 5) in vec2 f2InUV3;
 layout (location = 6) in vec2 f2InUV4;
 layout (location = 7) in vec4 f4InColorAdd;
 layout (location = 8) in float fInHeightAboveBase;
-layout (location = 9) in flat int iInLayer;
 layout (location = 10) in vec4 f4InTangent;
 
 // Fragment output
@@ -249,25 +248,19 @@ void main()
 		fEffectiveAo = 1.0 + material.fOcclusionStrength * (fAo - 1.0);
 	}
 
-	// Engine-specific lighting. Sun and moon split: the sun receives terrain and object shadow, the moon only
-	// object shadow. The sun/moon color terms are precomputed CPU-side (GlobalUniforms.cpp PopulateDayCycleColors):
+	// Engine-specific lighting. Sun and moon split: the sun receives terrain shadow; the moon is unshadowed.
+	// The sun/moon color terms are precomputed CPU-side (GlobalUniforms.cpp PopulateDayCycleColors):
 	// the per-target Objects intensity and gPbrSun fold into f4PhysicallyBasedRenderingSun/MoonColorObjects, and the
 	// IBL specular path multiplies in the Rec.709 luminance / fPbrDayBrightness via the separate
 	// f4PhysicallyBasedRenderingSun/MoonColorObjectsImageBasedLighting. Kept as two fields so the IBL path stays
 	// linear in gPbrSun, because its luminance comes from the UNSCALED color.
 	vec3 f3AmbientColor = globalLayout.f4AmbientColor.rgb;
 
-	vec2 f2ObjectShadowsPosition = WorldToVisibleArea(f3InWorldPosition, globalLayout.objectShadowsAreaToUv);
 	vec2 f2LightingPosition = WorldToVisibleArea(f3InWorldPosition, globalLayout.lightingAreaToUv);
 	vec2 f2ShadowPosition = WorldToVisibleArea(f3InWorldPosition, globalLayout.shadowAreaToUv);
 	float fShadow = max(mainLayout.fPbrShadowFloor, SampleTerrainShadow(shadowTextureSampler, f2ShadowPosition));
-	// The terrain shadow lies on the ground, so a ship climbing above the lowest flight plane fades out of it.
+	// The terrain shadow lies on the ground, so a ship climbing above base height fades out of it.
 	fShadow = mix(fShadow, 1.0f, clamp(fInHeightAboveBase * globalLayout.fObjectShadowsTerrainShadowFadeInverse, 0.0f, 1.0f));
-	// Only ships on the planes above iInLayer shade this ship; the smoke loop below reuses this sample.
-	vec4 f4ObjectShadows = texture(objectShadowsTextureSampler, f2ObjectShadowsPosition);
-	float fObjectShadow = ObjectShadowAbove(f4ObjectShadows, iInLayer);
-	fShadow *= fObjectShadow;
-	float fShadowMoon = fObjectShadow;
 
 	// Accumulate lighting
 	vec3 color = vec3(0.0);
@@ -287,7 +280,7 @@ void main()
 	vec3 specularResult = pow(mainLayout.fPbrBrdfSpecular * specularContrib, vec3(mainLayout.fPbrBrdfSpecularPower));
 	vec3 brdf = NdotL * (diffuseResult + specularResult);
 	color += max(globalLayout.f4PhysicallyBasedRenderingSunColorObjects.rgb  * fShadow * fShadow,
-	             globalLayout.f4PhysicallyBasedRenderingMoonColorObjects.rgb * fShadowMoon * fShadowMoon) * brdf;
+	             globalLayout.f4PhysicallyBasedRenderingMoonColorObjects.rgb) * brdf;
 #endif
 
 	// Image based lighting
@@ -297,57 +290,24 @@ void main()
 	GetIBLContribution(NdotV, perceptualRoughness, diffuseColor, specularColor, n, reflection, f3IblDiffuse, f3IblSpecular);
 	f3IblDiffuse *= mainLayout.fPbrAmbient * f3AmbientColor * mix(1.0, fShadow, mainLayout.fPbrIblShadowBlend);
 	f3IblSpecular *= max(globalLayout.f4PhysicallyBasedRenderingSunColorObjectsImageBasedLighting.rgb  * fShadow,
-	                     globalLayout.f4PhysicallyBasedRenderingMoonColorObjectsImageBasedLighting.rgb * fShadowMoon);
+	                     globalLayout.f4PhysicallyBasedRenderingMoonColorObjectsImageBasedLighting.rgb);
 	vec3 f3IblDiffuseResult = pow(mainLayout.fPbrIblDiffuse * f3IblDiffuse, vec3(mainLayout.fPbrIblDiffusePower));
 	vec3 f3IblSpecularResult = pow(mainLayout.fPbrIblSpecular * f3IblSpecular, vec3(mainLayout.fPbrIblSpecularPower));
 	color += fEffectiveAo * (f3IblDiffuseResult + f3IblSpecularResult);
 #endif
 
-	#if 1
-	// Sample each lighting layer where lights on its flight plane deposit: along the eye line, by the model centre's height
-	// above that plane. Zero height samples the raw XY exactly. The fragment blends the low and high layers by its height
-	// between the two planes, reading only the layers the weight needs.
+	// Sample world lighting where lights at base height deposit: along the eye line, by the model centre's height
+	// above base height. Zero height samples the raw XY exactly.
 	vec3 f3ToEye = ToEyeLine(mainLayout, f3InWorldPosition);
 	vec2 f2LightingWorldPosition = f3InWorldPosition.xy - (fInHeightAboveBase / f3ToEye.z) * f3ToEye.xy;
-	vec2 f2LightingTexcoordLow = WorldToVisibleArea(vec3(f2LightingWorldPosition, 0.0f), globalLayout.pLightingAreaToUvs[0]);
-	vec2 f2LightingWorldPositionHigh = f3InWorldPosition.xy - ((fInHeightAboveBase + globalLayout.fBaseHeight - globalLayout.pfFlightPlaneHeights[1]) / f3ToEye.z) * f3ToEye.xy;
-	vec2 f2LightingTexcoordHigh = WorldToVisibleArea(vec3(f2LightingWorldPositionHigh, 0.0f), globalLayout.pLightingAreaToUvs[1]);
-	float fLayerBlend = clamp((f3InWorldPosition.z - globalLayout.fBaseHeight) * globalLayout.fLightingLayerHeightInverse, 0.0f, 1.0f);
-	vec4 pf4LightingLow[3] = vec4[3](vec4(0.0f), vec4(0.0f), vec4(0.0f));
-	vec4 pf4LightingHigh[3] = vec4[3](vec4(0.0f), vec4(0.0f), vec4(0.0f));
-	if (fLayerBlend < 1.0f)
-	{
-		ReadLighting(pf4LightingLow, pLightingSamplers, 0, f2LightingTexcoordLow);
-	}
-	if (fLayerBlend > 0.0f)
-	{
-		ReadLighting(pf4LightingHigh, pLightingSamplers, 1, f2LightingTexcoordHigh);
-	}
-	vec4 pf4Lighting[3] = vec4[3](mix(pf4LightingLow[0], pf4LightingHigh[0], fLayerBlend), mix(pf4LightingLow[1], pf4LightingHigh[1], fLayerBlend), mix(pf4LightingLow[2], pf4LightingHigh[2], fLayerBlend));
+	vec2 f2LightingTexcoord = WorldToVisibleArea(vec3(f2LightingWorldPosition, 0.0f), globalLayout.lightingAreaToUv);
+	vec4 pf4Lighting[3];
+	ReadLighting(pf4Lighting, pLightingSamplers, f2LightingTexcoord);
 
 	// Apply directional lighting
 	vec3 f3Directional = DirectionalLighting(pf4Lighting, n, mainLayout.fLightingDirectionalIntensity, mainLayout.fLightingDirectionalPower, mainLayout.fLightingDirectionalPowerMode);
 	vec3 f3Lighting = globalLayout.fLightingObjects * globalLayout.fLightingTimeOfDayMultiplier * f3Directional;
 	vec3 directionalLighting = f3Lighting * mix(baseColor.rgb, vec3(1.0f), globalLayout.fLightingObjectsAdd);
-	#else
-	// Engine directional lighting
-	vec2 f2DirectTexcoord = WorldToVisibleArea(f3InWorldPosition, globalLayout.pLightingAreaToUvs[0]);
-	vec4 pf4DirectLighting[3];
-	ReadLighting(pf4DirectLighting, pLightingSamplers, 0, f2DirectTexcoord);
-	vec3 f3Direct = DirectionalLighting(pf4DirectLighting, n, mainLayout.fLightingDirectionalIntensity, mainLayout.fLightingDirectionalPower, mainLayout.fLightingDirectionalPowerMode);
-
-	vec2 f2AmbientPosition = BaseHeightPosition(globalLayout, mainLayout, f3InWorldPosition);
-	vec2 f2AmbientTexcoord = WorldToVisibleArea(vec3(f2AmbientPosition, 0.0f), globalLayout.pLightingAreaToUvs[0]);
-	vec4 pf4Lighting[3];
-	ReadLighting(pf4Lighting, pLightingSamplers, 0, f2AmbientTexcoord);
-	vec3 f3Ambient = AmbientLighting(pf4Lighting, mainLayout.fLightingAmbientIntensity, mainLayout.fLightingAmbientPower, mainLayout.fLightingAmbientPowerMode);
-	pf4Lighting[0] *= mainLayout.fLightingAmbientIntensity;
-	pf4Lighting[1] *= mainLayout.fLightingAmbientIntensity;
-	pf4Lighting[2] *= mainLayout.fLightingAmbientIntensity;
-
-	vec3 f3NewLighting = (f3Direct + f3Ambient) * globalLayout.fLightingTimeOfDayMultiplier * globalLayout.fLightingObjects;
-	vec3 directionalLighting = globalLayout.fLightingObjectsAdd * f3NewLighting + (1.0f - globalLayout.fLightingObjectsAdd) * f3NewLighting * baseColor.rgb;
-	#endif
 
 	// Cook-Torrance specular from engine directional lights (EWNS cardinal directions)
 #if ENABLE_SPECULAR_LIGHTING
@@ -386,45 +346,17 @@ void main()
 	color += mainLayout.fPbrEmissive * emissive;
 #endif
 
-	// Apply smoke/fog per flight plane, lowest first, projecting the position to each plane. Planes below the model's
-	// own plane are skipped; its own plane fades with the fragment's height above it so the model pokes through; planes
-	// above apply in full. The loop counter is the sampler index, so it counts from plane 0 and skips lower planes:
-	// instances in one draw can sit on different planes. Plane k is lit by lighting layer k; a layer the height blend
-	// skipped is read only where its plane's smoke shows.
+	// Blend base-height smoke along the eye ray (keeping the fragment's XY above fBaseHeight), faded by fragment height
+	// above fBaseHeight, reusing the base-height lighting and sampling object-shadow R.
 #if ENABLE_SMOKE
-	for (int iPlane = 0; iPlane < int(globalLayout.uiFlightPlaneCount); ++iPlane)
+	vec2 f2PositionAtBaseHeight = BaseHeightPosition(globalLayout, mainLayout, f3InWorldPosition);
+	float fSmokeFade = SmokeObjectHeightFade(globalLayout, f3InWorldPosition.z);
+	float fSmoke = ReadSmoke(globalLayout, f2PositionAtBaseHeight, smokeSampler);
+	float fSmokeMax = fSmokeFade * mainLayout.fPbrSmoke;
+	float fSmokeObjectShadow = texture(objectShadowsTextureSampler, WorldToVisibleArea(f3InWorldPosition, globalLayout.objectShadowsAreaToUv)).x;
+	if (fSmoke * fSmokeMax > 0.0f)
 	{
-		if (iPlane < iInLayer)
-		{
-			continue;
-		}
-		vec2 f2PositionAtPlane = FlightPlanePosition(globalLayout, mainLayout, f3InWorldPosition, iPlane);
-		float fSmokeFade = 1.0f;
-		if (iPlane == iInLayer)
-		{
-			fSmokeFade = SmokeObjectHeightFade(globalLayout, f3InWorldPosition.z, iPlane);
-		}
-		float fSmoke = ReadSmoke(globalLayout, f2PositionAtPlane, pSmokeSamplers[iPlane], iPlane);
-		float fSmokeMax = fSmokeFade * mainLayout.fPbrSmoke;
-		if (fSmoke * fSmokeMax > 0.0f)
-		{
-			if (iPlane == 0)
-			{
-				if (fLayerBlend == 1.0f)
-				{
-					ReadLighting(pf4LightingLow, pLightingSamplers, 0, f2LightingTexcoordLow);
-				}
-				color = AddSmoke(globalLayout, color, fSmoke, fSmokeMax, pf4LightingLow, iPlane == 0 ? f4ObjectShadows.x : 1.0f);
-			}
-			else
-			{
-				if (fLayerBlend == 0.0f)
-				{
-					ReadLighting(pf4LightingHigh, pLightingSamplers, 1, f2LightingTexcoordHigh);
-				}
-				color = AddSmoke(globalLayout, color, fSmoke, fSmokeMax, pf4LightingHigh, iPlane == 0 ? f4ObjectShadows.x : 1.0f);
-			}
-		}
+		color = AddSmoke(globalLayout, color, fSmoke, fSmokeMax, pf4Lighting, fSmokeObjectShadow);
 	}
 #endif
 

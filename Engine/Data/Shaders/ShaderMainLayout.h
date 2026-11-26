@@ -34,6 +34,12 @@ struct MainLayout
 	int32_t iWaterMediumCount INIT;
 	int32_t iWaterActiveQuadX INIT;
 	int32_t iWaterActiveQuadY INIT;
+	// Framing amplitude-fade scales applied to visual displacement/normals in WaterDisplacement.comp while
+	// pf4*WavesTwo.y stays un-faded for foam Jacobian compression.
+	float fWaterLowAmplitudeScale INIT;
+	float fWaterMediumAmplitudeScale INIT;
+	float fWaterFoamHighZoomBlend INIT; // 1 - mean low-band Nyquist alias weight; hands off Jacobian foam to procedural high-zoom whitecaps in WaterFoam.comp
+	vec2 f2WaterFoamHighZoomScroll INIT; // Double-precision modulo-2 spawn-noise UV scroll along the low-band wave direction
 
 	// Lighting — water normal map atlas (3 weighted samples)
 	float fLightingSampledNormalsOneSize INIT;
@@ -132,7 +138,7 @@ struct MainLayout
 	float fPbrCubemapLodPower INIT;
 	float fPbrCubemapLodOffset INIT;
 
-	float pfSmokeShadowIntensities[kiMaxFlightPlanes] INIT; // CPU-interpolated by normalized flight-plane index; avoids per-fragment interpolation.
+	float fSmokeShadowIntensity INIT;
 
 	float fHexShieldGrow INIT;
 	float fHexShieldEdgeDistance INIT;

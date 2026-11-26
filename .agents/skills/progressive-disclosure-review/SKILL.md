@@ -48,8 +48,16 @@ findings and fixes land, only the affected files receive a focused re-review.
 - `Stated net size` — the net instruction size change the session's plan
   states; omitted when the session has no plan or the plan states none.
 
-The reviewer derives the changed instruction-doc list itself from `Baseline`
-and `Scope` and never takes a caller-supplied list or diff in its place.
+The official region inventory supplies the review regions, including for
+bridge runs (`-Head` for a committed head; `-UntrackedPath` or
+`-IncludeUntracked` from `Scope`):
+
+```powershell
+pwsh -NoProfile -NonInteractive -Command 'Import-Module ./.agents/scripts/SessionChangeInventory.psm1; Get-SessionChangeInventory -RepositoryRoot (Get-Location).Path -Baseline <baseline SHA> -Regions|Select-Object status,coretide,counts,entries,regions|ConvertTo-Json -Depth 5'
+```
+
+With `Stated net size`, use the `instruction-size` row from the Change Workflow
+`Run targeted pre-review checks` command (`-Head` for a committed head).
 
 If the baseline is unavailable, the change inventory cannot produce the changed
 regions, or a focused re-review arrives without `First-round findings`, return

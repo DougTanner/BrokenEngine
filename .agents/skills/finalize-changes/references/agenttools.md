@@ -9,9 +9,18 @@ locks, and claims do not qualify.
 
 These trigger paths are shared tool infrastructure: every linked worktree
 consumes the same authoritative binaries. When a change to them could break
-another live worktree — a changed CLI contract, a changed lock or claim format,
-or a behavior other sessions depend on mid-run — pause and warn the user before
-landing. When it cannot affect another live worktree, continue without a pause.
+another live worktree — a changed CLI contract, a changed lock, claim, or
+tracked Plan marker format, or a behavior other sessions depend on mid-run —
+main relays a pause warning to the user before primary advances. For a tracked
+format-version bump (such as a Plan marker bump), warn that peer sessions must
+stop starting scheduler operations (`plan claim-next`, `plan validate`) and let
+in-flight ones finish before confirming the advance, stay paused through
+verified promotion (including any failure and retry) so the unpromoted binary
+cannot heal live claims against migrated primary files, and reconcile their
+checkouts with the migrated primary before resuming any command that parses
+local Plans (`plan list`, `plan claim-next`, `plan validate`, `plan complete`,
+`plan reject`). When a change cannot affect another live worktree, continue
+without a pause.
 
 Before the landing summary, run `../scripts/Wait-AgentToolsQuiescence.ps1`
 with the durable session owner, using the canonical invocation in

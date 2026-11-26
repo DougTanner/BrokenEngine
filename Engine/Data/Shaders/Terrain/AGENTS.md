@@ -35,9 +35,6 @@ ambient-occlusion, and material-mask textures.
   samples only; material color remains mask-driven.
 - Island normals, ambient occlusion, and masks use the clamp sampler, while
   detail normals use the repeat sampler.
-- Lighting blends the low and high lighting layers by the fragment's elevation
-  between their flight planes, reading only the layers the weight needs: the low
-  layer at the fragment XY (directional) and base-height projection (ambient),
-  the high layer at the eye-ray position on its plane. Plane k's smoke is lit by
-  layer k's ambient at that plane's projection, a layer the blend skipped being
-  read only where that plane's smoke shows.
+- Lighting samples the single lighting layer at the fragment XY (directional)
+  and at the base-height projection (ambient, also passed to smoke,
+  `../Smoke/AGENTS.md`).

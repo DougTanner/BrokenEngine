@@ -1,5 +1,7 @@
 #pragma once
 
+#if defined(BT_CLIENT)
+
 #include "WrapperBase.h"
 
 namespace engine
@@ -36,7 +38,6 @@ inline Wrapper gUiOpacity(0.5f, 0.0f, 1.0f);
 inline Wrapper gUiFontScale(1.0f, 0.5f, 3.0f);
 inline Wrapper gUiTheme(UiTheme::kNavalSteel, std::vector<UiTheme> {UiTheme::kNavalSteel, UiTheme::kDarkAmber, UiTheme::kMidnightMauve});
 inline Wrapper gSmokeEnabled(true);
-inline Wrapper gSmokeLayerStagger(true);
 inline Wrapper gWindEnabled(true);
 inline Wrapper gLightingEnabled(true);
 inline Wrapper gSunAngleOverride(1.15f, 0.0f, XM_2PI);
@@ -47,3 +48,5 @@ inline UiTheme GetUiTheme()
 }
 
 } // namespace engine
+
+#endif // BT_CLIENT

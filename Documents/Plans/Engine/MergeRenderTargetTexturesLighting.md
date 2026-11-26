@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-11-20T23:55:12.420Z","dependsOn":["Documents/Plans/Engine/RemoveFlightPlanes.md","Documents/Plans/Engine/SingleLayerWorldLighting.md"]} -->
+<!-- broken-engine-plan/v2 {"createdUtc":"2026-11-20T23:55:12.420Z","dependsOn":[]} -->
 # Merge RenderTargetTexturesLighting.cpp into RenderTargetTextures.cpp
 
 ## Context
@@ -6,12 +6,13 @@
 `class RenderTargetTextures`
 (`Engine/Source/Graphics/Managers/RenderTargetTextures.h:8`) defines its
 members in two .cpp files: `RenderTargetTextures.cpp` holds nine definitions
-(`Create` `:25` through `CreateTerrainTextures` `:329`), and
-`RenderTargetTexturesLighting.cpp` holds `DestroyLightingTextures` (`:24`),
-`CreateLightingTextures` (`:69`), and `RegisterDebugTextures` (`:415`), with
-file-static name tables (`:16-22`) and a `static_assert` on the lighting layer
-count (`:14`). `Documents/C++StyleGuide.txt` rule 67 requires a `class` to keep
-every member definition outside its header in one .cpp file.
+(`Create` through `CreateTerrainTextures`), and
+`RenderTargetTexturesLighting.cpp` holds `DestroyLightingTextures`,
+`CreateLightingTextures`, and `RegisterDebugTextures`, with file-static name
+tables (`kpCombineNames`, `kAmbientCombineName`, `kpHistoryNames`,
+`sppSpreadNames`, `sppSpreadOnlyNames`). `Documents/C++StyleGuide.txt` rule 67
+requires a `class` to keep every member definition outside its header in one
+.cpp file.
 
 `RenderTargetTexturesLighting.cpp` is listed in
 `Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/BrokenEngineSandbox.vcxproj:427`
@@ -19,15 +20,10 @@ and its `.filters:956`, and in
 `Projects/ModelViewer/Platforms/VisualStudio2026/ModelViewer.vcxproj:121` and
 its `.filters:110`.
 
-The user chose the merge into `RenderTargetTextures.cpp`, executed after the
-single-layer lighting work. `Documents/Plans/Engine/SingleLayerWorldLighting.md`
-rewrites the lighting file (its include, `static_assert`, name tables, destroy,
-create, and debug-slot regions), and
-`Documents/Plans/Engine/SingleLayerSmoke.md` and
-`Documents/Plans/Engine/RemoveFlightPlanes.md` cite line numbers at the top of
-`RenderTargetTextures.cpp`, where the merge adds an include; landing this merge
-first would invalidate their citations. `SingleLayerWorldLighting` also deletes
-the `static_assert` at `RenderTargetTexturesLighting.cpp:14`.
+The user chose the merge into `RenderTargetTextures.cpp`. World lighting and
+smoke now use a single layer, and `RenderTargetTextures.cpp` already includes
+every header `RenderTargetTexturesLighting.cpp` uses. Flight-plane cleanup also
+touches `RenderTargetTextures.cpp` and affects the merged file's final size.
 
 ## Design
 
@@ -36,8 +32,9 @@ A pure move with no behavior change:
 1. Move every definition, file-static table, and `static_assert` that remains
    in `RenderTargetTexturesLighting.cpp` at execution time into
    `RenderTargetTextures.cpp`, after its last member definition, keeping their
-   order. Add the lighting file's includes that `RenderTargetTextures.cpp` does
-   not already have (today `Ui/LightingWrappersBase.h`) in its include block.
+   order. Add any includes from `RenderTargetTexturesLighting.cpp` that
+   `RenderTargetTextures.cpp` does not already have at execution time in its
+   include block.
 2. Delete `RenderTargetTexturesLighting.cpp` and remove it from the
    BrokenEngineSandbox and ModelViewer project and filter files through
    `/update-vcxproj`.

@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-11-24T21:08:52.582Z","dependsOn":["Documents/Plans/Engine/RemoveFlightPlanes.md"]} -->
+<!-- broken-engine-plan/v2 {"createdUtc":"2026-11-24T21:08:52.582Z","dependsOn":["Documents/Plans/Engine/ReplaceFlightPlanesWithBaseHeight.md"]} -->
 # Graceful Fighter Raise-Above-Terrain
 
 ## Context

@@ -31,7 +31,7 @@ static bool ResolveLocalPosition(GridCoord& rCoord, XMFLOAT4A& rf4Local)
 	return true;
 }
 
-// Render path (ProjectToFlightPlane). Resolves a position past the cell edge onto the neighbouring cell and takes that
+// Render path (ProjectToBaseHeight). Resolves a position past the cell edge onto the neighbouring cell and takes that
 // cell's highest island elevation.
 static float XM_CALLCONV GlobalElevation(GridCoord coord, FXMVECTOR vecLocalPosition)
 {
@@ -57,7 +57,7 @@ static float XM_CALLCONV GlobalElevation(GridCoord coord, FXMVECTOR vecLocalPosi
 	return gpIslandTerrain->CellElevation(it->second.staticData, f4Local);
 }
 
-XMVECTOR ProjectToFlightPlane(XMVECTOR vecLocalPosition, const RenderBasis& rBasis, int64_t iPlane)
+XMVECTOR ProjectToBaseHeight(XMVECTOR vecLocalPosition, const RenderBasis& rBasis)
 {
 	// The elevation query is answered in the emitter's own cell, from the coordinate the basis carries; the
 	// projection toward the eye is the conversion point, so the rebase happens exactly once here.
@@ -65,12 +65,7 @@ XMVECTOR ProjectToFlightPlane(XMVECTOR vecLocalPosition, const RenderBasis& rBas
 	XMVECTOR vecRenderPosition = Rebase(rBasis, vecLocalPosition);
 	// Orthographic eye lines run parallel to the view direction rather than through the (virtual) eye.
 	XMVECTOR vecLinePoint = engine::gpCamera->mbOrthographicProjection ? XMVectorAdd(vecRenderPosition, engine::gpCamera->mVecToEyeNormal) : engine::gpCamera->mVecEyePosition;
-	return common::ToBaseHeight(vecRenderPosition, vecLinePoint, std::max(fElevation, gpFlightPlanes->Plane(iPlane).fHeightMeters));
-}
-
-XMVECTOR ProjectToBaseHeight(XMVECTOR vecLocalPosition, const RenderBasis& rBasis)
-{
-	return ProjectToFlightPlane(vecLocalPosition, rBasis, 0);
+	return common::ToBaseHeight(vecRenderPosition, vecLinePoint, std::max(fElevation, gpFlightPlanes->Lowest().fHeightMeters));
 }
 
 } // namespace engine

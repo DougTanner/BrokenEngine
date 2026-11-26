@@ -715,6 +715,23 @@ void ImGuiManager::Submit(int64_t iFramebuffer, bool bAfterMain)
 
 	vkCmdBeginRenderPass(rCommandBuffers.mImGuiVkCommandBuffer, &vkRenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
+	if (!bAfterMain)
+	{
+		VkClearAttachment vkClearAttachment
+		{
+			.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+			.colorAttachment = 0,
+			.clearValue = {.color = {.float32 = {0.0f, 0.0f, 0.0f, 1.0f}}},
+		};
+		VkClearRect vkClearRectangle
+		{
+			.rect = {.offset = {.x = 0, .y = 0}, .extent = gpGraphics->mFramebufferVkExtent2D},
+			.baseArrayLayer = 0,
+			.layerCount = 1,
+		};
+		vkCmdClearAttachments(rCommandBuffers.mImGuiVkCommandBuffer, 1, &vkClearAttachment, 1, &vkClearRectangle);
+	}
+
 	mpDrawData->Textures = nullptr;
 	ImGui_ImplVulkan_RenderDrawData(mpDrawData, rCommandBuffers.mImGuiVkCommandBuffer);
 

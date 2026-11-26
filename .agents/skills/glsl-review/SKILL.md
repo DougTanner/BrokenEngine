@@ -33,6 +33,13 @@ authorization pass runs. Also require the authorization source: either the
 approved plan's exact in-scope and out-of-scope text or an explicit list of the
 authorizing user instructions, plus the execution card when one exists.
 
+Region inventory (`-Head` for a committed head; `-UntrackedPath` or
+`-IncludeUntracked` from `Scope`):
+
+```powershell
+pwsh -NoProfile -NonInteractive -Command 'Import-Module ./.agents/scripts/SessionChangeInventory.psm1; Get-SessionChangeInventory -RepositoryRoot (Get-Location).Path -Baseline <baseline SHA> -Regions|Select-Object status,coretide,entries,regions|ConvertTo-Json -Depth 5'
+```
+
 ## Handoff
 
 Order findings by severity, give each one a stable `GLSL###` ID, and omit empty

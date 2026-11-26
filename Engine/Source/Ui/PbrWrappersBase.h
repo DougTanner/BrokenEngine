@@ -1,5 +1,7 @@
 #pragma once
 
+#if defined(BT_CLIENT)
+
 #include "WrapperBase.h"
 
 namespace engine
@@ -33,3 +35,5 @@ inline Wrapper gColorGradingContrast(1.205f, 0.5f, 2.0f);
 inline Wrapper gColorGradingTemperature(-0.205f, -1.0f, 1.0f);
 
 } // namespace engine
+
+#endif // BT_CLIENT

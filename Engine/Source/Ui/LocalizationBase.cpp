@@ -96,6 +96,96 @@ static char32_t sppTranslatedStrings[][kiLanguageCount][256]
 		U"EN PAUSE", // French
 		U"PAUSIERT", // German
 	},
+	// kStringKeybinds
+	{
+		U"KEYBINDS", // English
+		U"", // Chinese
+		U"", // Spanish
+		U"", // Portuguese
+		U"", // French
+		U"", // German
+	},
+	// kStringFullscreen
+	{
+		U"TOGGLE FULLSCREEN", // English
+		U"", // Chinese
+		U"", // Spanish
+		U"", // Portuguese
+		U"", // French
+		U"", // German
+	},
+	// kStringOpenChat
+	{
+		U"OPEN CHAT", // English
+		U"", // Chinese
+		U"", // Spanish
+		U"", // Portuguese
+		U"", // French
+		U"", // German
+	},
+	// kStringScreenshot
+	{
+		U"SCREENSHOT", // English
+		U"", // Chinese
+		U"", // Spanish
+		U"", // Portuguese
+		U"", // French
+		U"", // German
+	},
+	// kStringCameraForward
+	{
+		U"CAMERA FORWARD", // English
+		U"", // Chinese
+		U"", // Spanish
+		U"", // Portuguese
+		U"", // French
+		U"", // German
+	},
+	// kStringCameraBack
+	{
+		U"CAMERA BACK", // English
+		U"", // Chinese
+		U"", // Spanish
+		U"", // Portuguese
+		U"", // French
+		U"", // German
+	},
+	// kStringCameraLeft
+	{
+		U"CAMERA LEFT", // English
+		U"", // Chinese
+		U"", // Spanish
+		U"", // Portuguese
+		U"", // French
+		U"", // German
+	},
+	// kStringCameraRight
+	{
+		U"CAMERA RIGHT", // English
+		U"", // Chinese
+		U"", // Spanish
+		U"", // Portuguese
+		U"", // French
+		U"", // German
+	},
+	// kStringUnbound
+	{
+		U"UNBOUND", // English
+		U"", // Chinese
+		U"", // Spanish
+		U"", // Portuguese
+		U"", // French
+		U"", // German
+	},
+	// kStringPressKey
+	{
+		U"PRESS A KEY...", // English
+		U"", // Chinese
+		U"", // Spanish
+		U"", // Portuguese
+		U"", // French
+		U"", // German
+	},
 
 	// kCount
 	{

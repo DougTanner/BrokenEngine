@@ -37,10 +37,13 @@ itself and on-demand cell creation are engine-owned
 - Display input is engine-owned (`../../../Engine/Source/Input/AGENTS.md`). The
   game's only display-input entry point is `Game::ProcessGameMenuInput`, which
   `GameBase::ProcessInput` calls last, after engine menu policy and the
-  engine's debug-control requests: it polls its own keys through the borrowed
-  `engine::InputPoll`. Everything it does is `kbDebugInput`-only except TAB,
-  which follows the map input contract in `Ui/Screens/AGENTS.md`,
-  and the `kbFreeCamera`-only main-menu Backspace (`Graphics/AGENTS.md`).
+  engine's debug-control requests: it polls its own keys through
+  `engine::InputPoll`. Everything it does is `kbDebugInput`-only except
+  `GameKeyAction::kToggleMap` (defaults in `kpDefaultGameKeybinds`, remappable
+  via `Input/GameKeybinds.h`), which follows the map input contract in
+  `Ui/Screens/AGENTS.md`, backtick (`VK_OEM_3`), which toggles gameplay Observer
+  mode when in gameplay with `UiState::kNone` and the map closed, and the
+  `kbFreeCamera`-only main-menu Backspace (`Graphics/AGENTS.md`).
 - Agent commands are game-dispatched, but transport, synthetic input, UI
   snapshots, the build-agnostic shared handlers, and the client-generic and
   server-generic handlers are engine-owned; the dispatcher tries the engine
@@ -52,14 +55,19 @@ itself and on-demand cell creation are engine-owned
 
 ## Architecture
 
-- Client subscriptions cover the current cell plus whichever of its six edge
-  neighbors overlap the camera's cell loaded area (world framing), which sits
-  at the destination during a camera jump, plus the confirmed departure cells
-  kept until that jump ends, best effort; the engine client session runtime
-  computes them (`../../../Engine/Source/Network/Client/AGENTS.md`). The
-  client's cell is stored on `GameBase`, but game policy chooses it; its write
-  path is engine-owned (`../../../Engine/Source/Network/Client/AGENTS.md`
-  `## Other`).
+- Under gameplay policy, client subscriptions are anchored to the focused
+  fleet's live flagship as fog of war: `mClientGridCoordinate` follows that
+  flagship (origin when none is alive) unless the harness viewer pin holds it
+  (`../../../Engine/Source/Network/Client/AGENTS.md` `## Other`), and
+  subscriptions cover that cell plus whichever of its six edge neighbors
+  overlap the camera's cell loaded area (world framing centered on the flagship
+  via `Camera::PullSubscriptionCenter`; anchor lifecycle in
+  `Graphics/AGENTS.md`); the engine client session runtime computes them
+  (`../../../Engine/Source/Network/Client/AGENTS.md`). Focusing a non-flagship
+  fleet member keeps the flagship subscription anchor fixed, and panning in
+  Observer mode does not change subscriptions. The client's cell is stored on
+  `GameBase`, but game policy chooses it; its engine-owned write path lives in
+  that `## Other` section.
 - Cross-cell transfers and spawns decided outside the tick are serialized
   `StatusChange`s carrying spawn state; the machinery that moves them between
   cells and applies them is engine-owned
@@ -76,8 +84,11 @@ itself and on-demand cell creation are engine-owned
   (`Graphics/AGENTS.md`); orderly client shutdown writes that mirror plus both
   camera poses once, while abnormal exits do not guarantee current-session
   changes are saved and may leave the previous orderly-exit snapshot on disk.
-  Bump the owning version on layout change. Tweaks, game, sound, and graphics
-  settings persistence is engine-owned (`../../../Engine/Source/Ui/AGENTS.md`).
+  Bump the owning version on layout change. `GameKeybinds.bin` (versioned POD in
+  `Input/GameKeybinds.cpp`) persists game keybinds, loaded with engine keybinds
+  at startup (`Input::LoadAllKeybinds`) and saved when leaving
+  `UiState::kKeybinds`. Tweaks, game, sound, and graphics settings persistence
+  is engine-owned (`../../../Engine/Source/Ui/AGENTS.md`).
 - Save/replay compatibility is gated by `Frame::kiVersion`, and the replay
   metadata file also by its own `ReplayMeta::kiVersion`;
   `Version.h::kiGameVersion` is informational.

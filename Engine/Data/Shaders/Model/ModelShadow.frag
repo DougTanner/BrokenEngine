@@ -25,19 +25,14 @@ layout (location = 5) in vec2 f2InUV3;
 layout (location = 6) in vec2 f2InUV4;
 layout (location = 7) in vec4 f4InColorAdd;
 layout (location = 8) in float fInHeightAboveBase;
-layout (location = 9) in flat int iInLayer;
 layout (location = 10) in vec4 f4InTangent;
 
 // Output
-layout (location = 0) out vec4 f4OutColor;
+layout (location = 0) out float fOutColor;
 
 void main()
 {
-	// Coverage merged by MAX blending. R and G split ground coverage by ship height above the ground below it, between
-	// the lowest and highest flight-plane heights, and blur with Sigma Low and High, so the ground blur varies smoothly
-	// with height. B and A hold ships on flight planes 1 and 2 only, for shadows on ships below them; nothing
-	// reads plane 0's.
-	float fHeightFraction = clamp(fInHeightAboveBase * globalLayout.fObjectShadowsBlurHeightRangeInverse, 0.0f, 1.0f);
+	// Single-channel object-shadow coverage merged by MAX blending, faded linearly below sea level.
 	float fUnderwaterFade = clamp(1.0f + f3InWorldPosition.z * globalLayout.fObjectShadowsUnderwaterFadeInverse, 0.0f, 1.0f);
-	f4OutColor = fUnderwaterFade * vec4(1.0f - fHeightFraction, fHeightFraction, equal(ivec2(1, 2), ivec2(iInLayer)));
+	fOutColor = fUnderwaterFade;
 }

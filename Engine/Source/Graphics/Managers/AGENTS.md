@@ -207,26 +207,24 @@ buffers are indexed by CRC.
   record-once command buffers reach skinning data only through descriptor sets
   the grow repoints.
 - Smoke and wind share one occupancy + active-tile-list pattern for hierarchical
-  indirect dispatch. Smoke pairs one bit-packed occupancy buffer with each
-  flight plane's ping-pong textures and shares one active-tile list across
-  every plane's spread halves: each plane's deposits mark its first texture's
-  occupancy; each spread's dilate reads its
-  input occupancy and read-and-clears its output texture's prior occupancy as a
-  stale-storage union term, then the spread re-marks nonzero output. Smoke
-  dilates dispatch through per-framebuffer host-visible indirect commands so a
-  frame that skips a plane dispatches nothing for it and leaves its occupancy
-  intact; wind still
-  resets its occupancy with a fill. Wind keeps a separate occupancy and
-  active-tile-list pair per ping-pong texture, with both spread variants
+  indirect dispatch. Smoke pairs one bit-packed occupancy buffer with each of
+  its two ping-pong textures and shares one active-tile list across both spread
+  halves: deposits mark the first texture's occupancy; each spread's dilate
+  reads its input occupancy and read-and-clears its output texture's prior
+  occupancy as a stale-storage union term, then the spread re-marks nonzero
+  output. Smoke dilates dispatch through per-framebuffer host-visible indirect
+  commands so a skipped frame dispatches nothing and leaves occupancy intact;
+  wind still resets its occupancy with a fill. Wind keeps a separate occupancy
+  and active-tile-list pair per ping-pong texture, with both spread variants
   recorded and runtime state plus indirect dispatch selecting useful work.
   Occupancy describes persistent texture contents, so every occupancy buffer
   starts at zero. Wind hierarchy storage is created with the wind textures,
   which zero-fill its occupancy, so it survives pipeline-only rebuilds together
   with the retained texture contents; smoke hierarchy storage is pipeline-owned.
   Replacing smoke hierarchy storage also re-arms the one-frame smoke clear:
-  Global first observes the zeroed occupancy, Main then clears every plane's
-  retained ping-pong images, and fresh `SmokeOne` deposits after that clear
-  must mark their plane's occupancy A.
+  Global first observes the zeroed occupancy, Main then clears both retained
+  ping-pong images, and fresh `SmokeOne` deposits after that clear must mark
+  occupancy A.
 - Swapchain recreation tears down and rebuilds only per-framebuffer buffers,
   preserving static geometry.
 
@@ -341,11 +339,12 @@ Loads SPIR-V from pack chunks and owns fixed engine pipelines plus CRC-keyed
 dynamic collection pipelines. Pipelines retain pointers into the manager's
 stable shader map.
 
-- Fixed pipelines implement renderer passes and utility compute work. Lighting
-  follows deposit, spread, combine, then temporal accumulation: deposit and
-  spread are one scratch chain, while combine, temporal, and history copy have
-  one pipeline per lighting layer over that layer's own outputs; separable blur
-  pipelines pre-process registered light textures.
+- Fixed pipelines implement renderer passes and utility compute work. For
+  lighting (pass sequence: `../../../Data/Shaders/Lighting/AGENTS.md`,
+  `../Render/AGENTS.md` `## Ordering and Publication`), the manager owns one
+  deposit/spread scratch chain, single combine, temporal, and history-copy
+  pipelines over the lighting outputs, and separable blur pipelines that
+  pre-process registered light textures.
 - Collections register dynamic pipelines by behavior and model role; these maps
   repopulate lazily after pipeline-tier recreation, so a new renderable
   collection must use the established idempotent registration path rather than
@@ -372,11 +371,12 @@ every allocated particle by the whole-cell offset in the update pass.
 ### ImGuiManager
 
 Integrates Dear ImGui with a dedicated load-preserving overlay pass. It records
-the UI command buffer each frame; on a world frame that buffer records the HDR
-resolve, which writes the scene into the swapchain image, into the present
-pass. Its submission waits as `### CommandBufferManager` states, then signals
-presentation and the per-framebuffer fence as the frame's final graphics
-submission.
+the UI command buffer each frame (`ImGuiManager::Submit`): on a world frame
+that buffer records the HDR resolve, which writes the scene into the swapchain
+image, into the present pass, and on a world-hidden frame it clears the color
+attachment to black before drawing ImGui. Its submission waits as
+`### CommandBufferManager` states, then signals presentation and the
+per-framebuffer fence as the frame's final graphics submission.
 
 - The manager owns ImGui setup, submission, and the Tweaks screen. It calls
   three UI functions `ImGuiManager.h` declares and each client program defines

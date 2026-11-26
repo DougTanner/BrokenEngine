@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-11-25T00:02:01.145Z","dependsOn":["Documents/Plans/Engine/RemoveFlightPlanes.md"]} -->
+<!-- broken-engine-plan/v2 {"createdUtc":"2026-11-25T00:02:01.145Z","dependsOn":[]} -->
 # Unify Remaining Singleton and Graphics RAII Siblings
 
 ## Context

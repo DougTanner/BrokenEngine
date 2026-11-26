@@ -42,6 +42,45 @@ included, runs the full audit in [`references/worker.md`](references/worker.md).
   `## Task brief`,
   including repository identity and session baseline.
 
+Run the finder once, adding `-SessionId <exact-id>` when supplied.
+
+```powershell
+pwsh -NoProfile -NonInteractive -File .agents/skills/next-plan-review/scripts/Find-AgentSessionTranscript.ps1 -RepositoryRoot '<absolute repository root>' -Commit <requested commit>
+```
+
+Run the projection once per applicable Claude or `agy` parent.
+
+```powershell
+pwsh -NoProfile -NonInteractive -File .agents/skills/next-plan-checkpoint-review/scripts/Get-TranscriptProjection.ps1 -TranscriptPath '<parent transcript path>'
+```
+
+Before launch with inaccessible stores, stage bounded, redacted production
+records and matching projection rows for applicable candidates by client,
+session ID, and event or line selector. Stage more only for the producing
+parent and proven children by source identity. The reviewer independently
+verifies each proof and uses only matching evidence.
+
+A producing parent started before and spanned the commit and recorded
+finalization producing its full hash. An ordinary child needs the parent's
+own delegation event and fixed return window.
+
+In full reviews with an explicit usage request, run once per proven Claude or
+`agy` transcript. For inaccessible stores, the host runs on originals before
+launch and supplies parsed results by client and `## Handoff` label.
+
+```powershell
+pwsh -NoProfile -NonInteractive -File .agents/skills/next-plan-review/scripts/Get-TranscriptUsage.ps1 -TranscriptPath '<path>' | ConvertFrom-Json
+```
+
+Use the proven parent's path. Use literal child paths only as helper arguments.
+For Claude, derive
+`<parent transcript dir>/<parent session ID>/subagents/agent-<agentId>.jsonl`
+from the parent tool-result's `toolUseResult.agentId` (`^[A-Za-z0-9]+$`).
+For `agy`, import `./.agents/scripts/AgentTranscriptCommon.psm1`.
+Call `Resolve-AgentAgyTranscriptPath -SessionId` with the proven
+`invoke_subagent` `GENERIC` `conversationId` and any finder root override
+as `-BrainRoot`. Use `Path` only for `safe` and matching `SessionId`.
+
 ## Handoff
 
 Require the shared handoff form in

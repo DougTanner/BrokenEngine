@@ -3,7 +3,8 @@
     "baseRef": "head"
   },
   "env": {
-    "CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH": "1"
+    "CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH": "1",
+    "CLAUDE_CODE_USE_POWERSHELL_TOOL": "1"
   },
   "permissions": {
     "deny": ["SendMessage"]

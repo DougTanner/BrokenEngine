@@ -15,7 +15,7 @@ layout (set = 0, binding = kiGlobalBindingMainUniform) uniform mainUniform
 	MainLayout mainLayout;
 };
 
-layout (set = 1, binding = 2) uniform sampler2D pLightingSamplers[kiLightingLayers * 3];
+layout (set = 1, binding = 2) uniform sampler2D pLightingSamplers[3];
 layout (set = 1, binding = 3) uniform sampler2D shadowTextureSampler;
 layout (set = 1, binding = 4) uniform sampler2D objectShadowsTextureSampler;
 layout (set = 1, binding = 5) uniform sampler2D elevationTextureSampler;
@@ -23,8 +23,8 @@ layout (set = 1, binding = 6) uniform samplerCube skyboxSampler;
 layout (set = 1, binding = 7) uniform sampler2D noiseTextureSampler;
 layout (set = 1, binding = 8) uniform sampler2D pWaterNormalSamplers[kiWaterNormalCount];
 layout (set = 1, binding = 9) uniform sampler2D depthLutSampler;
-layout (set = 1, binding = 10) uniform sampler2D pSmokeSamplers[kiMaxFlightPlanes];
-layout (set = 1, binding = 11) uniform sampler2D ambientLightingSamplers[kiLightingLayers];
+layout (set = 1, binding = 10) uniform sampler2D smokeSampler;
+layout (set = 1, binding = 11) uniform sampler2D ambientLightingSampler;
 layout (set = 1, binding = kiWaterBindingFoam) uniform sampler2D foamTextureSampler;
 layout (set = 1, binding = kiWaterBindingFoamColor) uniform sampler2D pFoamColorTextureSamplers[kiWaterFoamTextureCount];
 layout (set = 1, binding = kiWaterBindingFoamBreakup) uniform sampler2D pFoamBreakupTextureSamplers[kiWaterFoamBreakupTextureCount];
@@ -54,6 +54,9 @@ void main()
 	// Camera-relative to world-space reconstruction
 	vec2 f2WaterOrigin = vec2(globalLayout.fWaterOriginX, globalLayout.fWaterOriginY);
 	vec2 f2WorldInitialPosition = f2InInitialPosition + f2WaterOrigin;
+	vec2 f2LocalDisplacedPos = f3InPosition.xy - f2WaterOrigin;
+	vec2 f2NoiseLocalDx = dFdx(f2LocalDisplacedPos);
+	vec2 f2NoiseLocalDy = dFdy(f2LocalDisplacedPos);
 
 	// Bias eye normal up a bit for skybox. Compute eye-to-water in camera-relative space rather than
 	// reconstructing world position and subtracting f4WaterEyePosition: at large camera coords, the world
@@ -81,12 +84,9 @@ void main()
 	// product stays integer for any tuning (0.0, 0.1, 0.2, ...). Derivatives taken from the un-scaled
 	// local position and scaled the same way as the UV keep mip selection stable across the wrap
 	// (plain texture() pops at the seam).
-	vec2 f2LocalDisplacedPos = f3InPosition.xy - f2WaterOrigin;
 	vec2 f2ReducedNoiseOrigin = vec2(globalLayout.fWaterReducedNoiseOriginX, globalLayout.fWaterReducedNoiseOriginY);
 	float fMultOne = globalLayout.fWaterColorNoiseMultiplierOne;
 	float fMultTwo = globalLayout.fWaterColorNoiseMultiplierTwo;
-	vec2 f2NoiseLocalDx = dFdx(f2LocalDisplacedPos);
-	vec2 f2NoiseLocalDy = dFdy(f2LocalDisplacedPos);
 	// A noise weight is a uniform and may be negative; at zero the read contributes nothing, so it is skipped whole.
 	float fNoiseWeightOne = globalLayout.fWaterColorNoiseWeightOne * globalLayout.fWaterColorNoiseAmount;
 	float fNoiseColorOne = 0.0f;
@@ -118,18 +118,28 @@ void main()
 	if (bFoamEnabled)
 	{
 		vec2 f2FoamUv = vec2(f2WorldInitialPosition.x - globalLayout.f4WaterFoamArea.x, globalLayout.f4WaterFoamArea.y - f2WorldInitialPosition.y) * globalLayout.f2WaterFoamAreaInverseSize;
-		float fCoverage = texture(foamTextureSampler, f2FoamUv).x;
+		float fCoverage = textureGrad(foamTextureSampler, f2FoamUv, vec2(f2InitialDx.x, -f2InitialDx.y) * globalLayout.f2WaterFoamAreaInverseSize, vec2(f2InitialDy.x, -f2InitialDy.y) * globalLayout.f2WaterFoamAreaInverseSize).x;
 		vec2 f2FoamTextureUv = globalLayout.fWaterFoamTextureInverseTileSize * f2InInitialPosition + globalLayout.f2WaterFoamReducedTextureOrigin;
-		f3FoamColor = TextureGradPatched(globalLayout, pFoamColorTextureSamplers[globalLayout.uiWaterFoamTextureIndex], f2FoamTextureUv, globalLayout.fWaterFoamTextureInverseTileSize * dFdx(f2InInitialPosition), globalLayout.fWaterFoamTextureInverseTileSize * dFdy(f2InInitialPosition), false, globalLayout.waterFoamTexturePatchLattice, f2WorldInitialPosition, globalLayout.fWaterFoamTexturePatchBlend).rgb;
+		vec2 f2FoamDx = globalLayout.fWaterFoamTextureInverseTileSize * f2InitialDx;
+		vec2 f2FoamDy = globalLayout.fWaterFoamTextureInverseTileSize * f2InitialDy;
+		vec4 f4FoamSample = TextureGradPatched(globalLayout, pFoamColorTextureSamplers[globalLayout.uiWaterFoamTextureIndex], f2FoamTextureUv, f2FoamDx, f2FoamDy, false, globalLayout.waterFoamTexturePatchLattice, f2WorldInitialPosition, globalLayout.fWaterFoamTexturePatchBlend);
+		f3FoamColor = f4FoamSample.rgb;
 		// mix(1, opacity, 0) is exactly 1, so a zero breakup amount skips the breakup read.
 		float fFoamMask = 1.0f;
 		if (globalLayout.fWaterFoamBreakupAmount != 0.0f)
 		{
 			vec2 f2FoamBreakupUv = globalLayout.fWaterFoamBreakupInverseTileSize * f2InInitialPosition + globalLayout.f2WaterFoamBreakupReducedTextureOrigin;
-			float fFoamBreakupOpacity = TextureGradPatched(globalLayout, pFoamBreakupTextureSamplers[globalLayout.uiWaterFoamBreakupTextureIndex], f2FoamBreakupUv, globalLayout.fWaterFoamBreakupInverseTileSize * dFdx(f2InInitialPosition), globalLayout.fWaterFoamBreakupInverseTileSize * dFdy(f2InInitialPosition), false, globalLayout.waterFoamBreakupPatchLattice, f2WorldInitialPosition, globalLayout.fWaterFoamBreakupPatchBlend).x;
+			float fFoamBreakupOpacity = TextureGradPatched(globalLayout, pFoamBreakupTextureSamplers[globalLayout.uiWaterFoamBreakupTextureIndex], f2FoamBreakupUv, globalLayout.fWaterFoamBreakupInverseTileSize * f2InitialDx, globalLayout.fWaterFoamBreakupInverseTileSize * f2InitialDy, false, globalLayout.waterFoamBreakupPatchLattice, f2WorldInitialPosition, globalLayout.fWaterFoamBreakupPatchBlend).x;
 			fFoamMask = mix(1.0f, fFoamBreakupOpacity, globalLayout.fWaterFoamBreakupAmount);
 		}
-		fFoamShade = clamp(fCoverage * fFoamMask * globalLayout.fWaterFoamTextureStrength, 0.0f, 1.0f);
+		float fFoamPattern = min(f4FoamSample.a * fFoamMask, 1.0f);
+		float fShapedCoverage = pow(fCoverage, globalLayout.fWaterFoamErosionCurve);
+		float fUvFootprint = max(length(f2FoamDx), length(f2FoamDy));
+		float fEdgeWidth = min(globalLayout.fWaterFoamEdgeSoftness + fUvFootprint * globalLayout.fWaterFoamDistanceSoften, 0.5f);
+		float fLowerEdge = 1.0f - fShapedCoverage;
+		float fUpperEdge = fLowerEdge + 2.0f * min(fEdgeWidth, max(0.5f * fShapedCoverage, globalLayout.fWaterFoamEdgeSoftness));
+		float fErodedMask = smoothstep(fLowerEdge, fUpperEdge, fFoamPattern);
+		fFoamShade = clamp(fErodedMask * globalLayout.fWaterFoamTextureStrength, 0.0f, 1.0f);
 		f3FoamColor = pow(f3FoamColor, vec3(2.2));
 	}
 
@@ -179,7 +189,7 @@ void main()
 	// luminance-weighted blend of the two shadow values rather than a per-channel split: the
 	// f3SkyboxColor mix above breaks pure linearity in (Sun + Moon), so a per-channel divide
 	// would zero entire channels when Sun.c + Moon.c happens to be ~0 (e.g. morning sun has B=0).
-	float fShadowMoon = SmokeShadow(globalLayout, f3InPosition, pSmokeSamplers, mainLayout.pfSmokeShadowIntensities) * texture(objectShadowsTextureSampler, WorldToVisibleArea(f3InPosition, globalLayout.objectShadowsAreaToUv)).x;
+	float fShadowMoon = SmokeShadow(globalLayout, f3InPosition, smokeSampler, mainLayout.fSmokeShadowIntensity) * texture(objectShadowsTextureSampler, WorldToVisibleArea(f3InPosition, globalLayout.objectShadowsAreaToUv)).x;
 	float fShadowSun  = fShadowMoon * SampleTerrainShadow(shadowTextureSampler, WorldToVisibleArea(f3InPosition, globalLayout.shadowAreaToUv));
 	// Rec.601 sun/moon weights and their guarded reciprocal-sum are folded CPU-side (GlobalUniforms.cpp).
 	float fEffectiveShadow = (fShadowSun * globalLayout.fWaterSunWeight + fShadowMoon * globalLayout.fWaterMoonWeight) * globalLayout.fWaterShadowWeightSumInverse;
@@ -196,18 +206,18 @@ void main()
 	// Terrain elevation (for water transparency)
 	f4OutColor.w = clamp(-fTerrainElevation * globalLayout.fWaterTerrainFadeInverse, 0.0f, 1.0f);
 
-	// Sample the low lighting layer at projected base-height x/y; water reads the high layer only for high-plane smoke.
+	// Directional lighting samples the base-height projection blended with the wave-reflected position.
 	vec2 f2PositionAtBaseHeight = BaseHeightPosition(globalLayout, mainLayout, vec3(f2WorldInitialPosition, 0.0f));
 	vec2 f2PositionAtBaseHeightFinal = ProjectWaterReflection(normalResult, f2WorldInitialPosition, f2PositionAtBaseHeight);
 
-	vec2 f2LightingTexcoordBaseHeight = WorldToVisibleArea(vec3(f2PositionAtBaseHeightFinal, 0.0f), globalLayout.pLightingAreaToUvs[0]);
+	vec2 f2LightingTexcoordBaseHeight = WorldToVisibleArea(vec3(f2PositionAtBaseHeightFinal, 0.0f), globalLayout.lightingAreaToUv);
 	vec4 pf4LightingBaseHeight[3];
-	ReadLighting(pf4LightingBaseHeight, pLightingSamplers, 0, f2LightingTexcoordBaseHeight);
+	ReadLighting(pf4LightingBaseHeight, pLightingSamplers, f2LightingTexcoordBaseHeight);
 
 	// Ambient sample — straight-down base-height projection, no reflection offset.
 	// Uses the precomputed direction-averaged ambient texture from a single fetch.
-	vec2 f2LightingTexcoordBaseHeightAmbient = WorldToVisibleArea(vec3(f2PositionAtBaseHeight, 0.0f), globalLayout.pLightingAreaToUvs[0]);
-	vec3 f3AmbientSum = ReadAmbientLighting(ambientLightingSamplers, 0, f2LightingTexcoordBaseHeightAmbient);
+	vec2 f2LightingTexcoordBaseHeightAmbient = WorldToVisibleArea(vec3(f2PositionAtBaseHeight, 0.0f), globalLayout.lightingAreaToUv);
+	vec3 f3AmbientSum = ReadAmbientLighting(ambientLightingSampler, f2LightingTexcoordBaseHeightAmbient);
 
 	// Scale base-height lighting (hue-preserving: pow applied to per-direction luminance/average scalar)
 	float fWaterEwnsPowMode = mainLayout.fLightingWaterEastWestNorthSouthPowerMode;
@@ -249,24 +259,11 @@ void main()
 	return;
 #endif
 
-	// Blend smoke per flight plane, lowest first (precomputed direction-averaged ambient — matches Terrain.frag,
-	// decouples smoke from wave normals). Plane k is lit by lighting layer k: plane 0 by the base-height ambient above,
-	// a higher plane by its layer's ambient at that plane's smoke position, read only where its smoke shows. Only plane 0
-	// receives the combined object shadow at the base-height projected position.
+	// Blend smoke at the base-height projection (precomputed direction-averaged ambient — matches Terrain.frag,
+	// decouples smoke from wave normals), reusing the base-height ambient lighting read above and combined object shadow.
 	float fSmokeObjectShadow = texture(objectShadowsTextureSampler, WorldToVisibleArea(vec3(f2PositionAtBaseHeight, 0.0f), globalLayout.objectShadowsAreaToUv)).x;
-	for (int iPlane = 0; iPlane < int(globalLayout.uiFlightPlaneCount); ++iPlane)
-	{
-		vec2 f2PositionAtPlane = FlightPlanePosition(globalLayout, mainLayout, vec3(f2WorldInitialPosition, 0.0f), iPlane);
-		vec2 f2SmokeTexcoord = WorldToSmokeTexcoord(globalLayout.pf4SmokeAreas[iPlane], f2PositionAtPlane);
-		float fSmokeRaw = globalLayout.fSmokeMax * texture(pSmokeSamplers[iPlane], f2SmokeTexcoord).x;
-		float fSmokePow = clamp(pow(fSmokeRaw, globalLayout.fSmokePower), 0.0f, 1.0f);
-		vec3 f3SmokeAmbientSum = f3AmbientSum;
-		if (iPlane > 0 && fSmokePow > 0.0f)
-		{
-			f3SmokeAmbientSum = ReadAmbientLighting(ambientLightingSamplers, iPlane, WorldToVisibleArea(vec3(f2PositionAtPlane, 0.0f), globalLayout.pLightingAreaToUvs[iPlane]));
-		}
-		// The 4.0f un-averages the ambient target: Lighting/LightingHistoryCopy.comp stores 0.25 * (E+W+N+S) and
-		// BlendSmokePrecomputed expects the un-averaged sum. Terrain/Terrain.frag carries the identical scale.
-		f4OutColor.xyz = BlendSmokePrecomputed(f4OutColor.xyz, fSmokePow, 4.0f * f3SmokeAmbientSum, globalLayout, iPlane == 0 ? fSmokeObjectShadow : 1.0f);
-	}
+	float fSmokePow = ReadSmoke(globalLayout, f2PositionAtBaseHeight, smokeSampler);
+	// The 4.0f un-averages the ambient target: Lighting/LightingHistoryCopy.comp stores 0.25 * (E+W+N+S) and
+	// BlendSmokePrecomputed expects the un-averaged sum. Terrain/Terrain.frag carries the identical scale.
+	f4OutColor.xyz = BlendSmokePrecomputed(f4OutColor.xyz, fSmokePow, 4.0f * f3AmbientSum, globalLayout, fSmokeObjectShadow);
 }

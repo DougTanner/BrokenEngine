@@ -30,8 +30,8 @@ The `argument-hint` value selects the Plan:
 - A normalized `Documents/Plans/...` or `Projects/Coretide/Documents/Plans/...`
   argument selects that Plan.
 - Any other argument is a case-sensitive partial match against executable Plan
-  paths relative to whichever of those two Plans roots holds them; exactly one
-  match selects that Plan, and zero or multiple matches block.
+  paths visible to the current CLI (relative to either Plans root); one match
+  selects it, and zero or multiple matches block.
 
 ## Steps
 
@@ -57,9 +57,11 @@ The `argument-hint` value selects the Plan:
    or with the requested normalized path or partial pattern quoted after
    `-Plan`, for example:
 `pwsh -NoProfile -File .agents/skills/next-plan/scripts/Invoke-NextPlanClaim.ps1 -Plan 'Documents/Plans/example.md'`
-   Read any result other than `nextAction: prepare` through
-   [claim-results.md](references/claim-results.md) `## nextAction`; `prepare`
-   needs no reference read.
+   Route targeted `agentCliLock` to
+   [claim-exceptions.md](references/claim-exceptions.md#agent-cli-override)
+   before `nextAction`; read any other non-`prepare` result via
+   [claim-results.md](references/claim-results.md) `## nextAction` (`prepare`
+   needs no read).
    Done when the result reports `nextAction: prepare`.
 4. Dispatch one preparation `planner` to verify the Plan against current code
    per [subagent-reporting.md](../../references/subagent-reporting.md)
@@ -127,9 +129,8 @@ The `argument-hint` value selects the Plan:
 
    On a sync range per [claim-results.md](references/claim-results.md)
    `## Final-refresh sync brief`, never list or read the range; dispatch one
-   `researcher` on that brief, reading only that section and
-   `## Session baseline and the sync object` (to its first `###`) per
-   `subagent-reporting.md` `## Task brief` lookup.
+   `researcher` on that brief, applying that section and
+   `## Session baseline and the sync object` (to its first `###`).
 
    When any row of that `researcher`'s handoff reports a touch, return to step
    4, rerun the affected Plan review checks in step 5, and repeat this final
@@ -279,37 +280,35 @@ work still to land — prints neither line.
 
 ## Rules
 
-- Every result is acted on per its `nextAction`, never by reconstructing a
-  script's transitions, and for a `-Plan`-targeted invocation the manager never
-  selects or claims a different candidate in that run, except through step 6's
-  user-confirmed `claim.plan-moved` route, which replaces that result's
-  `stop-report-to-user`.
+- Act per `nextAction`, never reconstructing script transitions, except
+  targeted `agentCliLock` (route to
+  [claim-exceptions.md](references/claim-exceptions.md#agent-cli-override)
+  before `nextAction`) and step 6's confirmed `claim.plan-moved` route
+  (replaces `stop-report-to-user`). Never select or claim another candidate on
+  a `-Plan` run outside `claim.plan-moved`.
 - Never create or adopt a worktree, or inspect machine-local claims directly.
-- When the preparation handoff reports an empty realized change, or that the
-  problem the Plan describes is gone, the run goes from preparation straight to
-  this file's `### Implementation approval` route, at any tier, without reaching
-  the Plan review step. Approving either counts as implementation accepted;
-  once step 8's acceptance checks pass on the empty change, step 10's
-  completion applies. Refusing either is the approval-refused
+- When preparation reports an empty realized change or that the Plan's problem
+  is gone, go straight to `### Implementation approval` at any tier, skipping
+  Plan review. Approving either counts as implementation accepted (step 8 empty
+  checks then step 10 completion); refusing is the approval-refused
   `### Post-checkpoint outcomes` row.
 - A Plan, card, scope, invariant, or acceptance change after approval requires
   a new presentation of the difference, unless `### Implementation approval`
   or the `completion.plan-cited` row of `### Post-checkpoint outcomes` sends it
   to implementation without one.
-- Deferral, pixel-evidence deferral, retained-work resume, and takeover each
-  need an explicit user instruction given in the current session (for
-  deferral, once final preparation has run), recorded in the handoff; follow
-  [claim-exceptions.md](references/claim-exceptions.md) for them, for a runtime
-  criterion only rendered pixels can settle, and for a targeted
-  `none-available` result naming another session's claim.
+- Deferral (after final preparation), pixel-evidence deferral, retained-work
+  resume, takeover, and agent CLI override each need an explicit
+  current-session user instruction recorded in the handoff; follow
+  [claim-exceptions.md](references/claim-exceptions.md) for them and targeted
+  `none-available` `holder`/`agentCliLock` results.
 
 ## References
 
 - [references/claim-results.md](references/claim-results.md) — how each claim,
   listing, and claim-exit result is read.
-- [references/claim-exceptions.md](references/claim-exceptions.md) — deferral,
-  pixel-evidence deferral, retained resume, takeover, and changes requested at
-  landing.
+- [references/claim-exceptions.md](references/claim-exceptions.md) — rare claim
+  branches (deferrals, retained resume, takeover, agent CLI override, landing
+  changes).
 - [`../prepare-change/SKILL.md`](../prepare-change/SKILL.md) — the step-4
   preparation `planner` contract (`mode: claimed-plan`).
 - [references/tier3-workflow.md](references/tier3-workflow.md) — the additional

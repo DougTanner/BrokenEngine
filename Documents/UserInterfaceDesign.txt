@@ -352,8 +352,7 @@ Screen-specific commitments this contract makes, each verified visually:
     Object Shadow Cadence slider.
     The Lighting group follows with its toggle, detail row, and
     update-cadence slider; the Smoke group then carries its toggle, detail row,
-    area slider, update-cadence slider, and Stagger Smoke Layer Updates toggle
-    directly above Wind.
+    area slider, and update-cadence slider directly above Wind.
     Dependent controls remain visible and dimmed while their parent is off,
     matching the sample-count, sample-shading, and anisotropy groups on the left.
     The three option labels repeat verbatim down the column.

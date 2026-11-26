@@ -6,10 +6,9 @@ quad vertices for many fragment pipelines.
 ## Invariants
 
 - A push constant selects camera, shadow, smoke, or lighting projection for
-  visible-area variants. The smoke selector (`kiAreaSelectorSmoke`) also reads
-  push-constant y as the flight plane whose smoke area applies, so wind deposits
-  pass plane 0, the area wind lies in. This allows record-once command buffers
-  to reuse the same pipelines across target spaces.
+  visible-area variants. Both smoke and wind deposits use the smoke selector
+  (`kiAreaSelectorSmoke`; see `../Wind/AGENTS.md`). This allows record-once
+  command buffers to reuse the same pipelines across target spaces.
 - Zero-size rectangles intentionally collapse to degenerate triangles, allowing
   fixed-capacity instance buffers to cull entries without changing recorded draw
   counts.

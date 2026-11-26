@@ -1,5 +1,7 @@
 #pragma once
 
+#if defined(BT_CLIENT)
+
 #include "WrapperBase.h"
 
 namespace engine
@@ -28,3 +30,5 @@ inline Wrapper gWindDiffusionLow(100.0f, 0.0f, 100.0f);
 inline Wrapper gWindDiffusionHigh(0.0f, 0.0f, 100.0f);
 
 } // namespace engine
+
+#endif // BT_CLIENT

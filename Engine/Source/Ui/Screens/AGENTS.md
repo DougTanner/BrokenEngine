@@ -1,19 +1,19 @@
 # `/Engine/Source/Ui/Screens/` - Engine ImGui Screens
 
-Engine-owned ImGui screens: the six standard player-facing menus — Main Menu,
-Pause, Graphics, Sound, Game Settings, and Modal — plus the in-game `ChatScreen`
-and the `TweaksScreen/` debug family. `UiScreens.cpp` owns the gameplay client's
-construction and per-frame invocation of every screen except Tweaks through the
-UI functions `ImGuiManager` calls, and draws only the game's map screen and
-Modal while Tweaks is open, and only the map screen while a Tweaks slider is
-dragged; Main Menu is still called then and keeps its discovery and auto-connect
-running without drawing. It draws the map screen first and in every UI state,
-because a world-hidden frame (`../../Graphics/AGENTS.md`
-`## Frame and Resource Lifecycle`) shows nothing else of the world;
-`ImGuiManager` owns the Tweaks screen, its settings load and save, and
-submission (`../../Graphics/Managers/AGENTS.md` `### ImGuiManager`). The HUD and
-the game's Tweaks content stay in the game project. This document owns the
-runtime contracts that code changes must preserve.
+Engine-owned ImGui screens: the seven standard player-facing menus — Main Menu,
+Pause, Graphics, Sound, Game Settings, Keybinds, and Modal — plus the in-game
+`ChatScreen` and the `TweaksScreen/` debug family. `UiScreens.cpp` owns the
+gameplay client's construction and per-frame invocation of every screen except
+Tweaks through the UI functions `ImGuiManager` calls, and draws only the game's
+map screen and Modal while Tweaks is open, and only the map screen while a
+Tweaks slider is dragged; Main Menu is still called then and keeps its
+discovery and auto-connect running without drawing. It draws the map screen
+first and in every UI state, because a world-hidden frame
+(`../../Graphics/AGENTS.md` `## Frame and Resource Lifecycle`) shows nothing
+else of the world; `ImGuiManager` owns the Tweaks screen, its settings load and
+save, and submission (`../../Graphics/Managers/AGENTS.md` `### ImGuiManager`).
+The HUD and the game's Tweaks content stay in the game project. This document
+owns the runtime contracts that code changes must preserve.
 
 ## Standard Menu Contract
 
@@ -71,6 +71,14 @@ runtime contracts that code changes must preserve.
   immediately and stays on the screen.
 - The Game Settings language buttons stay in their own language and are never
   routed through the translation table.
+- `KeybindsScreen` renders engine and game keybinds in one flat list, caps
+  root-window height with `SetNextWindowSizeConstraints` instead of `BeginChild`
+  so Input's root-window scroll gate (`../../Input/AGENTS.md`
+  `## Scroll Ownership`) stays intact, and uses a fixed bind-button width so
+  clicking or rebinding never reflows the column. Leaving `UiState::kKeybinds`
+  (Back, Esc, frame transition, connection modal, or shutdown) goes through
+  `GameBase::LeaveSettingsScreen`, which cancels active capture and saves both
+  keybind files.
 - `ChatScreen` draws the chat state in `GameBase::mChatLog` only in game with
   `UiState::kNone`; anywhere else it closes the input box and clears its text.
   `RenderUiScreens` calls it only while Tweaks is hidden, and

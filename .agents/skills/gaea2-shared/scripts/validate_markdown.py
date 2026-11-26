@@ -15,6 +15,10 @@ import os
 import re
 import sys
 
+# Preserve the read-only contract: never write __pycache__/.pyc on sibling import.
+sys.dont_write_bytecode = True
+from load_terrain import short_type
+
 SCHEMA_VERSION = "broken-engine-gaea2-markdown/v1"
 
 # Output caps, modelled on .agents/skills/update-vcxproj/scripts/Invoke-VcxprojPairCheck.ps1.
@@ -112,20 +116,22 @@ def parse_mermaid(body):
 
 
 def parse_sections(body):
-    """Return (section ids in order, id -> {type, properties}).
+    """Return (section (id, type) headings in order, id -> {type, properties}).
 
-    Mirrors save_terrain.py's parse_node_sections, but keeps the declaration
-    order so duplicate ids stay visible instead of overwriting each other.
+    Mirrors save_terrain.py's parse_node_sections, but keeps every heading in
+    declaration order so duplicate ids and their headings stay visible instead
+    of overwriting each other.
     """
     m = re.search(r"##\s*Nodes\s*\n(.*?)(?=\n##\s|\Z)", body, re.DOTALL)
     if not m:
         raise Blocked("markdown.structure-unparsed", "No '## Nodes' section found.")
     chunks = re.split(r"(?m)^###\s+n(\d+):\s*([^\n]+?)\s*$", m.group(1))
-    ids = []
+    headings = []
     sections = {}
     for i in range(1, len(chunks), 3):
         nid = int(chunks[i])
-        ids.append(nid)
+        section_type = chunks[i + 1].strip()
+        headings.append((nid, section_type))
         if nid in sections:
             continue
         properties = {}
@@ -133,8 +139,8 @@ def parse_sections(body):
             prop = re.match(r"^([^:]+):\s*(.*)$", line.rstrip())
             if prop:
                 properties[prop.group(1).strip()] = prop.group(2).strip()
-        sections[nid] = {"type": chunks[i + 1].strip(), "properties": properties}
-    return ids, sections
+        sections[nid] = {"type": section_type, "properties": properties}
+    return headings, sections
 
 
 def load_passthrough(path):
@@ -151,10 +157,10 @@ def load_passthrough(path):
 
 def check_mermaid_section_agreement(graph):
     entries = []
-    for nid in sorted(set(graph["mermaid_ids"]) - set(graph["section_ids"])):
+    for nid in sorted(set(graph["mermaid_ids"]) - set(graph["sections"])):
         entries.append(entry(nid, "mermaid-node-without-section",
                              f"Mermaid declares n{nid} but no '### n{nid}:' section exists."))
-    for nid in sorted(set(graph["section_ids"]) - set(graph["mermaid_ids"])):
+    for nid in sorted(set(graph["sections"]) - set(graph["mermaid_ids"])):
         entries.append(entry(nid, "section-without-mermaid-node",
                              f"Section '### n{nid}:' has no n{nid} node in the Mermaid block."))
     return entries
@@ -162,7 +168,8 @@ def check_mermaid_section_agreement(graph):
 
 def check_duplicate_ids(graph):
     entries = []
-    for name, ids in (("section", graph["section_ids"]), ("Mermaid", graph["mermaid_ids"])):
+    section_ids = [nid for nid, _ in graph["section_headings"]]
+    for name, ids in (("section", section_ids), ("Mermaid", graph["mermaid_ids"])):
         seen = set()
         for nid in ids:
             if nid in seen:
@@ -186,7 +193,7 @@ def check_new_node_id_range(graph):
 
 def check_edge_endpoints(graph):
     entries = []
-    known = set(graph["section_ids"]) | set(graph["mermaid_ids"])
+    known = set(graph["sections"]) | set(graph["mermaid_ids"])
     for e in graph["edges"]:
         for role, nid in (("source", e["from_id"]), ("target", e["to_id"])):
             if nid not in known:
@@ -197,7 +204,7 @@ def check_edge_endpoints(graph):
 
 def check_required_version(graph):
     entries = []
-    for nid in graph["ordered_section_ids"]:
+    for nid in graph["sections"]:
         section = graph["sections"][nid]
         if section["type"] not in VERSION_2_TYPES:
             continue
@@ -209,7 +216,7 @@ def check_required_version(graph):
 
 def check_port_count(graph):
     entries = []
-    for nid in graph["ordered_section_ids"]:
+    for nid in graph["sections"]:
         section = graph["sections"][nid]
         if section["type"] not in DYNAMIC_PORT_TYPES:
             continue
@@ -231,7 +238,7 @@ def required_input_ports(graph, nid):
 def check_required_inputs_wired(graph):
     entries = []
     wired = {(e["to_id"], e["to_port"]) for e in graph["edges"]}
-    for nid in graph["ordered_section_ids"]:
+    for nid in graph["sections"]:
         for port in required_input_ports(graph, nid):
             if (nid, port) not in wired:
                 entries.append(entry(nid, "required-input-unwired",
@@ -260,7 +267,7 @@ def check_reaches_output(graph):
     runs once the graph has at least one anchor to reach.
     """
     anchors = set()
-    for nid in graph["ordered_section_ids"]:
+    for nid in graph["sections"]:
         section = graph["sections"][nid]
         if section["type"] == "Export" or "SaveDefinition" in section["properties"]:
             anchors.add(nid)
@@ -272,7 +279,7 @@ def check_reaches_output(graph):
         downstream.setdefault(e["from_id"], []).append(e["to_id"])
 
     entries = []
-    for nid in graph["ordered_section_ids"]:
+    for nid in graph["sections"]:
         if graph["sections"][nid]["properties"].get("Marked") == "true":
             continue
         reached = False
@@ -293,6 +300,23 @@ def check_reaches_output(graph):
     return entries
 
 
+def check_passthrough_type_mismatch(graph):
+    entries = []
+    for nid, actual in graph["section_headings"]:
+        passthrough = graph["passthrough_nodes"].get(str(nid)) or {}
+        type_fqn = passthrough.get("type_fqn")
+        if not type_fqn:
+            continue
+        expected = short_type(type_fqn)
+        if actual != expected:
+            entries.append(entry(
+                nid, "passthrough-type-mismatch",
+                f"Node n{nid} heading type '{actual}' differs from passthrough type '{expected}'; "
+                f"save_terrain.py pins $type from passthrough.",
+            ))
+    return entries
+
+
 CHECKS = (
     check_mermaid_section_agreement,
     check_duplicate_ids,
@@ -303,27 +327,23 @@ CHECKS = (
     check_required_inputs_wired,
     check_multi_producer_inputs,
     check_reaches_output,
+    check_passthrough_type_mismatch,
 )
 
 
 def build_graph(markdown_path, passthrough_path):
     body = strip_frontmatter(read_text(markdown_path, "markdown.unreadable"))
     mermaid_ids, mermaid_types, edges = parse_mermaid(body)
-    section_ids, sections = parse_sections(body)
+    section_headings, sections = parse_sections(body)
     passthrough_nodes = load_passthrough(passthrough_path)
-    ordered_section_ids = []
-    for nid in section_ids:
-        if nid not in ordered_section_ids:
-            ordered_section_ids.append(nid)
     return {
         "mermaid_ids": mermaid_ids,
         "mermaid_types": mermaid_types,
         "edges": edges,
-        "section_ids": section_ids,
-        "ordered_section_ids": ordered_section_ids,
+        "section_headings": section_headings,
         "sections": sections,
         "passthrough_nodes": passthrough_nodes,
-        "new_node_ids": {nid for nid in ordered_section_ids if str(nid) not in passthrough_nodes},
+        "new_node_ids": {nid for nid in sections if str(nid) not in passthrough_nodes},
     }
 
 
@@ -378,7 +398,7 @@ def main(argv):
         for check in CHECKS:
             entries.extend(check(graph))
 
-        result["payload"]["nodeCount"] = len(graph["ordered_section_ids"])
+        result["payload"]["nodeCount"] = len(graph["sections"])
         result["payload"]["edgeCount"] = len(graph["edges"])
         result["payload"]["entryCount"] = len(entries)
         result["payload"]["entriesTruncated"] = len(entries) > MAXIMUM_ENTRIES

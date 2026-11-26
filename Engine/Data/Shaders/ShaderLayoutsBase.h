@@ -34,7 +34,7 @@ inline constexpr VkFormat kVkFormatLighting = VK_FORMAT_R16G16B16A16_SFLOAT;
 inline constexpr VkFormat kVkFormatSmoke = VK_FORMAT_R16_SFLOAT;
 inline constexpr VkFormat kVkFormatWind = VK_FORMAT_R16G16_SFLOAT;
 inline constexpr VkFormat kVkFormatShadow = VK_FORMAT_R16_UNORM;
-inline constexpr VkFormat kVkFormatObjectShadows = VK_FORMAT_R16G16B16A16_SFLOAT; // RG: ground coverage split by ship height; B, A: coverage by flight planes 1, 2
+inline constexpr VkFormat kVkFormatObjectShadows = VK_FORMAT_R16_SFLOAT; // Single-channel object-shadow coverage
 inline constexpr VkFormat kVkFormatCombine = VK_FORMAT_R8G8B8A8_UNORM;
 inline constexpr VkFormat kVkFormatWaterDisplacement = VK_FORMAT_R16G16B16A16_SFLOAT;
 inline constexpr VkFormat kVkFormatWaterFoam = VK_FORMAT_R16_SFLOAT;
@@ -131,7 +131,7 @@ CONSTEXPR int kiWaterBindingDisplacement = 13;
 CONSTEXPR int kiWaterBindingDisplacementNormal = 14;
 CONSTEXPR int kiWaterBindingFoam = 15;
 CONSTEXPR int kiWaterBindingFoamColor = 16;
-CONSTEXPR int kiWaterFoamTextureCount = 3;
+CONSTEXPR int kiWaterFoamTextureCount = 4;
 // Sizes MainLayout's water skybox one ring sample offsets; gWaterSkyboxOneSampleCount's largest value is this plus one (the center
 // sample).
 CONSTEXPR int kiMaxWaterSkyboxOneSampleOffsets = 8;
@@ -150,7 +150,6 @@ CONSTEXPR int kiModelBindingSmoke = 11;
 CONSTEXPR int kiModelBindingObjectShadows = 12;
 CONSTEXPR int kiModelBindingMeshData = 15;
 CONSTEXPR int kiModelBindingJointMatrix = 16;
-CONSTEXPR int kiModelBindingTerrainElevation = 17;
 
 // Push-constant selectors for record-once command buffers. The area selector (f4Pipeline.x) picks the projection area of
 // the quad and hex-shield shaders, which reach the lighting area through their fallthrough branch rather than a
@@ -205,16 +204,11 @@ CONSTEXPR int kiShadowBlurRadius = 5;
 CONSTEXPR int kiMaxObjectShadowsBlurRadius = 128; // gObjectShadowsBlurRadiusNoon/Sunset slider maximum; sizes the GlobalLayout object-shadow blur half-kernel
 CONSTEXPR int kiObjectShadowsBlurStripLength = 64; // ObjectShadowsBlurH/V workgroup size: output texels per strip along the blur axis
 #if defined(BT_ENGINE)
-// The strip's vec4 tap cache must fit the Vulkan minimum maxComputeSharedMemorySize.
-static_assert((kiObjectShadowsBlurStripLength + 2 * kiMaxObjectShadowsBlurRadius) * 16 <= 16'384);
+// The strip's float tap cache must fit the Vulkan minimum maxComputeSharedMemorySize.
+static_assert((kiObjectShadowsBlurStripLength + 2 * kiMaxObjectShadowsBlurRadius) * 4 <= 16'384);
 #endif
 
 CONSTEXPR int kiComputeTileSize = 8;
-// Sizes the per-flight-plane smoke sampler arrays and GlobalLayout plane heights. Must equal engine::kiMaxFlightPlanes
-// (static_assert in RenderTargetTextures.cpp).
-CONSTEXPR int kiMaxFlightPlanes = 8;
-// One world-lighting layer per flight plane; the client requires exactly this many planes (CreateLightingTextures).
-CONSTEXPR int kiLightingLayers = 2;
 CONSTEXPR int kiOccupancyDilateGroupSize = 256;
 CONSTEXPR int kiParticleUpdateGroupSize = 32;
 
@@ -310,7 +304,7 @@ static_assert(BT_OFFSETOF(PbrMaterialLayout, fColorTextureIndex) == 72, "PbrMate
 
 struct ModelLayout
 {
-	vec4 f4PositionLayer INIT;        // xyz model centre; w FlightPlanes::NearestPlaneIndex of its height (Model.frag skips smoke planes below, fades this one)
+	vec4 f4Position INIT;             // xyz model centre; w unused
 	vec4 f3x4Transform[3] INIT;
 	vec4 f3x4TransformNormal[3] INIT;
 	vec4 f4ColorAdd INIT;

@@ -187,11 +187,6 @@ void PipelineManager::CreateTerrainDataPipelines()
 	});
 }
 
-Pipeline& PipelineManager::SmokePipeline(int64_t iPlane, SmokePipelineKind eKind)
-{
-	return mpPipelines[kPipelineSmokeFirst + iPlane * kSmokePipelineKindCount + eKind];
-}
-
 void PipelineManager::CreateSmokeWindPipelines()
 {
 	struct SmokeClearPipelineDescription
@@ -200,12 +195,10 @@ void PipelineManager::CreateSmokeWindPipelines()
 		std::string_view name;
 		Texture* pTargetTexture = nullptr;
 	};
-	// Every plane draws these two clears inside its own render passes, valid because every plane's smoke textures
-	// share plane 0's TextureInfo (compatible render passes, same static viewport extent).
 	SmokeClearPipelineDescription pSmokeClearPipelineDescriptions[]
 	{
-		{.ePipeline = kPipelineSmokeClearA, .name = "SmokeClearA", .pTargetTexture = &gpTextureManager->mRenderTargetTextures.mSmokeTexturesOne[0]},
-		{.ePipeline = kPipelineSmokeClearB, .name = "SmokeClearB", .pTargetTexture = &gpTextureManager->mRenderTargetTextures.mSmokeTexturesTwo[0]},
+		{.ePipeline = kPipelineSmokeClearA, .name = "SmokeClearA", .pTargetTexture = &gpTextureManager->mRenderTargetTextures.mSmokeTextureOne},
+		{.ePipeline = kPipelineSmokeClearB, .name = "SmokeClearB", .pTargetTexture = &gpTextureManager->mRenderTargetTextures.mSmokeTextureTwo},
 	};
 	for (const SmokeClearPipelineDescription& rDescription : pSmokeClearPipelineDescriptions)
 	{
@@ -228,77 +221,70 @@ void PipelineManager::CreateSmokeWindPipelines()
 
 	struct SmokeOccupancyPipelineDescription
 	{
-		SmokePipelineKind eKind;
+		Pipelines ePipeline;
 		std::string_view name;
 		common::crc_t shaderCrc;
 		VkBuffer* pVkSourceOccupancyBuffer = nullptr;
 		VkBuffer* pVkDestinationOccupancyBuffer = nullptr;
 	};
-	for (int64_t i = 0; i < gpFlightPlanes->Count(); ++i)
+	SmokeOccupancyPipelineDescription pSmokeOccupancyPipelineDescriptions[]
 	{
-		VkBuffer* pVkOccupancyBuffers = gpBufferManager->mpSmokeOccupancyVkBuffers[i];
-		SmokeOccupancyPipelineDescription pSmokeOccupancyPipelineDescriptions[]
+		{.ePipeline = kPipelineSmokeOccupancyDilate, .name = "SmokeOccupancyDilate", .shaderCrc = data::kShadersSmokeSmokeOccupancyDilatecompCrc, .pVkSourceOccupancyBuffer = &gpBufferManager->mpSmokeOccupancyVkBuffers[0], .pVkDestinationOccupancyBuffer = &gpBufferManager->mpSmokeOccupancyVkBuffers[1]},
+		{.ePipeline = kPipelineSmokeOccupancyDilateRemap, .name = "SmokeOccupancyDilateRemap", .shaderCrc = data::kShadersSmokeSmokeOccupancyDilateRemapcompCrc, .pVkSourceOccupancyBuffer = &gpBufferManager->mpSmokeOccupancyVkBuffers[1], .pVkDestinationOccupancyBuffer = &gpBufferManager->mpSmokeOccupancyVkBuffers[0]},
+	};
+	for (const SmokeOccupancyPipelineDescription& rDescription : pSmokeOccupancyPipelineDescriptions)
+	{
+		mpPipelines[rDescription.ePipeline].Create(
 		{
-			{.eKind = kSmokeOccupancyDilate, .name = "SmokeOccupancyDilate", .shaderCrc = data::kShadersSmokeSmokeOccupancyDilatecompCrc, .pVkSourceOccupancyBuffer = &pVkOccupancyBuffers[0], .pVkDestinationOccupancyBuffer = &pVkOccupancyBuffers[1]},
-			{.eKind = kSmokeOccupancyDilateRemap, .name = "SmokeOccupancyDilateRemap", .shaderCrc = data::kShadersSmokeSmokeOccupancyDilateRemapcompCrc, .pVkSourceOccupancyBuffer = &pVkOccupancyBuffers[1], .pVkDestinationOccupancyBuffer = &pVkOccupancyBuffers[0]},
-		};
-		// The remap dilate reads its plane index from push constant x for the plane's area pair; the plain dilate shares
-		// this description, declares no push-constant block, and ignores it.
-		for (const SmokeOccupancyPipelineDescription& rDescription : pSmokeOccupancyPipelineDescriptions)
-		{
-			SmokePipeline(i, rDescription.eKind).Create(
-			{
-				.name = rDescription.name,
-				.flags = {PipelineFlags::kCompute, PipelineFlags::kIndirectHostVisible, PipelineFlags::kPushConstants},
-				.ppShaders = {&mShaders.at(rDescription.shaderCrc)},
-				.descriptorInfos =
-				{
-					{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
-					{.flags = DescriptorFlags::kStorageBuffer, .pVkBuffers = rDescription.pVkSourceOccupancyBuffer},
-					{.flags = DescriptorFlags::kStorageBuffer, .pVkBuffers = &gpBufferManager->mSmokeActiveTileVkBuffer},
-					{.flags = DescriptorFlags::kStorageBuffer, .pVkBuffers = rDescription.pVkDestinationOccupancyBuffer},
-				},
-			});
-		}
-
-		// Pass B reads its plane index from push constant x for the plane-relative terrain decay.
-		SmokePipeline(i, kSmokeSpreadComputeB).Create(
-		{
-			.name = "SmokeSpreadComputeB",
-			.flags = {PipelineFlags::kCompute, PipelineFlags::kUpdateAfterBind, PipelineFlags::kPushConstants},
-			.ppShaders = {&mShaders.at(data::kShadersSmokeSmokeSpreadTwocompCrc)},
+			.name = rDescription.name,
+			.flags = {PipelineFlags::kCompute, PipelineFlags::kIndirectHostVisible},
+			.ppShaders = {&mShaders.at(rDescription.shaderCrc)},
 			.descriptorInfos =
 			{
 				{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
-				{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerSmoke}, .pTexture = &gpTextureManager->mRenderTargetTextures.mSmokeTexturesOne[i]},
-				{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerMirroredRepeatLinear}, .textureCrc = data::kTexturesSmokeBC4tex_glass_0001_MKjpgCrc},
-				{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &gpTextureManager->mRenderTargetTextures.mTerrainElevationTexture},
-				{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerWindClamp}, .pTexture = &gpTextureManager->mRenderTargetTextures.mWindTextureOne},
-				{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerWindClamp}, .pTexture = &gpTextureManager->mRenderTargetTextures.mWindTextureTwo},
-				{.flags = DescriptorFlags::kStorageImages, .pTexture = &gpTextureManager->mRenderTargetTextures.mSmokeTexturesTwo[i]},
+				{.flags = DescriptorFlags::kStorageBuffer, .pVkBuffers = rDescription.pVkSourceOccupancyBuffer},
 				{.flags = DescriptorFlags::kStorageBuffer, .pVkBuffers = &gpBufferManager->mSmokeActiveTileVkBuffer},
-				{.flags = DescriptorFlags::kStorageBuffer, .pVkBuffers = &pVkOccupancyBuffers[1]},
-			},
-		});
-
-		SmokePipeline(i, kSmokeSpreadComputeA).Create(
-		{
-			.name = "SmokeSpreadComputeA",
-			.flags = {PipelineFlags::kCompute, PipelineFlags::kUpdateAfterBind, PipelineFlags::kPushConstants},
-			.ppShaders = {&mShaders.at(data::kShadersSmokeSmokeSpreadOnecompCrc)},
-			.descriptorInfos =
-			{
-				{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
-				{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerSmoke}, .pTexture = &gpTextureManager->mRenderTargetTextures.mSmokeTexturesTwo[i]},
-				{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerMirroredRepeatLinear}, .textureCrc = data::kTexturesSmokeBC4tex_swirl_0002_MKjpgCrc},
-				{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerWindClamp}, .pTexture = &gpTextureManager->mRenderTargetTextures.mWindTextureOne},
-				{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerWindClamp}, .pTexture = &gpTextureManager->mRenderTargetTextures.mWindTextureTwo},
-				{.flags = DescriptorFlags::kStorageImages, .pTexture = &gpTextureManager->mRenderTargetTextures.mSmokeTexturesOne[i]},
-				{.flags = DescriptorFlags::kStorageBuffer, .pVkBuffers = &gpBufferManager->mSmokeActiveTileVkBuffer},
-				{.flags = DescriptorFlags::kStorageBuffer, .pVkBuffers = &pVkOccupancyBuffers[0]},
+				{.flags = DescriptorFlags::kStorageBuffer, .pVkBuffers = rDescription.pVkDestinationOccupancyBuffer},
 			},
 		});
 	}
+
+	mpPipelines[kPipelineSmokeSpreadComputeB].Create(
+	{
+		.name = "SmokeSpreadComputeB",
+		.flags = {PipelineFlags::kCompute, PipelineFlags::kUpdateAfterBind},
+		.ppShaders = {&mShaders.at(data::kShadersSmokeSmokeSpreadTwocompCrc)},
+		.descriptorInfos =
+		{
+			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerSmoke}, .pTexture = &gpTextureManager->mRenderTargetTextures.mSmokeTextureOne},
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerMirroredRepeatLinear}, .textureCrc = data::kTexturesSmokeBC4tex_glass_0001_MKjpgCrc},
+			{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &gpTextureManager->mRenderTargetTextures.mTerrainElevationTexture},
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerWindClamp}, .pTexture = &gpTextureManager->mRenderTargetTextures.mWindTextureOne},
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerWindClamp}, .pTexture = &gpTextureManager->mRenderTargetTextures.mWindTextureTwo},
+			{.flags = DescriptorFlags::kStorageImages, .pTexture = &gpTextureManager->mRenderTargetTextures.mSmokeTextureTwo},
+			{.flags = DescriptorFlags::kStorageBuffer, .pVkBuffers = &gpBufferManager->mSmokeActiveTileVkBuffer},
+			{.flags = DescriptorFlags::kStorageBuffer, .pVkBuffers = &gpBufferManager->mpSmokeOccupancyVkBuffers[1]},
+		},
+	});
+
+	mpPipelines[kPipelineSmokeSpreadComputeA].Create(
+	{
+		.name = "SmokeSpreadComputeA",
+		.flags = {PipelineFlags::kCompute, PipelineFlags::kUpdateAfterBind},
+		.ppShaders = {&mShaders.at(data::kShadersSmokeSmokeSpreadOnecompCrc)},
+		.descriptorInfos =
+		{
+			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerSmoke}, .pTexture = &gpTextureManager->mRenderTargetTextures.mSmokeTextureTwo},
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerMirroredRepeatLinear}, .textureCrc = data::kTexturesSmokeBC4tex_swirl_0002_MKjpgCrc},
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerWindClamp}, .pTexture = &gpTextureManager->mRenderTargetTextures.mWindTextureOne},
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerWindClamp}, .pTexture = &gpTextureManager->mRenderTargetTextures.mWindTextureTwo},
+			{.flags = DescriptorFlags::kStorageImages, .pTexture = &gpTextureManager->mRenderTargetTextures.mSmokeTextureOne},
+			{.flags = DescriptorFlags::kStorageBuffer, .pVkBuffers = &gpBufferManager->mSmokeActiveTileVkBuffer},
+			{.flags = DescriptorFlags::kStorageBuffer, .pVkBuffers = &gpBufferManager->mpSmokeOccupancyVkBuffers[0]},
+		},
+	});
 
 	struct WindOccupancyPipelineDescription
 	{
@@ -408,7 +394,7 @@ void PipelineManager::CreateParticlePipelines()
 				{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
 				{.flags = DescriptorFlags::kMainLayoutUniformBuffers},
 				{.flags = DescriptorFlags::kStorageBuffer, .pBuffers = rDescription.pStorageBuffer},
-				{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerSmoke}, .iCount = shaders::kiMaxFlightPlanes, .ppTextures = gpTextureManager->mRenderTargetTextures.mppSmokeTexturesOne},
+				{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerSmoke}, .pTexture = &gpTextureManager->mRenderTargetTextures.mSmokeTextureOne},
 			},
 		});
 

@@ -61,8 +61,7 @@ static void XM_CALLCONV WriteModelLayout(const engine::RenderBasis& rBasis, cons
 	XMMATRIX matTilt = XMMatrixRotationQuaternion(vecTilt);
 	XMMATRIX matTranslation = XMMatrixTranslationFromVector(vecRenderPosition);
 	XMMATRIX matInstanceTransform = matYaw * matTilt * matTranslation;
-	int64_t iPlane = engine::gpFlightPlanes->NearestPlaneIndex(XMVectorGetZ(vecRenderPosition));
-	engine::FillModelLayout(rShadowBounds, matAlignment, matInstanceTransform, vecRenderPosition, iPlane, pAnimationData, rReservation, iInstance, animationTime, rModelLayout);
+	engine::FillModelLayout(rShadowBounds, matAlignment, matInstanceTransform, vecRenderPosition, pAnimationData, rReservation, iInstance, animationTime, rModelLayout);
 }
 
 // Draws the rows and wrecks whose controller selects iPipeline from pLayouts on, adds the wrecks to riWrecks, and returns

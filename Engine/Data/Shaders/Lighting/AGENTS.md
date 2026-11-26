@@ -8,12 +8,11 @@ shields provide an additional surface-normal depositor from Objects
 
 ## Pipeline Contracts
 
-- Readers sample lighting layer k through `pLightingAreaToUvs[k]`;
-  `f4LightingArea` holds the area of the refreshing layer,
-  `uiLightingRefreshLayer`. The spread's terrain height fade applies only to
-  layer 0; layer 1's plane lies above every island. Render
+- Readers sample the single lighting layer through `lightingAreaToUv`;
+  `f4LightingArea` holds its world area. The spread's terrain height fade
+  applies unconditionally at `fBaseHeight`. Render
   (`../../../Source/Graphics/Render/AGENTS.md` `## Ordering and Publication`)
-  owns shared passes, per-layer targets, and per-frame attachment load clears.
+  owns the refresh schedule, targets, and per-frame attachment load clears.
 - Area and point deposits fade against the padded lighting-texture boundary, not
   the visible-area edge. Rotation can move point-light texture coordinates
   outside `[0,1]`, so that path uses clamped sampling.

@@ -21,15 +21,16 @@ try {
 	$rows=@(if($listing.PSObject.Properties.Name -ccontains 'plans' -and $null -ne $listing.plans){$listing.plans}else{@()})
 	$stateCounts=[ordered]@{}
 	foreach($row in $rows){$state=[string]$row.state;if(-not $stateCounts.Contains($state)){$stateCounts[$state]=0};$stateCounts[$state]++}
-	$plans=@(foreach($row in @($rows|Select-Object -First $Top)){$plan=[ordered]@{path=[string]$row.path;state=[string]$row.state};if($row.PSObject.Properties.Name -ccontains 'blockedBy'){$plan.blockedBy=@($row.blockedBy)};if($row.PSObject.Properties.Name -ccontains 'diagnostic'){$plan.diagnostic=[string]$row.diagnostic};if($row.PSObject.Properties.Name -ccontains 'claim'){$plan.claim=$row.claim};$plan})
+	$visibleRows=@($rows|Where-Object{-not ($_.PSObject.Properties.Name -ccontains 'agentCliMismatch' -and -not [string]::IsNullOrWhiteSpace([string]$_.agentCliMismatch))})
+	$plans=@(foreach($row in @($visibleRows|Select-Object -First $Top)){$plan=[ordered]@{path=[string]$row.path;state=[string]$row.state};if($row.PSObject.Properties.Name -ccontains 'agentCli' -and -not [string]::IsNullOrWhiteSpace([string]$row.agentCli)){$plan.agentCli=[string]$row.agentCli};if($row.PSObject.Properties.Name -ccontains 'blockedBy'){$plan.blockedBy=@($row.blockedBy)};if($row.PSObject.Properties.Name -ccontains 'diagnostic'){$plan.diagnostic=[string]$row.diagnostic};if($row.PSObject.Properties.Name -ccontains 'claim'){$plan.claim=$row.claim};$plan})
 	$projection=[ordered]@{
 		schemaVersion='broken-engine-next-plan-list/v2'
 		status='pass'
 		code=$(if($listing.PSObject.Properties.Name -ccontains 'code'){[string]$listing.code}else{'ok'})
-		message="First $($plans.Count) of $($rows.Count) Plans in selection order."
+		message="First $($plans.Count) of $($visibleRows.Count) Plans in selection order."
 		stateCounts=$stateCounts
 		plans=$plans
-		truncated=($rows.Count -gt $Top)
+		truncated=($visibleRows.Count -gt $Top)
 		diagnostics=@(if($listing.PSObject.Properties.Name -ccontains 'diagnostics' -and $null -ne $listing.diagnostics){$listing.diagnostics}else{@()})
 		notices=@(if($listing.PSObject.Properties.Name -ccontains 'notices' -and $null -ne $listing.notices){$listing.notices}else{@()})
 	}

@@ -99,13 +99,18 @@ uncommitted, blocked, dirty, retained-claim, or still-active work.
 For each launch row (`SmartGit launch:`, omitted when Coretide-only; `Coretide
 SmartGit launch:` when present): if `none`, skip
 `Show-FinalizeApprovalReview.ps1` and reuse that `v2` receipt; else run it
-verbatim (root AGENTS.md bundled-script rule). If every applicable row is
-`none` under standing confirmation and `(d)` does not pause on the fresh
-acceptance table, skip the summary and land same-turn with the existing
-receipt(s). Otherwise — whenever main presents a summary, including a `(d)`
-pause or mixed engine/Coretide handoff — read `status`, `message`, and
-`manualCommand` from each fresh or reused `v2` receipt. Between handoff and
-question main makes only these tool calls and those the handoff or
+verbatim (root AGENTS.md bundled-script rule). If every applicable row is `none` under standing confirmation, `(d)` does not
+pause on the fresh acceptance table, and the handoff carries no unacknowledged
+[`agenttools.md`](references/agenttools.md) pause warning, skip the summary and
+land same-turn with the existing receipt(s). Otherwise — whenever main presents
+a summary, including a `(d)` pause, an unacknowledged `agenttools.md` pause
+warning, or a mixed engine/Coretide handoff — read `status`, `message`, and
+`manualCommand` from each fresh or reused `v2` receipt. Whenever the handoff
+carries an unacknowledged [`agenttools.md`](references/agenttools.md) pause
+warning, relay it to the user and wait for acknowledgment that peers have
+paused before the first advance (`(e)` below); that acknowledgment carries
+through recovery while the same pause remains in effect. Between handoff and question main makes only these tool calls
+and those the handoff or
 [receipt contract](references/scripts.md#approval-review-receipt) requires;
 block on any unresolved receipt failure before presenting the summary.
 
@@ -173,11 +178,12 @@ paths and a passing table (no companion files; any byte or path drift — even
 within a `-Reject` path — requires refreshed preparation, SmartGit launch,
 summary, and separate confirmation instead of automatic filing or landing).
 Pre-summary authorization skips only the question (never initial SmartGit launch
-or summary), dispatching landing same-turn; standing confirmation survives
-recovery without re-asking or halting for non-blocking checks or user-judgment
-prompts (following the launch/summary routing above), unless a summary carries
-a `/sweep` `UNVERIFIED` owed row unaccepted under `(d)` below, where main asks
-and waits.
+or summary), dispatching landing same-turn unless `(d)` or an unacknowledged
+`(e)` pause warning pauses; standing confirmation survives recovery without
+re-asking or halting for non-blocking checks or user-judgment prompts
+(following the launch/summary routing above), unless a summary carries a
+`/sweep` `UNVERIFIED` owed row unaccepted under `(d)` below or an
+unacknowledged `(e)` pause warning, where main asks and waits.
 
 Confirmation binds the reviewed diff, not commit hashes. A clean byte-identical
 post-confirmation rebase lands with no re-asking, re-review, or rebuild;

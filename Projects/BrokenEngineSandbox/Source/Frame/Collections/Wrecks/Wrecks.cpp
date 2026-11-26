@@ -7,6 +7,7 @@
 
 #include "Frame/Collections/Battleships/Battleships.h"
 #include "Frame/Collections/Ships/ShipHitboxes.h"
+#include "Game.h"
 
 namespace engine
 {
@@ -76,10 +77,11 @@ void WrecksPostRender::Destroy(Frame& __restrict rFrame, const engine::CellStati
 	const WrecksInterpolate& rInterpolate = *rFrame.interpolate.pWrecks;
 	WrecksPostRender& rPostRender = *rFrame.postRender.pWrecks;
 
-	// The client subscription's cell loaded area, or during a camera jump the previous cell loaded area too; map view
-	// leaves both unchanged. Only the main thread writes them.
+	// Cell-subscription retention covers the primary subscribed cell and any cell overlapping the cell loaded area (or
+	// previous area when valid). Only the main thread writes those camera areas.
+	engine::GridCoord primaryCoordinate = gpGame->HasFocusedClientEntity() ? gpGame->mClientGridCoordinate : engine::kOriginCoordinate;
 	XMVECTOR vecCellCenter = engine::CellCenterOffset(engine::gpCamera->mBasisCoordinate, rStaticData.coordinate);
-	bool bInLoadedArea = common::RectangleOverlapsHex(engine::gpCamera->mf4CellLoadedArea, vecCellCenter, engine::kCellDirections) || (engine::gpCamera->mbPreviousCellLoadedAreaValid && common::RectangleOverlapsHex(engine::gpCamera->mf4PreviousCellLoadedArea, vecCellCenter, engine::kCellDirections));
+	bool bInLoadedArea = rStaticData.coordinate == primaryCoordinate || common::RectangleOverlapsHex(engine::gpCamera->mf4CellLoadedArea, vecCellCenter, engine::kCellDirections) || (engine::gpCamera->mbPreviousCellLoadedAreaValid && common::RectangleOverlapsHex(engine::gpCamera->mf4PreviousCellLoadedArea, vecCellCenter, engine::kCellDirections));
 
 	engine::DestroySweep(rInterpolate, rPostRender, [&](int64_t i)
 	{

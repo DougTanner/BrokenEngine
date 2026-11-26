@@ -5,14 +5,10 @@ triggers, inputs, and the handoff form — lives in [`../SKILL.md`](../SKILL.md)
 
 ## Steps
 
-1. Run below with zero disk writes (`-Head` from `Baseline` for a committed
-   head; `-UntrackedPath` or `-IncludeUntracked` from `Scope`). Require `status`
-   `pass`, else report unavailability without rebuilding the diff. Done when
-   output prints or unavailability is reported.
-
-```powershell
-pwsh -NoProfile -Command 'Import-Module ./.agents/scripts/SessionChangeInventory.psm1; Get-SessionChangeInventory -RepositoryRoot (Get-Location).Path -Baseline <baseline SHA> -Regions|Select-Object status,coretide,entries,regions|ConvertTo-Json -Depth 5'
-```
+1. Use the inventory in [`../SKILL.md`](../SKILL.md) `## Inputs`. For bridge
+   input see [`codex-bridge.md`](../../../references/codex-bridge.md) step 2.
+   Require `status` `pass` or report unavailability without rebuilding the
+   diff.
 
 2. Select every entry whose `class` is `glsl` or `dual-language-header` (those
    rules alone pick shader `.h` files — never restate them) with its matching

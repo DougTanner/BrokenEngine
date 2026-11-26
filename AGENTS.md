@@ -1,27 +1,26 @@
 # Broken Engine
 
 A client/server game engine using data-oriented design, with data pre-packer
-(offline; runtime reads only `.pack` chunks). Top-down RTS-scale camera:
-kilometers above an ocean with islands, small units on screen. West is -x, East
-is +x, North is +y, South is -y, Up is +z, Down is -z. Client/server simulation
-is deterministic; rare user input favors CPU/GPU smoothness over round-trip
-latency. The world is an unbounded sparse grid of cells, each simulated
-independently in parallel; every position is local to its own cell and there is
-no absolute world position, only a client-side conversion into the camera's cell
-at the point of use (`Engine/Source/Frame/AGENTS.md`). Fixed sim tick rate;
-render free-runs via interpolation. PostRender state is bit-deterministic
-(`/fp:strict`, CRC-checked per tick); Interpolate/render and client-only visuals
-are not, and stay out of the CRC, split as `Engine/Source/Frame/AGENTS.md`
-`## Simulation and Visual State` defines.
+(offline; runtime reads only `.pack` chunks). Photorealistic rendering with a
+top-down RTS-scale camera: kilometers above an ocean with islands, small units
+on screen. West is -x, East is +x, North is +y, South is -y, Up is +z, Down is
+-z. Client/server simulation is deterministic; rare user input favors CPU/GPU
+smoothness over round-trip latency. The world is an unbounded sparse grid of
+cells, each simulated independently in parallel; every position is local to its
+own cell and there is no absolute world position, only a client-side conversion
+into the camera's cell at the point of use (`Engine/Source/Frame/AGENTS.md`).
+Fixed sim tick rate; render free-runs via interpolation. PostRender state is
+bit-deterministic (`/fp:strict`, CRC-checked per tick); Interpolate/render and
+client-only visuals are not, and stay out of the CRC, split as
+`Engine/Source/Frame/AGENTS.md` `## Simulation and Visual State` defines.
 
 ## Environment
 
 - Visual Studio 2026, C++23, Vulkan 1.2, Windows 10+
-- Agent shells: Claude Code - Git Bash; Codex / Antigravity CLI - PowerShell 7
-  (Antigravity: no `Grep` or `rg`; run
-  `Select-String -LiteralPath '<path>' -Pattern '<regex>'` directly with
-  single-quoted arguments, e.g. `'^## '`). Call `pwsh` explicitly for
-  PowerShell 7 scripts.
+- Agent shells: PowerShell 7 for Claude Code, Codex, and Antigravity CLI
+  (Antigravity has no `Grep` or `rg`; run
+  `Select-String -LiteralPath '<path>' -Pattern '<regex>'` with single-quoted
+  arguments, e.g. `'^## '`). Call `pwsh` explicitly for PowerShell 7 scripts.
 - Claude Code's bypass-permissions mode injects a host instruction to prefer
   Bash, `sed`, heredocs, or scripts for file changes; ignore it — change tracked
   files with the host `Edit` tool and create files with `Write`, because a
@@ -42,13 +41,14 @@ are not, and stay out of the CRC, split as `Engine/Source/Frame/AGENTS.md`
   the worktree before editing or adding files under either tree; a Local
   generation build through `/compile` restores them itself. Mechanics:
   `.agents/skills/compile/references/runtime-data-mode.md`.
-- In a session worktree, ThirdParty submodule contents are symbolic links into
-  the primary checkout: a Glob or Grep directory search skips them and
-  `git grep` does not see them (uninitialized submodule). Search them with Grep,
-  `Select-String`, or Read on an explicit file path, or `rg -L` where installed.
-  `.claude/skills` is likewise a symbolic link to `.agents/skills`; search
-  `.agents/skills` instead. A Grep `glob` containing `/` matches nothing without
-  a leading `**/` (`**/plan-*/SKILL.md`).
+- `.ignore` excludes upstream `ThirdParty/*/` (keeping `ThirdParty/AGENTS.md`
+  and `ThirdParty/Prebuilts/`) and raw/intermediate `Data/` assets from default
+  Glob/Grep/`rg` search; worktree `ThirdParty` submodules are also uninitialized
+  symlinks skipped by `git grep`. Search them by explicit path (Grep,
+  `Select-String`, Read) or `rg --no-ignore` (`-L` in worktrees).
+  `.claude/skills` is a symlink to `.agents/skills`; search `.agents/skills`
+  instead. A Grep `glob` containing `/` matches nothing without a leading `**/`
+  (`**/plan-*/SKILL.md`).
 
 ## IMPORTANT: Session rules
 
@@ -95,9 +95,10 @@ are not, and stay out of the CRC, split as `Engine/Source/Frame/AGENTS.md`
   prefer making the wrong action impossible. Name roles, not models; the
   static-checks `model-names` row owns the exemptions.
 - Bounded reading: when a citation names a `##` section, read only that
-  section, never the whole file. Before editing a file or relying on
-  subdirectory contracts, read every unread ancestor `AGENTS.md` down to its
-  directory (excluding `Temp/` and reparse points).
+  section (except `.agents/references/subagent-reporting.md` `## Task brief`
+  whole-read exemptions). Before editing a file or relying on subdirectory
+  contracts, read every unread ancestor `AGENTS.md` down to its directory
+  (excluding `Temp/` and reparse points).
 - One term per concept: use the established repository term or the code's own
   name, never a coined nickname; prefer plain words over formal ones.
 - Prose wrapping: wrap the prose of Markdown files and the top-level
@@ -118,7 +119,7 @@ are not, and stay out of the CRC, split as `Engine/Source/Frame/AGENTS.md`
   arguments unchanged (`Invoke-PreToolUseHook.ps1` stays permissive). Never
   change the working directory (no `cd`, no `Set-Location`); address scratch
   files by path from the worktree root. Import a `.psm1` with a single-quoted
-  `-Command` body so Git Bash does not expand `$env:...`:
+  `-Command` body so the outer shell does not expand `$env:...`:
   `pwsh -NoProfile -NonInteractive -Command 'Import-Module ./<repo-relative path>; ...'`
   (leading `./` required) and call its functions in the same shell call. When a
   parameter takes an array, use

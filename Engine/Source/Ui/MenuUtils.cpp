@@ -1,8 +1,8 @@
+#if defined(BT_CLIENT)
+
 #include "Ui/MenuUtils.h"
 
-#if defined(BT_CLIENT)
 #include "Agent/AgentUiRegistry.h"
-#endif
 #include "Ui/GraphicsSettingsWrappersBase.h"
 
 namespace engine
@@ -66,12 +66,10 @@ bool WrapperSlider(std::string_view label, engine::Wrapper* pWrapper, std::strin
 		pWrapper->Set(fValue);
 		bChanged = true;
 	}
-#if defined(BT_CLIENT)
 	if (gpAgentUiRegistry != nullptr)
 	{
 		gpAgentUiRegistry->RecordItemValue(ImGui::GetID(label.data()), format.data(), static_cast<double>(pWrapper->mfCurrent));
 	}
-#endif
 	return bChanged;
 }
 
@@ -124,7 +122,6 @@ bool RadioRow(const char* pcHeader, engine::Wrapper* pWrapper, std::initializer_
 		}
 	}
 
-#if defined(BT_CLIENT)
 	if (gpAgentUiRegistry != nullptr)
 	{
 		float fFinal = pWrapper->mfCurrent;
@@ -133,7 +130,6 @@ bool RadioRow(const char* pcHeader, engine::Wrapper* pWrapper, std::initializer_
 			gpAgentUiRegistry->RecordItemChecked(ImGui::GetID(OptionLabel(rOption.first)), fFinal == rOption.second);
 		}
 	}
-#endif
 	ImGui::PopID();
 	return bChanged;
 }
@@ -145,10 +141,8 @@ bool WrapperPlusMinus(std::string_view label, engine::Wrapper* pWrapper)
 	ImGui::Text("%s", label.data());
 	ImGui::SameLine();
 	ImGui::PushID(label.data());
-#if defined(BT_CLIENT)
 	ImGuiID uiMinusId = ImGui::GetID("-");
 	ImGuiID uiPlusId = ImGui::GetID("+");
-#endif
 	if (ImGui::Button("-"))
 	{
 		pWrapper->Set(pWrapper->mfCurrent - kfStep);
@@ -162,18 +156,14 @@ bool WrapperPlusMinus(std::string_view label, engine::Wrapper* pWrapper)
 		pWrapper->Set(pWrapper->mfCurrent + kfStep);
 		bChanged = true;
 	}
-#if defined(BT_CLIENT)
 	if (gpAgentUiRegistry != nullptr)
 	{
 		gpAgentUiRegistry->RecordItemValue(uiMinusId, "%.0f%%", static_cast<double>(pWrapper->mfCurrent * 100.0f));
 		gpAgentUiRegistry->RecordItemValue(uiPlusId, "%.0f%%", static_cast<double>(pWrapper->mfCurrent * 100.0f));
 	}
-#endif
 	ImGui::PopID();
 	return bChanged;
 }
-
-#if defined(BT_CLIENT)
 
 constexpr float kfActivationDistancePixels = 350.0f;
 constexpr float kfSlideRate = 8.0f;
@@ -326,9 +316,10 @@ bool MenuButton(const char* pcLabel, const ImVec2& rvSize, float& rfHoverAnimati
 	float fButtonRounding = kfButtonRounding * fUiScale;
 	float fButtonAccentBarWidth = kfButtonAccentBarWidth * fUiScale;
 
-	ImVec2 vTextSize = ImGui::CalcTextSize(pcLabel);
+	const char* pcDisplayEnd = std::strstr(pcLabel, "##");
+	ImVec2 textSize = ImGui::CalcTextSize(pcLabel, pcDisplayEnd);
 	const ImGuiStyle& rStyle = ImGui::GetStyle();
-	ImVec2 vButtonSize(rvSize.x > 0.0f ? rvSize.x : vTextSize.x + rStyle.FramePadding.x * 2.0f, rvSize.y > 0.0f ? rvSize.y : vTextSize.y + rStyle.FramePadding.y * 2.0f);
+	ImVec2 vButtonSize(rvSize.x > 0.0f ? rvSize.x : textSize.x + rStyle.FramePadding.x * 2.0f, rvSize.y > 0.0f ? rvSize.y : textSize.y + rStyle.FramePadding.y * 2.0f);
 
 	// EnableNav: InvisibleButton defaults to ImGuiItemFlags_NoNav, which would skip keyboard/gamepad navigation
 	bool bPressed = ImGui::InvisibleButton(pcLabel, vButtonSize, ImGuiButtonFlags_EnableNav);
@@ -358,12 +349,12 @@ bool MenuButton(const char* pcLabel, const ImVec2& rvSize, float& rfHoverAnimati
 		pDrawList->AddRectFilled(ImVec2(vMinimum.x, fCenterY - fHalfHeight), ImVec2(vMinimum.x + fButtonAccentBarWidth, fCenterY + fHalfHeight), ChromeColor(rChrome.f4Accent, fBarIntensity));
 	}
 
-	ImVec2 vTextPosition((vMinimum.x + vMaximum.x - vTextSize.x) * 0.5f, (vMinimum.y + vMaximum.y - vTextSize.y) * 0.5f);
-	pDrawList->AddText(vTextPosition, ImGui::GetColorU32(ImGuiCol_Text), pcLabel);
+	ImVec2 vTextPosition((vMinimum.x + vMaximum.x - textSize.x) * 0.5f, (vMinimum.y + vMaximum.y - textSize.y) * 0.5f);
+	pDrawList->AddText(vTextPosition, ImGui::GetColorU32(ImGuiCol_Text), pcLabel, pcDisplayEnd);
 
 	return bPressed;
 }
 
-#endif // BT_CLIENT
-
 } // namespace engine
+
+#endif // BT_CLIENT

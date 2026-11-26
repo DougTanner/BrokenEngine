@@ -377,7 +377,7 @@ function Get-LineLengthFailure([string] $Path) {
 			# metadata marker as one line.
 			if ($line -match '^\s*(?:```|~~~)') { $fenced = -not $fenced; continue }
 			if ($fenced -or $line -match '^\s*\|') { continue }
-			if ($number -eq 1 -and $line.StartsWith('<!-- broken-engine-plan/v1 ', [StringComparison]::Ordinal)) { continue }
+			if ($number -eq 1 -and $line.StartsWith('<!-- broken-engine-plan/v2 ', [StringComparison]::Ordinal)) { continue }
 		}
 		if ($line.Length -gt $script:MaximumLineLength) { $failures.Add([ordered]@{ path = $Path; line = $number; length = $line.Length }) }
 	}

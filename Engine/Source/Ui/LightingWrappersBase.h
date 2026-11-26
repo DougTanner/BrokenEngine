@@ -1,11 +1,10 @@
 #pragma once
 
+#if defined(BT_CLIENT)
+
+#include "CurveData.h"
 #include "HeightLerpWrapperQuartet.h"
 #include "WrapperBase.h"
-
-#if defined(BT_CLIENT)
-#include "CurveData.h"
-#endif
 
 namespace engine
 {
@@ -18,10 +17,8 @@ inline Wrapper gLightingBlurEdgeFalloff(0.6f, 0.01f, 1.0f);
 // Write - Deposit
 inline Wrapper gLightingDepositTextureMultiplier(0.2f, 0.1f, 1.0f);
 inline Wrapper gLightingDepositCompress(0.0f, 0.0f, 128.0f);
-#if defined(BT_CLIENT)
 inline Wrapper gAreaLightAreaMultiplier(3.0f, 1.0f, 16.0f);
 inline Wrapper gAreaLightForcedSquare(0.2f, 0.0f, 1.0f);
-#endif
 
 // Write - Spread
 inline Wrapper gSpreadPassCount(64.0f, 1.0f, static_cast<float>(shaders::kiMaxSpreadPasses), 1.0f); // min >= 1.0f load-bearing: keeps std::pow(fPassCount, -fCombineExposurePassScale) base positive and the 1/fPassCount pass scaling finite (LightingUniforms.cpp). Step 1.0f load-bearing: RenderTargetTexturesLighting.cpp / CommandBufferRecordMain.cpp and uint() in LightCombine.comp truncate this value while LightingUniforms.cpp normalization and LightingSpread.frag interpolation use it raw, so only an integral value makes every phase describe the same pass count.
@@ -74,11 +71,9 @@ inline Wrapper gCombineBlackTightness(0.0f, 0.0f, 1.0f); // Fraction of resolved
 inline Wrapper gCombinePassNormalize(0.7f, 0.0f, 1.0f);
 inline Wrapper gCombineExposurePassScale(0.0f, 0.0f, 1.0f); // Paired with gSpreadPassCount min=1.0f: pow(fPassCount, -scale) stays finite (base>=1, exponent in [-1,0]).
 inline Wrapper gCombineHuePreserve(0.0f, 0.0f, 1.0f);
-#if defined(BT_CLIENT)
 inline CurveData gCombineCurveOld({ImVec2(0.0000f, 32.0000f), ImVec2(0.3880f, 25.9852f), ImVec2(0.5766f, 0.9778f), ImVec2(1.0000f, 8.4444f)}, 0.0000f, 32.0000f);
 inline CurveData gCombineCurveNew({ImVec2(0.f, 21.132076f), ImVec2(0.049473684f, 2.9886792f), ImVec2(0.14263158f, 1.9018868f), ImVec2(0.21947369f, 0.f), ImVec2(0.3131579f, 1.6905661f), ImVec2(0.4231579f, 0.96603775f), ImVec2(0.5105263f, 0.9056604f), ImVec2(1.f, 1.0867925f)}, 0.0000f, 32.0000f);
 inline bool gbUseCombineCurveNew = true;
-#endif
 
 // Read - Terrain Lighting
 inline Wrapper gLightingDirectionalIntensity(0.7f, 0.0f, 2.0f);
@@ -124,3 +119,5 @@ inline Wrapper gLightingWaterReflectedFresnel(0.9f, 0.0f, 1.0f);
 inline Wrapper gLightingWaterReflectedIntensity(0.4f, 0.0f, 5.0f);
 
 } // namespace engine
+
+#endif // BT_CLIENT

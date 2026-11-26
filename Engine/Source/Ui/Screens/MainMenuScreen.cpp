@@ -95,7 +95,7 @@ void MainMenuScreen::Render()
 	// Shared text-driven width over every button label (including the SCANNING... discovery state), floored to the
 	// primary-button minimum. Measured over the full label set so a disabled feature cannot reflow the column.
 	// Height auto-sizes per button (0.0f).
-	float fButtonWidth = std::max(MenuButtonsWidth({TranslatedString(StandardString::kStringLocalServer), TranslatedString(StandardString::kStringRemoteServer), TranslatedString(StandardString::kStringGraphics), TranslatedString(StandardString::kStringAudio), TranslatedString(StandardString::kStringGameSettings), TranslatedString(StandardString::kStringQuit), U"SCANNING..."}), kfPrimaryButtonMinimumWidthPixels * UiScale());
+	float fButtonWidth = std::max(MenuButtonsWidth({TranslatedString(StandardString::kStringLocalServer), TranslatedString(StandardString::kStringRemoteServer), TranslatedString(StandardString::kStringGraphics), TranslatedString(StandardString::kStringAudio), TranslatedString(StandardString::kStringGameSettings), TranslatedString(StandardString::kStringKeybinds), TranslatedString(StandardString::kStringQuit), U"SCANNING..."}), kfPrimaryButtonMinimumWidthPixels * UiScale());
 	float fHeadingWidth = 0.0f;
 	{
 		ScopedMenuFont headingFont(kfMenuUiScale * kfMainMenuHeadingScale);
@@ -157,7 +157,13 @@ void MainMenuScreen::Render()
 	}
 
 	CenterMenuItem(fContentStartX, fContentWidth, fButtonWidth);
-	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringQuit)).mpData, ImVec2(fButtonWidth, 0.0f), mpfButtonHoverAnimations[5]))
+	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringKeybinds)).mpData, ImVec2(fButtonWidth, 0.0f), mpfButtonHoverAnimations[5]))
+	{
+		game::gpGame->meUiState = UiState::kKeybinds;
+	}
+
+	CenterMenuItem(fContentStartX, fContentWidth, fButtonWidth);
+	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringQuit)).mpData, ImVec2(fButtonWidth, 0.0f), mpfButtonHoverAnimations[6]))
 	{
 		game::gpGame->mGameFlags.Set(GameFlags::kQuit);
 	}

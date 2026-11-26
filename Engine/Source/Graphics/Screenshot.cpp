@@ -208,8 +208,8 @@ static int64_t CheckDumpIndex(int64_t iIndex, int64_t iCount, std::string_view n
 }
 
 constexpr const char* kpcValidDumpNames =
-	"Log, TerrainElevation, SmokeGradient, SmokeOne[0-N], SmokeTwo[0-N], WindOne, WindTwo, "
-	"Lighting[0-2], Combine[0-5], AmbientCombine[0-1], LightingHistory[0-5], "
+	"Log, TerrainElevation, SmokeGradient, SmokeOne, SmokeTwo, WindOne, WindTwo, "
+	"Lighting[0-2], Combine[0-2], AmbientCombine, LightingHistory[0-2], "
 	"Spread[0-N][0-2], SpreadOnly[0-N][0-2], "
 	"ShadowElevation, Shadow, ShadowBlur, ShadowBlurIntermediate, ShadowHistory, "
 	"ObjectShadows, ObjectShadowsBlur, ObjectShadowsBlurIntermediate, WaterDisplacement, WaterDisplacementNormal";
@@ -234,11 +234,11 @@ static Texture* ResolveRenderTarget(std::string_view name, int64_t iIndex, int64
 	}
 	if (name == "SmokeOne")
 	{
-		return &rRenderTargetTextures.mSmokeTexturesOne[CheckDumpIndex(iIndex, gpFlightPlanes->Count(), name)];
+		return &rRenderTargetTextures.mSmokeTextureOne;
 	}
 	if (name == "SmokeTwo")
 	{
-		return &rRenderTargetTextures.mSmokeTexturesTwo[CheckDumpIndex(iIndex, gpFlightPlanes->Count(), name)];
+		return &rRenderTargetTextures.mSmokeTextureTwo;
 	}
 	if (name == "WindOne")
 	{
@@ -250,7 +250,7 @@ static Texture* ResolveRenderTarget(std::string_view name, int64_t iIndex, int64
 	}
 	if (name == "AmbientCombine")
 	{
-		return &rRenderTargetTextures.mpAmbientCombineTextures[CheckDumpIndex(iIndex, shaders::kiLightingLayers, name)];
+		return &rRenderTargetTextures.mAmbientCombineTexture;
 	}
 	if (name == "ShadowElevation")
 	{
@@ -297,16 +297,13 @@ static Texture* ResolveRenderTarget(std::string_view name, int64_t iIndex, int64
 	{
 		return &rRenderTargetTextures.mpLightingTextures[CheckDumpIndex(iIndex, 3, name)];
 	}
-	// Index = lighting layer * 3 + color.
 	if (name == "Combine")
 	{
-		int64_t iLayerColor = CheckDumpIndex(iIndex, shaders::kiLightingLayers * 3, name);
-		return &rRenderTargetTextures.mpCombineTextures[iLayerColor / 3][iLayerColor % 3];
+		return &rRenderTargetTextures.mpCombineTextures[CheckDumpIndex(iIndex, 3, name)];
 	}
 	if (name == "LightingHistory")
 	{
-		int64_t iLayerColor = CheckDumpIndex(iIndex, shaders::kiLightingLayers * 3, name);
-		return &rRenderTargetTextures.mpLightingHistoryTextures[iLayerColor / 3][iLayerColor % 3];
+		return &rRenderTargetTextures.mpLightingHistoryTextures[CheckDumpIndex(iIndex, 3, name)];
 	}
 
 	if (name == "Spread")

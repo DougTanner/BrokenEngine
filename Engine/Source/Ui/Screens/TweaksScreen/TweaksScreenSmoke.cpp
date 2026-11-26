@@ -36,8 +36,7 @@ void RenderSmokeSection(TweaksScreen& rScreen)
 				rScreen.WrapperSlider("Smoke Noise Scale Two", gSmokeNoiseScaleTwo, iSection, 1.0f);
 				rScreen.WrapperSlider("Smoke Wind Noise Scale", gSmokeWindNoiseScale, iSection, 1.0f);
 				rScreen.WrapperSlider("Smoke Noise Quantity", gSmokeNoiseQuantity, iSection, 1.0f);
-				rScreen.WrapperSlider("Smoke Wind Noise Quantity Bottom", gSmokeWindNoiseQuantityBottom, iSection, 1.0f);
-				rScreen.WrapperSlider("Smoke Wind Noise Quantity Top", gSmokeWindNoiseQuantityTop, iSection, 1.0f);
+				rScreen.WrapperSlider("Smoke Wind Noise Quantity", gSmokeWindNoiseQuantity, iSection, 1.0f);
 				rScreen.WrapperSlider("Smoke Curl Strength Low", gSmokeCurlStrengthLow, iSection, 1.0f);
 				rScreen.WrapperSlider("Smoke Curl Strength High", gSmokeCurlStrengthHigh, iSection, 1.0f);
 				rScreen.WrapperSlider("Smoke Curl Scale", gSmokeCurlScale, iSection, 1.0f);

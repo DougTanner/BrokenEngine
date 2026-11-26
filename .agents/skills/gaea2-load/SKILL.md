@@ -2,7 +2,7 @@
 name: gaea2-load
 description: Load a Gaea 2 .terrain file into an editable Markdown view (Mermaid topology + per-node properties) under Temp/. Pairs with /gaea2-modify and /gaea2-save for round-trip editing.
 argument-hint: <path-to-.terrain>
-allowed-tools: [Read, Bash, PowerShell]
+allowed-tools: [Read, PowerShell]
 disable-model-invocation: true
 ---
 
@@ -27,9 +27,8 @@ Convert a Gaea 2 `.terrain` JSON into:
 
    - If `$ARGUMENTS` is empty or doesn't end in `.terrain`, ask the user for the
      file path.
-   - If it's a bare filename (no directory), try
-     `C:/Program Files/QuadSpinner/Gaea 2/Examples/<name>.terrain` — that's
-     where Gaea ships its example library.
+   - Bare names and relative paths follow
+     [wrapper-contract.md](../gaea2-shared/references/wrapper-contract.md#no-inline-reconstruction).
 
 2. Run the load wrapper from the session worktree root. One call resolves the
    input path, checks Python, probes Gaea version drift, and runs the loader —
@@ -37,35 +36,26 @@ Convert a Gaea 2 `.terrain` JSON into:
    Done when that one call has returned.
 
    ```powershell
-   pwsh -NoProfile -File .agents/skills/gaea2-shared/scripts/Invoke-Gaea2Load.ps1 -InputPath "<input.terrain>"
+   pwsh -NoProfile -NonInteractive -File .agents/skills/gaea2-shared/scripts/Invoke-Gaea2Load.ps1 -InputPath "<input.terrain>"
    ```
 
-   - The wrapper resolves relative paths and `Temp/` against the repository root
-     whatever the shell's current directory is.
-   - It passes the child processes' stderr through to yours — append your
-     shell's stderr redirect (`2>$null` in PowerShell, `2>/dev/null` in Bash)
-     when you only want the JSON.
+   Path resolution and stderr pass-through follow
+   [wrapper-contract.md](../gaea2-shared/references/wrapper-contract.md#no-inline-reconstruction).
 
-3. Act on the envelope's `status`. Stdout is one JSON object, `schemaVersion`
+3. Act on the envelope's `code`. Stdout is one JSON object, `schemaVersion`
    `broken-engine-gaea2-load/v1`, with `status`, `code`, `message`. Done when
-   one `broken-engine-gaea2-load/v1` envelope has been read and its `status`
+   one `broken-engine-gaea2-load/v1` envelope has been read and its `code`
    acted on.
 
-   - `ok` (exit 0) — `markdownPath`, `passthroughPath`, and `versionDrift` are
-     populated. Continue to step 4.
-   - `input.needs-user` (exit 2) — the path was empty or didn't end in
-     `.terrain`. Ask the user for the file (step 1's rule), then re-run.
-   - `python.missing` / `python.stale` (exit 2) — no usable x64 CPython 3.12+
-     interpreter, and nothing else ran. Do not install anything: report to the
-     user that Python is missing or too old, quoting the envelope's `message`
-     (it carries the probe's own `MISSING`/`STALE` line), and — for
-     `python.missing` — the `installCommand` the envelope carries as the
-     suggested command for them to run (`installCommand` is null for a stale
-     interpreter, which the user resolves by upgrading). Stop until they say
-     it's installed.
-   - `input.not-found`, `load.failed`, `load.output-missing`, `internal.error`
-     (exit 1) — report `message` plus the envelope's `stderr`, which carries the
-     failing script's own diagnostics.
+   - `ok` — `markdownPath`, `passthroughPath`, and `versionDrift` are populated.
+     Continue to step 4.
+   - `input.needs-user` — the path was empty or didn't end in `.terrain`. Ask
+     the user for the file (step 1's rule), then re-run.
+   - `python.missing` / `python.stale` — follow
+     [wrapper-contract.md](../gaea2-shared/references/wrapper-contract.md#missing-or-stale-python).
+   - `input.not-found`, `script.not-found`, `probe.not-found`,
+     `python.probe-failed`, `load.failed`, `load.output-missing`,
+     `internal.error` — report `message` (and `stderr` when present).
 
 4. Act on the envelope's `versionDrift` object, which carries `state` and a
    `notice` (the probe's own output). Done when its `state` has been handled.
@@ -111,14 +101,11 @@ Convert a Gaea 2 `.terrain` JSON into:
 - Gaea's accepted enum values, required fields, and port catalogues can shift
   between releases, so the wrapper's `versionDrift` object exists to catch that
   before it bites.
-- Never reconstruct the wrapper's operations inline: don't run the shared
-  `.agents/scripts/Detect-Python.ps1` probe the wrapper already calls and parse
-  its `OK`/`MISSING`/`STALE` line yourself, don't invoke `check_gaea_version.py`
-  or `load_terrain.py` with a bare `python` or a captured interpreter path, and
-  don't chain the calls by hand.
+- Never reconstruct the wrapper's operations inline; follow
+  [wrapper-contract.md](../gaea2-shared/references/wrapper-contract.md#no-inline-reconstruction).
 - The `.passthrough.json` carries Newtonsoft `$id`/`$ref` graph state, original
   `$type` FQNs, port catalogues, modifier arrays, viewport state, GraphTabs,
   BuildProfiles, Bindings, metadata templates, and anything else the Markdown
   view drops. Treat it as opaque — hand-editing it will likely corrupt
-  round-trip; if a structural change is needed, modify the source `.terrain` and
-  re-run `/gaea2-load`.
+  round-trip; if a structural change is needed, instruct the user to modify the
+  source `.terrain` and run `/gaea2-load`.

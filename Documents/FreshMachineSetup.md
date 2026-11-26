@@ -103,14 +103,12 @@ build above yourself after a skip.
 
 ## 6. First wrapper run
 
-The session wrappers need no one-time coordination-state initialization:
+The session wrapper needs no one-time coordination-state initialization. From
+PowerShell 7 at the primary checkout root, run:
 
-- Claude Code, from Git Bash at the primary checkout root:
-  `./.claude/claude-worktree.sh`
-- Codex CLI, from PowerShell 7 at the primary checkout root:
-  `.\.codex\codex-worktree.ps1`
-- Antigravity CLI, from PowerShell 7 at the primary checkout root:
-  `.\.antigravity\agy-worktree.ps1`
+- Claude Code: `.\.agents\scripts\Start-AgentWorktreeSession.ps1 claude`
+- Codex CLI: `.\.agents\scripts\Start-AgentWorktreeSession.ps1 codex`
+- Antigravity CLI: `.\.agents\scripts\Start-AgentWorktreeSession.ps1 agy`
 
 At each session start the wrapper creates a UUID-named worktree (or resolves the
 existing one when reattaching) and launches the agent CLI inside the worktree.

@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-11-21T21:04:07.582Z","dependsOn":["Documents/Plans/Engine/RemoveCompassHaloFromLighting.md"]} -->
+<!-- broken-engine-plan/v2 {"createdUtc":"2026-11-21T21:04:07.582Z","dependsOn":["Documents/Plans/Engine/RemoveCompassHaloFromLighting.md"]} -->
 # Skip spread draws when a lighting refresh has no deposits
 
 ## Context
@@ -72,12 +72,6 @@ Maintain publication and debug behavior on every active lighting layer.
    cannot distinguish the paths. The shared
    targets clear on skipped frames too, so use a known refresh to observe
    the empty branch and distinct retained output from previous lighting.
-
-## Coordination
-
-- With `SingleLayerWorldLighting.md`, fold in the effective deposit counts
-  after the refresh writes, using the live layer count. Keep the gate
-  applied to spread draws even if that Plan rewrites the refresh predicate.
 
 ## Notes
 

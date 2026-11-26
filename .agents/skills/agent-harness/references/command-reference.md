@@ -255,15 +255,17 @@ when that window must be observed or clicked.
   `existing_queued` for a whole-chunk load queued from the main thread; and
   `existing_complete` for a finished whole-chunk or range load.
 - `dump_render_target`: `{"name","index"?:0,"channel"?:0,"path"?,"raw"?:false}`.
-  Unknown names list valid names. `Combine` and `LightingHistory` take `index` =
-  lighting layer * 3 + color (0-5), and `AmbientCombine` takes the lighting
-  layer (0-1); `Lighting`, `Spread`, and `SpreadOnly` are the one scratch chain
-  the refreshing layer reuses, so `Lighting` reads blank on a frame with no
-  lighting refresh. In `Engine/Source/Graphics/Screenshot.cpp`,
-  `IsSingleChannelNormalizable` formats (including single-channel floats)
-  normalize to grayscale PNG without `raw:true`, `IsFourByteColor` formats write
-  direct PNG, and all other formats require `raw:true` (writing `.bin`), as
-  enforced by `ValidateDumpRenderTargetRequest`. The default base path is
+  Unknown names list valid names (`ResolveRenderTarget` in
+  `Engine/Source/Graphics/Screenshot.cpp` owns the supported targets and
+  accepted index bounds; `kpcValidDumpNames` formats the unknown-name
+  diagnostic). `Combine` and `LightingHistory` take `index` = color, and
+  `AmbientCombine` takes no index; `Lighting`, `Spread`, and `SpreadOnly` are
+  the one scratch chain, so `Lighting` reads blank on a world frame that skips
+  the lighting refresh. In `Screenshot.cpp`, `IsSingleChannelNormalizable`
+  formats (including single-channel floats) normalize to grayscale PNG without
+  `raw:true`, `IsFourByteColor` formats write direct PNG, and all other formats
+  require `raw:true` (writing `.bin`), as enforced by
+  `ValidateDumpRenderTargetRequest`. The default base path is
   `%TEMP%\Screenshots\dump_<name>_N`. Requires `kbScreenshots`.
 - `describe_ui`: no params. Returns UI state, `tweaksVisible` (true while the F3
   Tweaks overlay is shown), game flags, framebuffer, windows, and labeled
@@ -300,11 +302,12 @@ when that window must be observed or clicked.
 - `key`: `{"key":name,"holdFrames"?:1}`. `holdFrames` is an integer in `0..1798`
   (default `1`); a value outside that range is a parameter error. The limit
   counts client drains/frames rather than wall-clock time, so duration varies
-  with the client drain rate. Supports case-insensitive single letters/digits;
-  `ESC`/`ESCAPE`, `SPACE`, `TAB`, `ENTER`/`RETURN`, `UP`/`DOWN`/`LEFT`/`RIGHT`,
-  and `F1`–`F24`. Returns `{"ok":true}`. While the client is not rendering
-  (minimized or swapchain recreate deferred), only the RawInput overlay takes
-  effect; `key` sends no ImGui event.
+  with the client drain rate. Supports case-insensitive single letters/digits
+  and `F1`–`F24`; exact uppercase `ESC`/`ESCAPE`, `SPACE`, `TAB`,
+  `ENTER`/`RETURN`, `BACKSPACE`, `DELETE`, `UP`/`DOWN`/`LEFT`/`RIGHT`. Returns
+  `{"ok":true}`. While the client is not rendering (minimized or swapchain
+  recreate deferred), only the RawInput overlay takes effect; `key` sends no
+  ImGui event.
 - `type_text`: `{"text":string}`. Types the UTF-8 text into the active ImGui
   text field through ImGui character input, then presses and releases Enter on
   its own frames. An empty string only presses Enter. A missing, non-string, or
@@ -365,12 +368,11 @@ when that window must be observed or clicked.
   Read-only client query of the presentation state the most recently published
   render frame sent. Returns
   `{"publishedFrames":int,"basisCoord":[q,r],"water":{"origin":[x,y],"reducedNoiseOrigin":[x,y],"noiseFrequency":float}}`
-  plus a `shadow` and `smoke` object and a `lighting` array of one such object
-  per lighting layer, layer 0 first, each shaped
-  `{"currentArea":[x,y,z,w],"previousArea":[x,y,z,w]}`;
-  `smoke` reports flight plane 0's area pair, the pair wind reads. A top-level
-  `objectShadowArea` `[x,y,z,w]` holds the area the object-shadow textures were
-  last drawn for, which consumers sample through between refreshes. Take
+  plus `shadow`, `smoke`, and `lighting` objects, each shaped
+  `{"currentArea":[x,y,z,w],"previousArea":[x,y,z,w]}`; `smoke` reports the
+  single smoke field's area pair. A top-level `objectShadowArea` `[x,y,z,w]`
+  holds the area the object-shadow textures were last drawn for, which
+  consumers sample through between refreshes. Take
   every sample with the client restored (`window_state {"minimized":false}`): a
   minimized client defers swapchain recreation, publishes no frame, and leaves
   the whole snapshot standing still. `publishedFrames` counts publications, so

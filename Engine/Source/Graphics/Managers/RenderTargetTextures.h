@@ -30,10 +30,8 @@ public:
 	Texture mTerrainElevationTexture;
 
 	Texture mSmokeGradientTexture;
-	// One ping-pong pair per flight plane; only the first gpFlightPlanes->Count() of each are created.
-	std::array<Texture, shaders::kiMaxFlightPlanes> mSmokeTexturesOne;
-	std::array<Texture, shaders::kiMaxFlightPlanes> mSmokeTexturesTwo;
-	Texture* mppSmokeTexturesOne[shaders::kiMaxFlightPlanes] {}; // Sampler-array binding; slots >= plane count alias plane 0 (never sampled)
+	Texture mSmokeTextureOne;
+	Texture mSmokeTextureTwo;
 
 	Texture mWindTextureOne;
 	Texture mWindTextureTwo;
@@ -51,20 +49,18 @@ public:
 	VkRenderPass mSpreadVkRenderPass = VK_NULL_HANDLE;
 	VkFramebuffer mpSpreadVkFramebuffers[shaders::kiMaxSpreadPasses] {};
 
-	// Combine outputs and history persist per lighting layer [layer][color]; the deposit and spread textures above are
-	// one scratch chain the refreshing layer reuses.
-	Texture mpCombineTextures[shaders::kiLightingLayers][3];
-	Texture* mppLightingFinalTextures[shaders::kiLightingLayers * 3] {}; // Layer-major sampler-array binding
+	// Combine outputs and history persist across skipped lighting refreshes.
+	Texture mpCombineTextures[3];
+	Texture* mppLightingFinalTextures[3] {}; // Sampler-array binding
 
 	// Direction-averaged 0.25*(E+W+N+S) of the finalized directional combine values, written by
 	// LightingHistoryCopy.comp. Terrain/Water read it with one texture sample in the ambient path.
-	Texture mpAmbientCombineTextures[shaders::kiLightingLayers];
-	Texture* mppAmbientCombineTextures[shaders::kiLightingLayers] {}; // Sampler-array binding
+	Texture mAmbientCombineTexture;
 
 	// Persistent last-refresh directional combined lighting (R/G/B), reprojected by LightingTemporal.comp to
 	// de-flicker the texel-ramp resample (mirror of mShadowHistoryTexture). LightingHistoryCopy.comp publishes the
 	// temporal result over the whole texture on refresh.
-	Texture mpLightingHistoryTextures[shaders::kiLightingLayers][3];
+	Texture mpLightingHistoryTextures[3];
 
 	// Debug texture array (channels A/B/C used by formats needing 3 textures per slot, e.g., spread direction combined)
 	int64_t miDebugTextureCount = 0;

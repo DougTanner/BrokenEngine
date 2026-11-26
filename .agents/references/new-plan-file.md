@@ -1,11 +1,11 @@
 # New Plan File
 
 `.agents/scripts/New-PlanFile.ps1` is the repository-owned writer for one
-executable Plan. It writes the immutable `broken-engine-plan/v1` metadata marker
-at byte zero with a canonical `createdUtc` and a unique ordinal-sorted
-`dependsOn`, copies the supplied body verbatim below it in BOM-less UTF-8,
-refuses to overwrite an existing path, stages that exact new Plan as the sole
-new index entry from the invocation, and folds
+executable Plan. It writes the immutable byte-zero metadata marker
+(`Documents/Plans/AGENTS.md`) with a canonical `createdUtc` and a unique
+ordinal-sorted `dependsOn`, copies the supplied body verbatim below it in
+BOM-less UTF-8, refuses to overwrite an existing path, stages that exact new
+Plan as the sole new index entry from the invocation, and folds
 `WorktreeCli plan validate --plan <normalized Plan path>` into its result. Never
 reconstruct its marker, timestamp, encoding, dependency, filename, overwrite,
 staging, or validation operations inline.
@@ -32,11 +32,13 @@ pwsh -NoProfile -File .agents/scripts/New-PlanFile.ps1 -Area <area> -Name <Pasca
   `## Planning Trees`.
 - `-DependsOn` — `Documents/Plans/**/*.md` paths (and Coretide Plans for a
   Coretide area; engine areas reject them with `input.depends-on-invalid`), as
-  one comma-separated token for `pwsh -File`; omit when none (blanks fail).
-  Auto-adds live Plans overlapping `## Critical files` or `## In scope`,
-  skipping reverse-reachable Plans.
-- `-UnresolvedFollowUp` — for `## Unresolved decisions` follow-ups: rejects
-  `-DependsOn` (`input.depends-on-not-allowed`) and skips overlap detection.
+  one comma-separated token for `pwsh -File`; omit for an empty `dependsOn`
+  (blanks fail). When to add one:
+  [`Documents/Plans/AGENTS.md`](../../Documents/Plans/AGENTS.md)
+  `## Plan files`.
+- `-AgentCli` — optional CLI lock written to metadata (values in
+  `Documents/Plans/AGENTS.md`); invalid or blank fails with
+  `input.agent-cli-invalid`.
 
 ## Result
 

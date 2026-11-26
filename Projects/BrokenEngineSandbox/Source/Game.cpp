@@ -5,6 +5,7 @@
 #include "Frame/Collections/Ships/ShipHitboxes.h"
 #include "Frame/Collections/Ships/ShipQueries.h"
 #include "Graphics/Camera.h"
+#include "Input/GameKeybinds.h"
 #include "Ui/Localization.h"
 #include "Ui/MapWrappers.h"
 
@@ -48,6 +49,22 @@ Game::Game()
 }
 
 #if defined(BT_CLIENT)
+const engine::OwnedEntity* Game::FindLiveFlagshipOwnedEntity() const
+{
+	const Fleet* pFleet = mFleetSelection.FocusedFleet();
+	if (pFleet == nullptr)
+	{
+		return nullptr;
+	}
+	auto memberIt = std::ranges::find(pFleet->members, pFleet->flagshipGlobalId, &FleetMember::globalId);
+	if (memberIt->flags & FleetMemberFlags::kIsDead)
+	{
+		return nullptr;
+	}
+	auto ownedIt = std::ranges::find(mClientOwnedEntities, pFleet->flagshipGlobalId, &engine::OwnedEntity::globalId);
+	return ownedIt != mClientOwnedEntities.end() ? &*ownedIt : nullptr;
+}
+
 engine::GlobalId Game::ClientOwnedEntityIdentifier() const
 {
 	const Fleet* pFleet = mFleetSelection.FocusedFleet();
@@ -61,6 +78,12 @@ engine::GlobalId Game::ClientOwnedEntityIdentifier() const
 		}
 	}
 	return {};
+}
+
+engine::GlobalId Game::ClientFlagshipIdentifier() const
+{
+	const engine::OwnedEntity* pFlagship = FindLiveFlagshipOwnedEntity();
+	return pFlagship != nullptr ? pFlagship->globalId : engine::GlobalId {};
 }
 
 // The client owned-entity list (mClientOwnedEntities) holds only engine global IDs and grid coordinates, so it is
@@ -89,19 +112,32 @@ std::optional<ShipLocator> Game::ClientOwnedEntity(const Frame& rFrame) const
 
 bool Game::HasFocusedClientEntity() const
 {
-	return ClientOwnedEntityIdentifier().iValue != 0;
+	return ClientFlagshipIdentifier().iValue != 0;
 }
 
 void Game::UpdateCameraShake()
 {
-	// Camera shake — read most recent ring frame
-	auto it = mCells.find(mClientGridCoordinate);
+	engine::GlobalId focusedGlobalIdentifier = ClientOwnedEntityIdentifier();
+	if (focusedGlobalIdentifier.iValue == 0)
+	{
+		return;
+	}
+
+	// Read the newest ring frame in the focused entity's recorded cell, using the client cell when the ownership record is absent.
+	engine::GridCoord shakeCoordinate = mClientGridCoordinate;
+	auto ownedIt = std::ranges::find(mClientOwnedEntities, focusedGlobalIdentifier, &engine::OwnedEntity::globalId);
+	if (ownedIt != mClientOwnedEntities.end())
+	{
+		shakeCoordinate = ownedIt->coord;
+	}
+
+	auto it = mCells.find(shakeCoordinate);
 	const Frame* pTailFrame = it != mCells.end() ? it->second.TailFrame() : nullptr;
 	if (pTailFrame != nullptr)
 	{
 		const Frame& rCurrentFrame = *pTailFrame;
 
-		std::optional<ShipLocator> optionalOwnedEntity = ClientOwnedEntity(rCurrentFrame);
+		std::optional<ShipLocator> optionalOwnedEntity = FindShipByGlobalId(rCurrentFrame, focusedGlobalIdentifier);
 		if (optionalOwnedEntity)
 		{
 			float fCurrentArmor = ShipHull(rCurrentFrame, *optionalOwnedEntity);
@@ -166,6 +202,7 @@ void Game::ResetGameState()
 	mMapFleetMarkers.clear();
 	// Close the map with no ease, so no world-hidden frame runs over the menu.
 	engine::gpCamera->mbFramingOverride = false;
+	static_cast<Camera&>(*engine::gpCamera).ClearSubscriptionAnchor();
 	mfPreviousClientArmor = 0.0f;
 #endif
 }
@@ -185,7 +222,7 @@ engine::StandardMenuModel Game::GetStandardMenuModel() const
 #if defined(BT_CLIENT)
 void Game::ProcessGameMenuInput(const engine::InputPoll& rInputPoll)
 {
-	if (rInputPoll.KeyboardPressed(VK_TAB))
+	if (rInputPoll.Pressed(GameKeyAction::kToggleMap))
 	{
 		bool bToggleMap = !(mGameFlags & engine::GameFlags::kMainMenu) && meUiState == engine::UiState::kNone;
 		if constexpr (kbDebugInput)
@@ -196,6 +233,11 @@ void Game::ProcessGameMenuInput(const engine::InputPoll& rInputPoll)
 		{
 			ToggleMap();
 		}
+	}
+
+	if (rInputPoll.KeyboardPressed(VK_OEM_3) && !(mGameFlags & engine::GameFlags::kMainMenu) && meUiState == engine::UiState::kNone && !MapOpen())
+	{
+		engine::gpCamera->SetObserverMode(engine::gpCamera->meObserverState != engine::CameraBase::ObserverState::kObserving);
 	}
 
 	if constexpr (kbFreeCamera)

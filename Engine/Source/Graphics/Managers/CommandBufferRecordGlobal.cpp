@@ -39,7 +39,7 @@ void CommandBufferRecordGlobal::Record(int64_t iFramebuffer)
 
 	gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerSpread);
 	RecordWindSpreadPipeline(vkCommandBuffer, iCommandBuffer, pPipelines);
-	RecordSmokeSpreadPipeline(vkCommandBuffer, iCommandBuffer);
+	RecordSmokeSpreadPipeline(vkCommandBuffer, iCommandBuffer, pPipelines);
 	gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerSpread);
 
 	gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerParticles);
@@ -160,7 +160,7 @@ void CommandBufferRecordGlobal::RecordWindSpreadPipeline(VkCommandBuffer vkComma
 	gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerWindSpread);
 }
 
-void CommandBufferRecordGlobal::RecordSmokeSpreadHalf(VkCommandBuffer vkCommandBuffer, int64_t iCommandBuffer, Pipeline& rDilatePipeline, VkBuffer vkOutputOccupancyBuffer, Texture& rSmokeTexture, Pipeline& rSpreadPipeline, const XMFLOAT4& rf4PushConstants)
+void CommandBufferRecordGlobal::RecordSmokeSpreadHalf(VkCommandBuffer vkCommandBuffer, int64_t iCommandBuffer, Pipeline& rDilatePipeline, VkBuffer vkOutputOccupancyBuffer, Texture& rSmokeTexture, Pipeline& rSpreadPipeline)
 {
 	uint32_t pResetCommand[3] {0, 1, 1};
 	vkCmdUpdateBuffer(vkCommandBuffer, gpBufferManager->mSmokeActiveTileVkBuffer, 0, sizeof(pResetCommand), pResetCommand);
@@ -170,8 +170,8 @@ void CommandBufferRecordGlobal::RecordSmokeSpreadHalf(VkCommandBuffer vkCommandB
 	vkCmdPipelineBarrier(vkCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 1, &vkActiveTileResetBarrier, 0, nullptr);
 
 	// Dilate: read input occupancy, read and clear output occupancy, write active tile list. RenderSmokeGlobal's
-	// indirect dispatch dispatches nothing on a frame that skips this plane.
-	rDilatePipeline.RecordComputeIndirect(iCommandBuffer, vkCommandBuffer, rf4PushConstants);
+	// indirect dispatch dispatches nothing on a frame that skips smoke.
+	rDilatePipeline.RecordComputeIndirect(iCommandBuffer, vkCommandBuffer);
 
 	// Barrier: dilate compute → indirect read + compute read (active tile), output occupancy clear → spread re-mark
 	VkBufferMemoryBarrier pVkDilateBarriers[]
@@ -182,48 +182,31 @@ void CommandBufferRecordGlobal::RecordSmokeSpreadHalf(VkCommandBuffer vkCommandB
 	vkCmdPipelineBarrier(vkCommandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, static_cast<uint32_t>(std::size(pVkDilateBarriers)), pVkDilateBarriers, 0, nullptr);
 
 	rSmokeTexture.TransitionImageLayout(vkCommandBuffer, TextureLayout::kShaderReadOnly, TextureLayout::kComputeReadWrite);
-	rSpreadPipeline.RecordComputeIndirectFrom(iCommandBuffer, vkCommandBuffer, gpBufferManager->mSmokeActiveTileVkBuffer, 0, rf4PushConstants);
+	rSpreadPipeline.RecordComputeIndirectFrom(iCommandBuffer, vkCommandBuffer, gpBufferManager->mSmokeActiveTileVkBuffer, 0);
 	rSmokeTexture.TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kShaderReadOnly);
 }
 
-void CommandBufferRecordGlobal::RecordSmokeSpreadPipeline(VkCommandBuffer vkCommandBuffer, int64_t iCommandBuffer)
+void CommandBufferRecordGlobal::RecordSmokeSpreadPipeline(VkCommandBuffer vkCommandBuffer, int64_t iCommandBuffer, Pipeline* pPipelines)
 {
 	// After the one-shot texture clear, spread must consume and drain stale occupancy, so disabled-state recording remains fixed.
 	gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerSmokeSpread);
 
-	// Every half resets the one shared active-tile list, so the next half's reset (transfer write) must wait for this
-	// half's spread indirect and compute reads.
-	VkBufferMemoryBarrier vkActiveTileReuseBarrier = Buffer::WholeBufferBarrier(VK_ACCESS_INDIRECT_COMMAND_READ_BIT | VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, gpBufferManager->mSmokeActiveTileVkBuffer);
+	// SpreadB: dilate the previous refresh's occupancy, then indirect-spread into TextureTwo.
+	RecordSmokeSpreadHalf(vkCommandBuffer, iCommandBuffer, pPipelines[kPipelineSmokeOccupancyDilate], gpBufferManager->mpSmokeOccupancyVkBuffers[1], gpTextureManager->mRenderTargetTextures.mSmokeTextureTwo, pPipelines[kPipelineSmokeSpreadComputeB]);
 
-	for (int64_t i = 0; i < gpFlightPlanes->Count(); ++i)
+	// Barrier between halves: SpreadB compute writes (occupancy) → SpreadA dilate reads, and SpreadB indirect/compute
+	// reads (active tile) → SpreadA reset transfer write.
+	VkBufferMemoryBarrier pVkSpreadBBarriers[]
 	{
-		VkBuffer* pVkOccupancyBuffers = gpBufferManager->mpSmokeOccupancyVkBuffers[i];
+		Buffer::WholeBufferBarrier(VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, gpBufferManager->mpSmokeOccupancyVkBuffers[1]),
+		Buffer::WholeBufferBarrier(VK_ACCESS_INDIRECT_COMMAND_READ_BIT | VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, gpBufferManager->mSmokeActiveTileVkBuffer),
+	};
+	vkCmdPipelineBarrier(vkCommandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, static_cast<uint32_t>(std::size(pVkSpreadBBarriers)), pVkSpreadBBarriers, 0, nullptr);
 
-		// Push constant x is the plane index, selecting the plane's area pair, step count, and decay in both halves.
-		XMFLOAT4 f4PushConstants {static_cast<float>(i), 0.0f, 0.0f, 0.0f};
-
-		// SpreadB: dilate the previous refresh's occupancy, then indirect-spread into TextureTwo.
-		RecordSmokeSpreadHalf(vkCommandBuffer, iCommandBuffer, gpPipelineManager->SmokePipeline(i, kSmokeOccupancyDilate), pVkOccupancyBuffers[1], gpTextureManager->mRenderTargetTextures.mSmokeTexturesTwo[i], gpPipelineManager->SmokePipeline(i, kSmokeSpreadComputeB), f4PushConstants);
-
-		// Barrier between halves: SpreadB compute writes (occupancy) → SpreadA dilate reads, plus the active-tile reuse barrier above.
-		VkBufferMemoryBarrier pVkSpreadBBarriers[]
-		{
-			Buffer::WholeBufferBarrier(VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, pVkOccupancyBuffers[1]),
-			vkActiveTileReuseBarrier,
-		};
-		vkCmdPipelineBarrier(vkCommandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, static_cast<uint32_t>(std::size(pVkSpreadBBarriers)), pVkSpreadBBarriers, 0, nullptr);
-
-		// SpreadA: dilate with the scale-aware remap (current-area UV -> world -> previous-area UV, so zoomed smoke
-		// whose remapped sample-tile lies more than ~2 tiles from the output tile stays in the active list), then
-		// indirect-spread into TextureOne.
-		RecordSmokeSpreadHalf(vkCommandBuffer, iCommandBuffer, gpPipelineManager->SmokePipeline(i, kSmokeOccupancyDilateRemap), pVkOccupancyBuffers[0], gpTextureManager->mRenderTargetTextures.mSmokeTexturesOne[i], gpPipelineManager->SmokePipeline(i, kSmokeSpreadComputeA), f4PushConstants);
-
-		// Barrier between planes: this plane's SpreadA reads (active tile) → the next plane's SpreadB reset
-		if (i + 1 < gpFlightPlanes->Count())
-		{
-			vkCmdPipelineBarrier(vkCommandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 1, &vkActiveTileReuseBarrier, 0, nullptr);
-		}
-	}
+	// SpreadA: dilate with the scale-aware remap (current-area UV -> world -> previous-area UV, so zoomed smoke
+	// whose remapped sample-tile lies more than ~2 tiles from the output tile stays in the active list), then
+	// indirect-spread into TextureOne.
+	RecordSmokeSpreadHalf(vkCommandBuffer, iCommandBuffer, pPipelines[kPipelineSmokeOccupancyDilateRemap], gpBufferManager->mpSmokeOccupancyVkBuffers[0], gpTextureManager->mRenderTargetTextures.mSmokeTextureOne, pPipelines[kPipelineSmokeSpreadComputeA]);
 
 	gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerSmokeSpread);
 }

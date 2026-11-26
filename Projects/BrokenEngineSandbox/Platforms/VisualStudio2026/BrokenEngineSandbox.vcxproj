@@ -309,6 +309,9 @@
     <ClInclude Include="..\..\..\..\Common\ModelMetadata.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\RenderInterpolation.h" />
     <ClInclude Include="..\..\..\..\Common\DebugDefines.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Input\Keybinds.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\Screens\KeybindsScreen.h" />
+    <ClInclude Include="..\..\Source\Input\GameKeybinds.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\..\Common\ErrorUtils.cpp" />
@@ -543,6 +546,9 @@
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\UiScreens.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\RenderInterpolation.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Profile\GpuStallTimeline.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Input\Keybinds.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\KeybindsScreen.cpp" />
+    <ClCompile Include="..\..\Source\Input\GameKeybinds.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\AreaLight.frag" />

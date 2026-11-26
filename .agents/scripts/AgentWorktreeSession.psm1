@@ -18,6 +18,21 @@ function Get-AgentWorktreeSessionId([string] $Branch, [string] $Client) {
 	return $null
 }
 
+function Format-AgentWorktreeReattachCommand {
+	[CmdletBinding()]
+	param(
+		[Parameter(Mandatory)][string] $Client,
+		[Parameter(Mandatory)][string] $Worktree
+	)
+	if ($Client -cnotin $script:SupportedSessionClients) {
+		$clientList = ($script:SupportedSessionClients | ForEach-Object { "'$_'" }) -join ', '
+		throw "Client must be lowercase: $clientList."
+	}
+	if ([string]::IsNullOrWhiteSpace($Worktree)) { throw 'Worktree path must not be blank.' }
+	$quotedWorktree = [Management.Automation.Language.CodeGeneration]::EscapeSingleQuotedStringContent($Worktree)
+	return ".\.agents\scripts\Start-AgentWorktreeSession.ps1 $Client -ReattachWorktree '$quotedWorktree'"
+}
+
 function Get-AgentWorktreeGitValue([string] $Worktree, [string[]] $Arguments, [string] $Description) {
 	$value = @(Invoke-AgentGit (@('-C', $Worktree) + $Arguments))
 	if ($value.Count -ne 1 -or [string]::IsNullOrWhiteSpace($value[0])) {
@@ -244,4 +259,4 @@ function Repair-AgentWorktreeForkPoint([string] $Worktree, [string] $PrimaryBran
 	return [pscustomobject]@{ Outcome = 'rebased'; ForkPoint = $baseline; Baseline = $PrimaryTip }
 }
 
-Export-ModuleMember -Function Get-AgentWorktreeSupportedClients, Get-AgentWorktreeSessionId, Get-AgentWorktreePrimaryCheckout, Get-AgentWorktreePrimaryIdentity, Get-AgentWorktreeRecords, Test-AgentWorktreeNoGitOperation, Test-AgentWorktreeAncestor, Set-AgentWorktreeSessionConfig, Get-AgentWorktreeSessionContext, Repair-AgentWorktreeForkPoint
+Export-ModuleMember -Function Get-AgentWorktreeSupportedClients, Get-AgentWorktreeSessionId, Format-AgentWorktreeReattachCommand, Get-AgentWorktreePrimaryCheckout, Get-AgentWorktreePrimaryIdentity, Get-AgentWorktreeRecords, Test-AgentWorktreeNoGitOperation, Test-AgentWorktreeAncestor, Set-AgentWorktreeSessionConfig, Get-AgentWorktreeSessionContext, Repair-AgentWorktreeForkPoint

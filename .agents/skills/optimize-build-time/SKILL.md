@@ -147,10 +147,10 @@ percent.
 
 ### vcperf calls
 
-Run each call from the worktree root as its own PowerShell tool call, never
-Bash, so its output and exit code are read directly. `<vcperf>` is the
-resolved path, `<session>` the session name, and `<build.json>` the absolute
-path of the phase directory's `build.json`.
+Run each call from the worktree root as its own PowerShell tool call so its
+output and exit code are read directly. `<vcperf>` is the resolved path,
+`<session>` the session name, and `<build.json>` the absolute path of the phase
+directory's `build.json`.
 
 - Start: `& '<vcperf>' /start /noadmin /level3 <session>; "exit $LASTEXITCODE"`,
   where `/level3` with Stop's `/templates` collects template data. Exit 0

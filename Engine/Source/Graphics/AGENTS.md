@@ -9,20 +9,22 @@ contracts, while Objects (`Objects/AGENTS.md`) own individual RAII handles.
 
 - Frames submit Global, Main, and ImGui work before present. The frame boundary
   is between Main submission and the next acquire.
-- A world-hidden frame, one the game's map overlay fully covers
-  (`GameBase::Render`), waits only its own fence and skips only the world draw:
-  Global and Main population and submission.
-  It still runs the game's world-hidden step
+- A world-hidden frame — one the game's map overlay fully covers, or an
+  Observer-mode frame awaiting a renderable subscribed basis
+  (`GameBase::Render`) — waits only its own fence and skips the world draw
+  (Global and Main population and submission); an Observer frame lacking an
+  eligible subscribed basis also returns from
+  `RenderInterpolation::UpdateRenderInterpolation` before per-cell interpolation
+  and camera update. Both still run the game's world-hidden step
   (`game::FrameInterpolate::UpdateWorldHidden`, no GPU write; its contents are
   in `../../../Documents/Architecture/FrameUpdatePipeline.md`), the
   active-island update, and the residency step `RenderGlobal` runs
   (`Graphics::UpdateFrameResidency`: descriptor churn, other-framebuffer
-  publication, retired-resource destruction) and advances `miFrameCounter` (the
+  publication, retired-resource destruction) and advance `miFrameCounter` (the
   island LRU clock and the lighting, terrain-shadow, object-shadow, and smoke
   cadence clock), so streaming proceeds behind the map instead of waiting for
-  the world.
-  On the frame the world hides, `GameBase::Render` clears the retained
-  camera-relative effects so they restart clean when the world returns.
+  the world. On the frame the world hides, `GameBase::Render` clears the
+  retained camera-relative effects so they restart clean when the world returns.
 - Global and Main command buffers are recorded once and rebuilt only by the
   recreation pipeline. Per-frame variation belongs in host-visible buffers,
   descriptors, and indirect commands; resources discovered within existing
@@ -117,12 +119,13 @@ contracts, while Objects (`Objects/AGENTS.md`) own individual RAII handles.
   retain the ordinary direction. It registers and clears the single
   `engine::gpCamera` global.
   Game code derives one final `game::Camera` from it, the only camera ever
-  constructed, and supplies only policy — `PullTarget` and `SunAngle` — as
-  non-virtual members the engine calls by name through a `static_cast` to
-  `game::Camera`. `CameraBase::Update` names no game type: the gameplay host's
-  `RenderInterpolation::UpdateCamera` reads the main menu from
-  `GameBase::mGameFlags`, pulls the target, and passes both with the
-  interpolate frame, the sim-scaled render delta, and the render clock's
+  constructed, and supplies only policy — `PullTarget`,
+  `PullSubscriptionCenter`, and `SunAngle` — as non-virtual members the engine
+  calls by name through a `static_cast` to `game::Camera`. `CameraBase::Update`
+  names no game type: the gameplay host's `RenderInterpolation::UpdateCamera`
+  reads the main menu from `GameBase::mGameFlags`, pulls the target and
+  optional subscription center (empty on the main menu), and passes them with
+  the interpolate frame, the sim-scaled render delta, and the render clock's
   advance for the sun. The camera also owns the reconciliation visual-error
   offset, client render state outside the CRC: `AddVisualErrorOffset`
   accumulates it, and the update decays it after `PullTarget` has read it. A
@@ -140,12 +143,17 @@ contracts, while Objects (`Objects/AGENTS.md`) own individual RAII handles.
   `RenderInterpolation::UpdateRenderInterpolation` overwrites `mfSunAngle` with
   `CameraBase::kfDefaultSunAngle` and passes a sun advance of 0. Debug
   free-camera motion is main-menu-only and drives the pose directly, ignoring
-  the pulled target.
+  the pulled target. Gameplay Observer mode (`CameraBase::ObserverState`) also
+  drives the pose directly in `StepObserverPan` before per-cell interpolation,
+  clamping movement to confirmed active subscribed cells and shifting
+  `mBasisCoordinate` across allowed neighbors; `CameraBase::Update` owns
+  rebasing and return-to-tracking transitions.
 - Long-distance target changes use a bounded smoothstep jump that may re-anchor
-  from the current position; normal tracking tightens with framing. During a
-  jump the cell loaded area sits at the destination, and the previous cell
-  loaded area (`mf4PreviousCellLoadedArea`), copied as the jump starts, holds
-  the departure through any re-anchor or retarget until the jump ends. Until the
+  from the current position; normal tracking tightens with framing. The cell
+  loaded area (`mf4CellLoadedArea`) evaluates the world framing's ground
+  footprint around `mOptionalSubscriptionCenter` at that center's height, and
+  stays empty when no subscription center is supplied;
+  `mbPreviousCellLoadedAreaValid` stays clear. Until the
   first tracked target after a session reset or a server load
   (`DiscardTrackingCaches`) the position holds, and that target sets it
   directly, with no jump. Mouse-wheel input updates a persisted, clamped framing

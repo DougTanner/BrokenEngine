@@ -1,11 +1,13 @@
 #include "File/PackChunks.h"
 #include "Memory/GlobalAllocator.h"
 #include "Server/ServerMonitorHost.h"
+#if defined(BT_CLIENT)
 #include "Ui/GameSettings.h"
 #include "Ui/GraphicsSettings.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
 #include "Ui/SoundSettings.h"
 #include "Ui/SoundSettingsWrappersBase.h"
+#endif
 #include "CrashReport.h"
 
 #include "Frame/TerrainUtils.h"
@@ -323,7 +325,7 @@ static int64_t MainThread(HINSTANCE hinstance)
 	auto pGame = std::make_unique<game::Game>();
 
 	auto pInput = std::make_unique<Input>();
-	gpInput = pInput.get();
+	gpInput->LoadAllKeybinds();
 
 	// Load persistent client state (the game's camera focus + zoom). Requires engine::gpCamera and gpGame; both exist by here.
 	game::LoadClientState();
@@ -484,8 +486,30 @@ static int64_t MainThread(HINSTANCE hinstance)
 				}
 			}
 
-			auto it = pGame->mCells.find(game::gpGame->mClientGridCoordinate);
-			pAudioManager->Update(it != pGame->mCells.end() && it->second.iSnapshotCount > 0 ? &pGame->RenderFrame(game::gpGame->mClientGridCoordinate) : nullptr);
+			GridCoord audioCoordinate = gpCamera->mBasisCoordinate;
+			const game::Frame* pAudioFrame = nullptr;
+			for (const auto& [rCoordinate, rCell] : pGame->mCells)
+			{
+				if (rCell.iSnapshotCount == 0)
+				{
+					continue;
+				}
+				if (IsInsideCell(XMVectorSubtract(gpCamera->mVecPosition, CellCenterOffset(gpCamera->mBasisCoordinate, rCoordinate))))
+				{
+					audioCoordinate = rCoordinate;
+					pAudioFrame = &pGame->RenderFrame(rCoordinate);
+					break;
+				}
+			}
+			if (pAudioFrame == nullptr)
+			{
+				auto it = pGame->mCells.find(audioCoordinate);
+				if (it != pGame->mCells.end() && it->second.iSnapshotCount > 0)
+				{
+					pAudioFrame = &pGame->RenderFrame(audioCoordinate);
+				}
+			}
+			pAudioManager->Update(pAudioFrame, audioCoordinate);
 #else
 			pServerMonitorHost->Update();
 #endif // BT_CLIENT
@@ -520,6 +544,10 @@ static int64_t MainThread(HINSTANCE hinstance)
 #endif
 
 #if defined(BT_CLIENT)
+	if (pGame->meUiState == UiState::kKeybinds)
+	{
+		pGame->LeaveSettingsScreen();
+	}
 	SaveSoundSettings();
 	SaveGraphicsSettings();
 	SaveGameSettings();
@@ -636,7 +664,28 @@ static bool ProcessMessages()
 	bool bHasMessage = PeekMessage(&message, nullptr, 0, 0, PM_REMOVE) == TRUE;
 	while (bHasMessage)
 	{
+#if defined(BT_CLIENT)
+		bool bIsKeyDown = std::cmp_equal(message.message, WM_KEYDOWN) || std::cmp_equal(message.message, WM_SYSKEYDOWN);
+		if (gpInput != nullptr && bIsKeyDown && !gpInput->mSuppressedChatOpenKey.IsBound() && game::gpGame != nullptr
+		 && !game::gpGame->mChatLog.bInputOpen && !(game::gpGame->mGameFlags & GameFlags::kMainMenu)
+		 && game::gpGame->meUiState == UiState::kNone && !gbShowImGui && !gpInput->IsCapturingKeybind())
+		{
+			VirtualKey chatOpenKey = KeybindFor(KeyAction::kOpenChat);
+			if (chatOpenKey.IsBound() && message.wParam == chatOpenKey.uiCode)
+			{
+				gpInput->mSuppressedChatOpenKey = chatOpenKey;
+			}
+		}
+
+		bool bSuppressChatOpenKey = gpInput != nullptr && gpInput->mSuppressedChatOpenKey.IsBound()
+		                         && bIsKeyDown && message.wParam == gpInput->mSuppressedChatOpenKey.uiCode;
+		if (!bSuppressChatOpenKey)
+		{
+			TranslateMessage(&message);
+		}
+#else
 		TranslateMessage(&message);
+#endif
 		DispatchMessage(&message);
 		bHasMessage = PeekMessage(&message, nullptr, 0, 0, PM_REMOVE) == TRUE;
 	}
@@ -656,6 +705,19 @@ static LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT uiMessage, WPARAM uiWord
 		return TRUE;
 	}
 
+	bool bSuppressChatOpenKey = false;
+	if (gpInput != nullptr && gpInput->mSuppressedChatOpenKey.IsBound())
+	{
+		if (std::cmp_equal(uiMessage, WM_KILLFOCUS) || ((std::cmp_equal(uiMessage, WM_KEYUP) || std::cmp_equal(uiMessage, WM_SYSKEYUP)) && uiWordParameter == gpInput->mSuppressedChatOpenKey.uiCode))
+		{
+			gpInput->mSuppressedChatOpenKey = VirtualKey::Unbound();
+		}
+		else if ((std::cmp_equal(uiMessage, WM_KEYDOWN) || std::cmp_equal(uiMessage, WM_SYSKEYDOWN)) && uiWordParameter == gpInput->mSuppressedChatOpenKey.uiCode)
+		{
+			bSuppressChatOpenKey = true;
+		}
+	}
+
 	bool bInputSuppressed = PhysicalInputSuppressed();
 
 	// When suppressed, keep the ImGui Win32 backend running for lifecycle bookkeeping (focus, tracking) but starve it
@@ -666,7 +728,7 @@ static LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT uiMessage, WPARAM uiWord
 	bool bInputMessage = (uiMessage >= WM_MOUSEFIRST && uiMessage <= WM_MOUSELAST) || (uiMessage >= WM_KEYFIRST && uiMessage <= WM_KEYLAST);
 	bool bTabMessage = ((uiMessage == WM_KEYDOWN || uiMessage == WM_KEYUP || uiMessage == WM_SYSKEYDOWN || uiMessage == WM_SYSKEYUP) && uiWordParameter == VK_TAB)
 	                || ((uiMessage == WM_CHAR || uiMessage == WM_SYSCHAR || uiMessage == WM_UNICHAR) && uiWordParameter == '\t');
-	if (!bTabMessage && !(bInputSuppressed && bInputMessage))
+	if (!bTabMessage && !bSuppressChatOpenKey && !(bInputSuppressed && bInputMessage))
 	{
 		if (ImGui_ImplWin32_WndProcHandler(hwnd, uiMessage, uiWordParameter, iLongParameter) != 0)
 		{

@@ -86,14 +86,15 @@ context, ad-hoc calls, or retyped entries; self-deriving workers take `Baseline`
 and `Scope` directly per `## Inputs`. Public subagent `SKILL.md` files (paired
 with `references/worker.md`, per
 [`skill-skeleton.md`](skill-skeleton.md#section-placement)) may be read whole
-when composing a brief or routing a handoff; main never opens
-`references/worker.md` or worker-only references such as
-`scope-authorization.md`. Multi-topic reference files (e.g.,
-`subagent-reporting.md`, `subagent-handoff.md`, `tier3-workflow.md`,
-`claim-results.md`, `change-workflow.md`) stay section-bounded per `AGENTS.md`
-`## Directives` Bounded reading: locate the cited heading with a `^#{2,4} `
-lookup (`AGENTS.md` `## Environment`) and read only its range. Each skill's
-`## Inputs` owns command form and producer (e.g.,
+for brief or handoff work; small main-readable `.agents/` workflow references
+may be read whole once per checkpoint span via `Read`/`read_file` under the
+allowlist and cap in
+`.agents/skills/next-plan-checkpoint-review/scripts/Get-TranscriptProjection.ps1`
+(`$script:MainOwnedReferenceDocs`, `Get-MainWorkflowRefKey`,
+`$script:WorkflowRefMaxChars`). Main never opens `references/worker.md` or
+worker-only references; all other cited files stay section-bounded per
+`AGENTS.md` `## Directives` Bounded reading. Each skill's `## Inputs` owns
+command form and producer (e.g.,
 `.agents/skills/repo-code-review/SKILL.md` `## Inputs`,
 `.agents/skills/adversarial-review/SKILL.md` `## Inputs`).
 

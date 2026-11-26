@@ -17,6 +17,10 @@ constexpr int64_t kiClaimLifetimeTicks = 48i64 * 60i64 * 60i64 * 10'000'000i64;
 // Guard default; deliberately separate from the build lock's wait.
 constexpr int64_t kiSchedulerGuardWaitSeconds = 500;
 
+constexpr uint32_t kuiArgumentUserAuthorizedRejection = 1ui32 << 0;
+constexpr uint32_t kuiArgumentLintOnly = 1ui32 << 1;
+constexpr uint32_t kuiArgumentAllowAgentCliMismatch = 1ui32 << 2;
+
 struct Arguments
 {
 	std::wstring repository;
@@ -26,8 +30,7 @@ struct Arguments
 	std::wstring owner;
 	std::wstring session;
 	std::wstring plan;
-	bool bUserAuthorizedRejection = false;
-	bool bLintOnly = false;
+	uint32_t uiFlags = 0;
 };
 
 struct Claim
@@ -48,6 +51,47 @@ static bool IsLowerHex(std::string_view text, int64_t iLength)
 	{
 		return (cValue >= '0' && cValue <= '9') || (cValue >= 'a' && cValue <= 'f');
 	});
+}
+
+static std::string_view ParseSessionAgentCli(std::string_view branch)
+{
+	int64_t iSlash = static_cast<int64_t>(branch.find('/'));
+	if (iSlash == -1)
+	{
+		return std::string_view();
+	}
+	std::string_view cli = branch.substr(0, static_cast<size_t>(iSlash));
+	std::string_view uuid = branch.substr(static_cast<size_t>(iSlash + 1));
+	if (!IsValidAgentCli(cli))
+	{
+		return std::string_view();
+	}
+	if (std::ssize(uuid) != 36)
+	{
+		return std::string_view();
+	}
+	if (uuid[8] != '-' || uuid[13] != '-' || uuid[18] != '-' || uuid[23] != '-')
+	{
+		return std::string_view();
+	}
+	if (!IsLowerHex(uuid.substr(0, 8), 8) || !IsLowerHex(uuid.substr(9, 4), 4) || !IsLowerHex(uuid.substr(14, 4), 4) || !IsLowerHex(uuid.substr(19, 4), 4) || !IsLowerHex(uuid.substr(24, 12), 12))
+	{
+		return std::string_view();
+	}
+	return cli;
+}
+
+static std::string_view FindAgentCliMismatch(const Plan& rSessionPlan, const Plan* pPrimaryPlan, std::string_view sessionAgentCli)
+{
+	if (!rSessionPlan.agentCli.empty() && rSessionPlan.agentCli != sessionAgentCli)
+	{
+		return rSessionPlan.agentCli;
+	}
+	if (pPrimaryPlan != nullptr && !pPrimaryPlan->agentCli.empty() && pPrimaryPlan->agentCli != sessionAgentCli)
+	{
+		return pPrimaryPlan->agentCli;
+	}
+	return std::string_view();
 }
 
 
@@ -81,12 +125,17 @@ static bool ParseArguments(std::span<wchar_t* const> argumentValues, int64_t iSt
 		std::wstring_view option = argumentValues[i];
 		if (option == L"--user-authorized-rejection")
 		{
-			rArguments.bUserAuthorizedRejection = true;
+			rArguments.uiFlags |= kuiArgumentUserAuthorizedRejection;
 			continue;
 		}
 		if (option == L"--lint-only")
 		{
-			rArguments.bLintOnly = true;
+			rArguments.uiFlags |= kuiArgumentLintOnly;
+			continue;
+		}
+		if (option == L"--allow-agent-cli-mismatch")
+		{
+			rArguments.uiFlags |= kuiArgumentAllowAgentCliMismatch;
 			continue;
 		}
 		std::wstring* pDestination = nullptr;
@@ -550,7 +599,7 @@ static int64_t RunValidate(const Arguments& rArguments)
 	// The lint result is complete above; only the heal below needs scheduler storage and the guard, so
 	// --lint-only skips that block entirely and reports an empty healedClaims to keep one output shape.
 	nlohmann::json healed = nlohmann::json::array();
-	if (!rArguments.bLintOnly)
+	if ((rArguments.uiFlags & kuiArgumentLintOnly) == 0)
 	{
 		std::optional<std::filesystem::path> optionalSchedulerRoot = SchedulerRoot(repository);
 		if (!optionalSchedulerRoot)
@@ -688,6 +737,8 @@ static int64_t RunList(const Arguments& rArguments)
 		return Failure("local-app-data-unavailable");
 	}
 	const std::filesystem::path& root = *optionalSchedulerRoot;
+	std::optional<std::string> optionalWorktreeBranch = ResolveGitBranch(worktree);
+	std::string_view sessionAgentCli = optionalWorktreeBranch ? ParseSessionAgentCli(*optionalWorktreeBranch) : std::string_view();
 	nlohmann::json output = {{"operation", "list"}, {"status", "ok"}, {"code", "ok"}, {"diagnostics", std::move(diagnostics)}, {"plans", nlohmann::json::array()}};
 	for (const Plan* pPlan : rows)
 	{
@@ -697,6 +748,10 @@ static int64_t RunList(const Arguments& rArguments)
 			dependencies.push_back(WideToUtf8(rDependency));
 		}
 		nlohmann::json row = {{"path", WideToUtf8(pPlan->path)}, {"createdUtc", pPlan->createdUtc}, {"dependsOn", std::move(dependencies)}};
+		if (!pPlan->agentCli.empty())
+		{
+			row["agentCli"] = pPlan->agentCli;
+		}
 		Claim claim;
 		std::optional<std::filesystem::path> optionalClaimPath = ClaimPath(root, pPlan->path);
 		if (!optionalClaimPath)
@@ -709,6 +764,11 @@ static int64_t RunList(const Arguments& rArguments)
 			row["claim"] = {{"session", claim.json["session"]}, {"worktree", claim.json["worktree"]}, {"expiresAt", claim.json["expiresAt"]}};
 		}
 		auto primary = primaryPlans.find(pPlan->path);
+		std::string_view cliMismatch = sessionAgentCli.empty() ? std::string_view() : FindAgentCliMismatch(*pPlan, primary != primaryPlans.end() ? &primary->second : nullptr, sessionAgentCli);
+		if (!cliMismatch.empty())
+		{
+			row["agentCliMismatch"] = cliMismatch;
+		}
 		if (primary == primaryPlans.end() || !primary->second.bValid)
 		{
 			// Excluded from selection for a reason that is not a dependency edge: a peer landing already removed
@@ -716,34 +776,46 @@ static int64_t RunList(const Arguments& rArguments)
 			row["state"] = "excluded";
 			row["diagnostic"] = primary == primaryPlans.end() ? "absent at the primary tip" : primary->second.diagnostic;
 		}
-		else if (IsBlockedByDependencies(*pPlan, sessionPlans) || IsBlockedByDependencies(primary->second, primaryPlans))
-		{
-			std::vector<std::wstring> blocking;
-			for (const std::wstring& rDependency : pPlan->dependencies)
-			{
-				if (sessionPlans.find(rDependency) != sessionPlans.end())
-				{
-					blocking.push_back(rDependency);
-				}
-			}
-			for (const std::wstring& rDependency : primary->second.dependencies)
-			{
-				if (primaryPlans.find(rDependency) != primaryPlans.end() && !std::ranges::contains(blocking, rDependency))
-				{
-					blocking.push_back(rDependency);
-				}
-			}
-			std::sort(blocking.begin(), blocking.end(), Utf8PathLess);
-			row["state"] = "blocked";
-			row["blockedBy"] = nlohmann::json::array();
-			for (const std::wstring& rDependency : blocking)
-			{
-				row["blockedBy"].push_back(WideToUtf8(rDependency));
-			}
-		}
 		else
 		{
-			row["state"] = bClaimed ? "claimed" : "eligible";
+			bool bBlocked = IsBlockedByDependencies(*pPlan, sessionPlans) || IsBlockedByDependencies(primary->second, primaryPlans);
+			if (bBlocked)
+			{
+				std::vector<std::wstring> blocking;
+				for (const std::wstring& rDependency : pPlan->dependencies)
+				{
+					if (sessionPlans.contains(rDependency))
+					{
+						blocking.push_back(rDependency);
+					}
+				}
+				for (const std::wstring& rDependency : primary->second.dependencies)
+				{
+					if (primaryPlans.contains(rDependency) && !std::ranges::contains(blocking, rDependency))
+					{
+						blocking.push_back(rDependency);
+					}
+				}
+				std::sort(blocking.begin(), blocking.end(), Utf8PathLess);
+				row["blockedBy"] = nlohmann::json::array();
+				for (const std::wstring& rDependency : blocking)
+				{
+					row["blockedBy"].push_back(WideToUtf8(rDependency));
+				}
+			}
+			if (!cliMismatch.empty())
+			{
+				row["state"] = "excluded";
+				row["diagnostic"] = "locked to agent CLI '" + std::string(cliMismatch) + "'";
+			}
+			else if (bBlocked)
+			{
+				row["state"] = "blocked";
+			}
+			else
+			{
+				row["state"] = bClaimed ? "claimed" : "eligible";
+			}
 		}
 		output["plans"].push_back(std::move(row));
 	}
@@ -855,6 +927,8 @@ static int64_t RunClaimNext(const Arguments& rArguments)
 		PrintClaim("existing", existingPlanPath, existing.json);
 		return kiExitOk;
 	}
+	std::string_view sessionAgentCli = ParseSessionAgentCli(*optionalWorktreeBranch);
+	std::string_view targetedAgentCliLock;
 	std::vector<Plan*> candidates;
 	for (auto& [rPath, rPlan] : sessionPlans)
 	{
@@ -878,6 +952,27 @@ static int64_t RunClaimNext(const Arguments& rArguments)
 		if (IsBlockedByDependencies(primary->second, plans))
 		{
 			continue; // a prerequisite landed at the primary tip after this session's baseline
+		}
+		if ((rArguments.uiFlags & kuiArgumentAllowAgentCliMismatch) == 0)
+		{
+			std::string_view cliMismatch = FindAgentCliMismatch(rPlan, &primary->second, sessionAgentCli);
+			if (!cliMismatch.empty())
+			{
+				if (!requestedPlan.empty())
+				{
+					std::optional<std::filesystem::path> optionalClaimPath = ClaimPath(root, rPath);
+					if (!optionalClaimPath)
+					{
+						return Failure("local-app-data-unavailable");
+					}
+					Claim occupied;
+					if (!ReadClaim(*optionalClaimPath, occupied))
+					{
+						targetedAgentCliLock = cliMismatch;
+					}
+				}
+				continue;
+			}
 		}
 		candidates.push_back(&rPlan);
 	}
@@ -910,7 +1005,12 @@ static int64_t RunClaimNext(const Arguments& rArguments)
 		PrintClaim("claimed", pPlan->path, claim);
 		return kiExitOk;
 	}
-	PrintResult({{"status", "ok"}, {"code", "none"}}, 2);
+	nlohmann::json result = {{"status", "ok"}, {"code", "none"}};
+	if (!targetedAgentCliLock.empty())
+	{
+		result["agentCliLock"] = targetedAgentCliLock;
+	}
+	PrintResult(std::move(result), 2);
 	return kiExitOk;
 }
 
@@ -1028,6 +1128,10 @@ static void RenderDependencies(const Plan& rPlan, std::wstring_view removed, std
 	{
 		metadata["dependsOn"].push_back(WideToUtf8(rDependency));
 	}
+	if (!rPlan.agentCli.empty())
+	{
+		metadata["agentCli"] = rPlan.agentCli;
+	}
 	rBytes = std::string(kMarkerPrefix) + metadata.dump() + std::string(kMarkerSuffix) + rPlan.bytes.substr(static_cast<size_t>(iSuffixStart));
 }
 
@@ -1048,7 +1152,7 @@ static bool WritePlanBytes(const std::filesystem::path& rPath, std::string_view 
 static int64_t RunTerminal(std::wstring_view operation, const Arguments& rArguments)
 {
 	bool bReject = operation == L"reject";
-	if (bReject && !rArguments.bUserAuthorizedRejection)
+	if (bReject && (rArguments.uiFlags & kuiArgumentUserAuthorizedRejection) == 0)
 	{
 		return Failure("authorization-required");
 	}
@@ -1184,7 +1288,11 @@ int64_t RunPlanSchedulerCommand(std::span<wchar_t* const> argumentValues)
 	{
 		return Failure("usage");
 	}
-	if (arguments.bLintOnly && operation != L"validate")
+	if ((arguments.uiFlags & kuiArgumentLintOnly) != 0 && operation != L"validate")
+	{
+		return Failure("usage");
+	}
+	if ((arguments.uiFlags & kuiArgumentAllowAgentCliMismatch) != 0 && (operation != L"claim-next" || arguments.plan.empty()))
 	{
 		return Failure("usage");
 	}

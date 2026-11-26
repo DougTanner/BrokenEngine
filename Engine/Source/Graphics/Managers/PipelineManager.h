@@ -7,17 +7,6 @@
 namespace engine
 {
 
-// Per-plane smoke pipelines; PipelineManager::SmokePipeline maps (plane, kind) into the Pipelines smoke range.
-enum SmokePipelineKind : int64_t
-{
-	kSmokeOccupancyDilate,
-	kSmokeOccupancyDilateRemap,
-	kSmokeSpreadComputeB,
-	kSmokeSpreadComputeA,
-
-	kSmokePipelineKindCount,
-};
-
 enum Pipelines
 {
 	kPipelineLog,
@@ -40,8 +29,10 @@ enum Pipelines
 
 	kPipelineSmokeClearA,
 	kPipelineSmokeClearB,
-	kPipelineSmokeFirst,
-	kPipelineSmokeLast = kPipelineSmokeFirst + kSmokePipelineKindCount * shaders::kiMaxFlightPlanes - 1,
+	kPipelineSmokeOccupancyDilate,
+	kPipelineSmokeOccupancyDilateRemap,
+	kPipelineSmokeSpreadComputeB,
+	kPipelineSmokeSpreadComputeA,
 
 	kPipelineWindOccupancyDilateA,
 	kPipelineWindOccupancyDilateB,
@@ -85,8 +76,6 @@ public:
 	void CreateParticlePipelines();
 	void CreateDebugRenderPipelines();
 
-	Pipeline& SmokePipeline(int64_t iPlane, SmokePipelineKind eKind);
-
 	Pipeline mpPipelines[kPipelineCount];
 
 	// Texture* array for the kPipelineWater normal map atlas binding (sized sampler array).
@@ -101,14 +90,14 @@ public:
 	// mirrors mShadowPipelineNames in DynamicPipelines)
 	std::string mpSpreadPipelineNames[shaders::kiMaxSpreadPasses];
 
-	// Combine pipelines [layer] (tone map accumulate → UNORM, all 3 colors in one dispatch)
-	Pipeline mpCombinePipelines[shaders::kiLightingLayers];
+	// Combine pipeline (tone map accumulate → UNORM, all 3 colors in one dispatch)
+	Pipeline mCombinePipeline;
 
-	// Temporal-accumulation pass after combine [layer]: reprojects + EMA-blends the layer's 3 directional combine outputs in place against its history
-	Pipeline mpLightingTemporalPipelines[shaders::kiLightingLayers];
+	// Temporal-accumulation pass after combine: reprojects + EMA-blends the 3 directional combine outputs in place against history
+	Pipeline mLightingTemporalPipeline;
 
-	// Publishes a layer's temporal-blended directional combine outputs into its distinct persistent history images and derives its ambient combine target [layer].
-	Pipeline mpLightingHistoryCopyPipelines[shaders::kiLightingLayers];
+	// Publishes temporal-blended directional combine outputs into distinct persistent history images and derives the ambient combine target.
+	Pipeline mLightingHistoryCopyPipeline;
 
 	DynamicPipelines mDynamicPipelines = DynamicPipelines(mShaders);
 };

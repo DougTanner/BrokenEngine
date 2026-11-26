@@ -1,5 +1,7 @@
 #pragma once
 
+#if defined(BT_CLIENT)
+
 #include "WrapperBase.h"
 
 namespace engine
@@ -48,3 +50,5 @@ inline Wrapper gSunMoonShadowSunriseStart(XM_PIDIV128, 0.0f, XM_PIDIV2);
 inline Wrapper gSunMoonShadowSunriseEnd(XM_PIDIV32, 0.0f, XM_PIDIV2);
 
 } // namespace engine
+
+#endif // BT_CLIENT

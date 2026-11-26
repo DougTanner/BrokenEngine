@@ -126,8 +126,7 @@ static int64_t RenderPipeline(const FightersInterpolate& __restrict rCurrent, co
 			XMMATRIX matYaw = common::RotationMatrixFromDirection(rCurrent.pVecDirections[i], XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f));
 			XMMATRIX matTranslation = XMMatrixTranslationFromVector(vecPosition);
 			XMMATRIX matInstanceTransform = matScaling * matRoll * matClimbTilt * matYaw * matTranslation;
-			int64_t iPlane = engine::gpFlightPlanes->NearestPlaneIndex(XMVectorGetZ(vecPosition));
-			engine::FillModelLayout(shadowBounds, matAlignment, matInstanceTransform, vecPosition, iPlane, pAnimationData, skinningReservation, j, rCurrent.pAnimationTimes[i], pLayouts[j]);
+			engine::FillModelLayout(shadowBounds, matAlignment, matInstanceTransform, vecPosition, pAnimationData, skinningReservation, j, rCurrent.pAnimationTimes[i], pLayouts[j]);
 		}
 	};
 

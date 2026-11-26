@@ -16,5 +16,5 @@ owner-driven sync path.
   forward unchanged.
 - A future start time holds the puff at its first keyframe, supporting delayed
   secondary effects.
-- Rendered puffs are culled, weighted between the flight planes bracketing their
-  height, and projected to each weighted plane before depositing smoke.
+- Rendered puffs are culled and projected through `ProjectToBaseHeight` before
+  depositing smoke whole.

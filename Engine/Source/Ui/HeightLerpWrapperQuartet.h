@@ -1,5 +1,7 @@
 #pragma once
 
+#if defined(BT_CLIENT)
+
 #include "WrapperBase.h"
 
 namespace engine
@@ -26,3 +28,5 @@ inline float LerpAtHeight(float fFraming, const HeightLerpWrapperQuartet& rQuart
 }
 
 } // namespace engine
+
+#endif // BT_CLIENT

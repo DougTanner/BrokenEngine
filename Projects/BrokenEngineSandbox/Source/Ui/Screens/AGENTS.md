@@ -12,12 +12,14 @@ runtime contracts of the screens that remain here.
 
 ## Shared Contracts
 
-- Screen bodies are client-only. `HudScreen.h` is listed in the server project
-  for IDE visibility and guards its client-only members internally, so screen
-  headers must remain parseable in their project affinity.
+- Screen headers and bodies (including `HudScreen.h`) are whole-file
+  `BT_CLIENT`-guarded and client-project-only.
 - Screens gate themselves from authoritative game/UI state
   (`../../../../../Engine/Source/Ui/Screens/AGENTS.md`
-  `## Standard Menu Contract`).
+  `## Standard Menu Contract`). `HudScreen` skips rendering while Observer mode
+  is active (`CameraBase::ObserverState::kObserving`) and gates its right-panel
+  content on `ClientOwnedEntityIdentifier()` rather than
+  `HasFocusedClientEntity()` (subscription policy lives in `../../AGENTS.md`).
 - Networked controls remain disabled through `NetworkUiControl` until
   authoritative state resolves the request. The fleet Fighter/Omni [x] controls
   share one pending mark, the spawn-into-fleet buttons another, and the right

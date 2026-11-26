@@ -1,5 +1,7 @@
 #pragma once
 
+#if defined(BT_CLIENT)
+
 namespace engine
 {
 
@@ -220,3 +222,5 @@ inline Wrapper gDebugTexture(false);
 inline Wrapper gDebugTextureIndex(0.0f, 0.0f, static_cast<float>(shaders::kiMaxDebugTextures - 1));
 
 } // namespace engine
+
+#endif // BT_CLIENT

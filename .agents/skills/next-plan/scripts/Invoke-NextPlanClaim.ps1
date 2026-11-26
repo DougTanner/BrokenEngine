@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([string] $Plan,[switch] $ResumeRetained,[switch] $UserAuthorizedTakeover)
+param([string] $Plan,[switch] $ResumeRetained,[switch] $UserAuthorizedTakeover,[switch] $AllowAgentCliMismatch)
 $ErrorActionPreference='Stop'; Set-StrictMode -Version Latest
 $result=[ordered]@{schemaVersion='broken-engine-next-plan-claim-result/v10';status='error';code='internal.error';message='Claim did not run.';nextAction='stop-report-to-user';claim=$null}
 function Complete-Claim([int]$ExitCode,[string]$Status,[string]$Code,[string]$Message,[string]$NextAction){$result.status=$Status;$result.code=$Code;$result.message=$Message;if($null -ne $result.claim -and $Status -cne 'pass'){$result.message+=" This session's claim on '$($result.claim.plan)' remains held."};$result.nextAction=$NextAction;[Console]::Out.Write(($result|ConvertTo-Json -Depth 100 -Compress));exit $ExitCode}
@@ -8,6 +8,7 @@ function Complete-Claim([int]$ExitCode,[string]$Status,[string]$Code,[string]$Me
 # are worktree paths a fast-forward could touch.
 function Get-DirtyPath([string]$Porcelain){$paths=[Collections.Generic.List[string]]::new();$fields=@($Porcelain -split "`0");$index=0;while($index -lt $fields.Count){$record=$fields[$index];$index++;if($record.Length -lt 4){continue};$paths.Add($record.Substring(3));$state=$record.Substring(0,2);if($state.Contains('R') -or $state.Contains('C')){if($index -lt $fields.Count){$paths.Add($fields[$index]);$index++}}};return $paths}
 function Format-DirtyPath([string[]]$Paths){$text=@($Paths|Select-Object -First 10) -join ', ';if($Paths.Count -gt 10){$text+=" (+$($Paths.Count-10) more)"};return $text}
+function Test-CanonicalPlanPath([string]$Path){if([string]::IsNullOrEmpty($Path) -or $Path.IndexOf("`0",[StringComparison]::Ordinal) -ge 0 -or $Path.IndexOf("`r",[StringComparison]::Ordinal) -ge 0 -or $Path.IndexOf("`n",[StringComparison]::Ordinal) -ge 0){return $false};$relative=$null;foreach($plansRoot in @('Documents/Plans/','Projects/Coretide/Documents/Plans/')){if($Path.StartsWith($plansRoot,[StringComparison]::Ordinal)){$relative=$Path.Substring($plansRoot.Length);break}};if($null -eq $relative){return $false};$segments=@($relative.Split('/'));if($segments.Count -ne 2){return $false};$area=$segments[0];$name=$segments[1];if([string]::IsNullOrWhiteSpace($area) -or $area -ceq '.' -or $area -ceq '..'){return $false};if(-not $name.EndsWith('.md',[StringComparison]::Ordinal) -or $name.Length -le 3 -or $name -ceq 'AGENTS.md' -or [string]::IsNullOrWhiteSpace($name.Substring(0,$name.Length-3))){return $false};return $true}
 function Get-TargetedNoneMessage($Context,[string]$RequestedPlan){
 	$fallback="The requested Plan '$RequestedPlan' could not be classified after the claim attempt; retry the targeted claim."
 	try {
@@ -20,6 +21,21 @@ function Get-TargetedNoneMessage($Context,[string]$RequestedPlan){
 		if($matches.Count -eq 1){
 			$row=$matches[0];$state=[string]$row.state
 			if($state -ceq 'blocked' -and $row.PSObject.Properties.Name -ccontains 'blockedBy'){$blockers=[Collections.Generic.List[string]]::new();foreach($path in @($row.blockedBy)){$blockers.Add([string]$path)};if($blockers.Count -eq 0){return $fallback};$blockers.Sort([StringComparer]::Ordinal);return "The requested Plan '$RequestedPlan' is blocked by prerequisite Plans: $(Format-DirtyPath $blockers.ToArray())."}
+			if($state -ceq 'excluded' -and $row.PSObject.Properties.Name -ccontains 'agentCliMismatch' -and -not [string]::IsNullOrWhiteSpace([string]$row.agentCliMismatch) -and $row.PSObject.Properties.Name -ccontains 'diagnostic' -and [string]$row.diagnostic -ceq "locked to agent CLI '$([string]$row.agentCliMismatch)'"){
+				# claim-next already handled any CLI-lock refusal via agentCliLock before calling this fallback, so a
+				# CLI-excluded row here was actually stopped by a prerequisite, a live claim, or a post-claim race.
+				if($row.PSObject.Properties.Name -ccontains 'blockedBy' -and $null -ne $row.blockedBy){
+					$blockers=[Collections.Generic.List[string]]::new()
+					foreach($path in @($row.blockedBy)){$blockers.Add([string]$path)}
+					if($blockers.Count -gt 0){$blockers.Sort([StringComparer]::Ordinal);return "The requested Plan '$RequestedPlan' is blocked by prerequisite Plans: $(Format-DirtyPath $blockers.ToArray())."}
+				}
+				if($row.PSObject.Properties.Name -ccontains 'claim' -and $null -ne $row.claim){
+					$result.holder=[ordered]@{session=[string]$row.claim.session;worktree=[string]$row.claim.worktree;expiresAt=$row.claim.expiresAt}
+					$script:targetedAgentCliMismatch=[string]$row.agentCliMismatch
+					return "The requested Plan '$RequestedPlan' is claimed by session $($result.holder.session) in worktree '$($result.holder.worktree)' until $((ConvertTo-Json -InputObject $result.holder.expiresAt -Compress).Trim('"'))."
+				}
+				return $fallback
+			}
 			if($state -ceq 'excluded' -and $row.PSObject.Properties.Name -ccontains 'diagnostic' -and -not [string]::IsNullOrWhiteSpace([string]$row.diagnostic)){return "The requested Plan '$RequestedPlan' is excluded from selection: $([string]$row.diagnostic)."}
 			if($state -ceq 'claimed'){
 				# ConvertFrom-Json turned the timestamp into a UTC DateTime; ConvertTo-Json renders the same instant as ISO 8601
@@ -60,6 +76,8 @@ try {
  $targeted=-not [string]::IsNullOrWhiteSpace($Plan)
  if($ResumeRetained -and -not $targeted){Complete-Claim 2 'blocked' 'claim.usage-error' '-ResumeRetained is valid only with -Plan, because only a named Plan can carry work retained by an earlier deferral; no Plan was claimed and the worktree was not touched.' 'stop-report-to-user'}
  if($UserAuthorizedTakeover -and -not $targeted){Complete-Claim 2 'blocked' 'claim.usage-error' '-UserAuthorizedTakeover is valid only with -Plan, because only a named Plan has a holder to release; no claim was released or made and the worktree was not touched.' 'stop-report-to-user'}
+ $normalizedPlan=if($targeted){$Plan.Replace('\','/')}else{''}
+ if($AllowAgentCliMismatch -and (-not $targeted -or -not (Test-CanonicalPlanPath $normalizedPlan))){Complete-Claim 2 'blocked' 'claim.usage-error' '-AllowAgentCliMismatch is valid only with a canonical -Plan path (Documents/Plans/<Area>/<Name>.md or Projects/Coretide/Documents/Plans/<Area>/<Name>.md), because overriding a CLI lock requires an exact confirmed Plan; no Plan was claimed and the worktree was not touched.' 'stop-report-to-user'}
  $pattern=$null
  if ($Plan) {
   $Plan=$Plan.Replace('\','/')
@@ -172,10 +190,22 @@ try {
  $invalidMetadata=@(@($projection['diagnostics'])|Where-Object{$null -ne $_ -and $_.PSObject.Properties.Name -ccontains 'code' -and [string]$_.code -ceq 'invalid-metadata'})
  if($violations.Count -ne 0 -or $invalidMetadata.Count -ne 0){$firstViolation=if($violations.Count -ne 0){" (first: $($violations[0].rule) '$($violations[0].path)')"}else{''};$firstInvalid=if($invalidMetadata.Count -ne 0 -and $invalidMetadata[0].PSObject.Properties.Name -ccontains 'plan'){" (first: '$([string]$invalidMetadata[0].plan)')"}else{''};Complete-Claim 2 'blocked' 'claim.plans-integrity' "Documents/Plans/ holds $($violations.Count) layout violation(s)$firstViolation and $($invalidMetadata.Count) invalid-metadata diagnostic(s)$firstInvalid; no Plan was claimed. Report each listed integrity item and diagnostic to the user." 'stop-report-to-user'}
  if($null -ne $pattern){
+  $listResponse=Invoke-NextPlanProcess $context.WorktreeCli @('plan','list','--repo',$context.CommonDirectory,'--worktree',$context.Worktree) $context.Worktree
+  $listing=ConvertFrom-NextPlanProcessJson $listResponse 'plan list'
+  if($listResponse.ExitCode -ne 0){$downstreamCode=if($listing.PSObject.Properties.Name -ccontains 'code'){[string]$listing.code}else{'unknown'};$exit=if($listResponse.ExitCode -eq 2){2}else{1};Complete-Claim $exit $(if($exit -eq 2){'blocked'}else{'error'}) $downstreamCode "WorktreeCli plan list failed during partial-name resolution: $downstreamCode." 'stop-report-to-user'}
+  $hiddenPlans=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+  if($listing.PSObject.Properties.Name -ccontains 'plans' -and $null -ne $listing.plans){
+   foreach($row in @($listing.plans)){
+    if($row.PSObject.Properties.Name -ccontains 'path' -and $row.PSObject.Properties.Name -ccontains 'agentCliMismatch' -and -not [string]::IsNullOrWhiteSpace([string]$row.agentCliMismatch)){
+     [void]$hiddenPlans.Add([string]$row.path)
+    }
+   }
+  }
   $candidates=[Collections.Generic.List[string]]::new()
   foreach($executablePlan in @($validation.plans)){
    if($executablePlan.PSObject.Properties.Name -ccontains 'path'){
     $candidate=[string]$executablePlan.path
+    if($hiddenPlans.Contains($candidate)){continue}
     # Match below whichever Plans root prefixes the candidate, so a pattern naming a root cannot match every Plan.
     $relative=$candidate;foreach($plansRoot in @('Documents/Plans/','Projects/Coretide/Documents/Plans/')){if($candidate.StartsWith($plansRoot,[StringComparison]::Ordinal)){$relative=$candidate.Substring($plansRoot.Length)}}
     if($relative.Contains($pattern,[StringComparison]::Ordinal)){$candidates.Add($candidate)}
@@ -188,19 +218,22 @@ try {
  }
  # A bare run holding a claim targets that Plan, so a claim healed away since the lookup ends in none or a fresh claim on
  # that same Plan, never in a claim on another Plan over this Plan's retained work.
- $claimArguments=@('plan','claim-next','--repo',$context.CommonDirectory,'--primary-worktree',$context.Primary,'--worktree',$context.Worktree,'--branch',$context.SessionBranch,'--owner',$context.Owner,'--session',$context.Session);if($Plan){$claimArguments+=@('--plan',$Plan)}elseif($null -ne $heldClaim){$claimArguments+=@('--plan',[string]$heldClaim.plan)}
+ $claimArguments=@('plan','claim-next','--repo',$context.CommonDirectory,'--primary-worktree',$context.Primary,'--worktree',$context.Worktree,'--branch',$context.SessionBranch,'--owner',$context.Owner,'--session',$context.Session);if($Plan){$claimArguments+=@('--plan',$Plan)}elseif($null -ne $heldClaim){$claimArguments+=@('--plan',[string]$heldClaim.plan)};if($AllowAgentCliMismatch){$claimArguments+='--allow-agent-cli-mismatch'}
  # claim-next reports claim-plan-mismatch before none, so reaching the none branch proves this session holds no other
  # claim; a user-authorized takeover releases the named holder's claim there at most once, then claims through this path.
  $takeover=$UserAuthorizedTakeover.IsPresent
  while($true){
+  $script:targetedAgentCliMismatch=$null
   $response=Invoke-NextPlanProcess $context.WorktreeCli $claimArguments $context.Worktree;$claim=ConvertFrom-NextPlanProcessJson $response 'plan claim-next'
   if($response.ExitCode -eq 2 -and [string]$claim.code -ceq 'claim-plan-mismatch'){$result.conflict=[ordered]@{requestedPlan=[string]$claim.requestedPlan;heldPlan=[string]$claim.heldPlan};Complete-Claim 2 'blocked' 'claim.plan-mismatch' 'This session already holds a different Plan claim.' 'stop-report-to-user'}
   if($response.ExitCode -ne 0){$detail=(($response.Stdout,$response.Stderr) -join "`n").Trim();$exit=if($response.ExitCode -eq 2){2}else{1};Complete-Claim $exit $(if($exit -eq 2){'blocked'}else{'error'}) 'claim.rejected' "WorktreeCli rejected the plan claim (exit $($response.ExitCode)). WorktreeCli reported: $detail" 'stop-report-to-user'}
   $code=[string]$claim.code
   if($code -cne 'none'){break}
+  if($claim.PSObject.Properties.Name -ccontains 'agentCliLock' -and -not [string]::IsNullOrWhiteSpace([string]$claim.agentCliLock)){$result.agentCliLock=[string]$claim.agentCliLock;$lockedPlan=if($Plan){$Plan}elseif($null -ne $heldClaim){[string]$heldClaim.plan}else{''};Complete-Claim 0 'pass' 'none-available' "The requested Plan '$lockedPlan' is locked to agent CLI '$($result.agentCliLock)'." 'checkpoint-followup-gate'}
   $message=if($targeted){Get-TargetedNoneMessage $context $Plan}elseif($null -ne $heldClaim){Get-TargetedNoneMessage $context ([string]$heldClaim.plan)}else{'No eligible Plan is available.'}
   if($result.Contains('moved')){Complete-Claim 2 'blocked' 'claim.plan-moved' $message 'stop-report-to-user'}
   if(-not $takeover -or -not $result.Contains('holder') -or [string]$result.holder.session -ceq $context.Session){Complete-Claim 0 'pass' 'none-available' $message 'checkpoint-followup-gate'}
+  if(-not $AllowAgentCliMismatch -and -not [string]::IsNullOrWhiteSpace($script:targetedAgentCliMismatch)){$result.agentCliLock=$script:targetedAgentCliMismatch;Complete-Claim 0 'pass' 'none-available' "The requested Plan '$Plan' is claimed by session $($result.holder.session) in worktree '$($result.holder.worktree)' and is also locked to agent CLI '$($result.agentCliLock)'; the existing claim was left intact until both takeover and CLI override are authorized." 'checkpoint-followup-gate'}
   $takeover=$false
   # Every scheduler claim is created by this script with owner and session both set to the session ID, and plan unclaim
   # finds a claim by owner and session alone, using --worktree only to resolve the repository.

@@ -17,11 +17,17 @@ LOD latching, texel-grid references, zoom, jump/chase, shake, sun angle, and the
   inherited visual-error offset (`CameraTarget::Tracked`), or
   `CameraTarget::Extrapolate` after the missing-owned-entity diagnostic. Menu
   target constants stay game-owned.
-- Owned-entity focus resolves through the cell the supplied interpolate frame is
-  local to — not the client cell — and that cell's ship rows of every type
-  (`Game::ClientOwnedEntity`), surviving spawn and transfer. Brief lookup
-  failures extrapolate the last focus within the engine's bounded window; an
-  absent owned-entity identity uses the main-menu pose.
+- Owned-entity focus (`Camera::PullTarget`) resolves the focused entity
+  (`Game::ClientOwnedEntityIdentifier`) into the camera basis
+  (`engine::Rebase`), surviving spawn and transfer (`PullTarget` owns the
+  per-cell lookup and fallback sequence). Brief lookup failures extrapolate the
+  last focus within the engine's bounded window; an absent owned-entity
+  identity uses the main-menu pose.
+- `PullSubscriptionCenter` resolves the focused fleet's live flagship
+  (`Game::FindLiveFlagshipOwnedEntity`) across `rRenderInterpolates`, retains
+  its last known cell-local position across transient lookup gaps (rebased into
+  `basisCoordinate`), and clears the anchor when the flagship changes, dies, or
+  on session/load reset (`ClearSubscriptionAnchor`).
 - Network reconciliation contributes a decaying camera-target offset only;
   authoritative simulation state is unchanged. Keep this integration consistent
   with `../../../../Documents/Architecture/GameReconciliation.md`.

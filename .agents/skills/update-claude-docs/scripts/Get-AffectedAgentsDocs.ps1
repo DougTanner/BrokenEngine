@@ -4,7 +4,7 @@
 # with the agent.
 [CmdletBinding()]
 param(
-	# Remaining arguments bind here so `-File <script> -ChangedPath a b c` works:
+	# Remaining arguments bind positionally so `-File <script> a b c` works:
 	# under -File a comma-separated `a,b,c` would arrive as one string.
 	[Parameter(Mandatory = $true, Position = 0, ValueFromRemainingArguments = $true)]
 	[ValidateNotNullOrEmpty()]
@@ -374,7 +374,11 @@ try
 	{
 		if ($suppliedPath.StartsWith('-', [StringComparison]::Ordinal))
 		{
-			Complete-AffectedAgentsDocs 1 'error' 'input.unknown-parameter' "Unknown parameter '$suppliedPath'. Prefix a repository-relative path starting with '-' with './'."
+			$prefix = "Unknown parameter '"
+			$suffix = "'. Pass paths positionally: pwsh -NoProfile -NonInteractive -File .agents/skills/update-claude-docs/scripts/Get-AffectedAgentsDocs.ps1 <path> [<path> ...]. Prefix a dash-prefixed path with './'."
+			$maxTokenLength = $script:MaximumMessageLength - $prefix.Length - $suffix.Length
+			$displayPath = if ($suppliedPath.Length -gt $maxTokenLength) { $suppliedPath.Substring(0, $maxTokenLength - 3) + '...' } else { $suppliedPath }
+			Complete-AffectedAgentsDocs 1 'error' 'input.unknown-parameter' "$prefix$displayPath$suffix"
 		}
 
 		$rooted = if ([IO.Path]::IsPathRooted($suppliedPath)) { $suppliedPath } else { Join-Path $script:RepositoryRoot $suppliedPath }

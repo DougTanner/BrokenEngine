@@ -7,7 +7,7 @@ param(
 	[Parameter(Mandatory)][string] $Name,
 	[Parameter(Mandatory)][string] $Body,
 	[string[]] $DependsOn = @(),
-	[switch] $UnresolvedFollowUp
+	[string] $AgentCli
 )
 
 $ErrorActionPreference = 'Stop'
@@ -126,154 +126,6 @@ function Invoke-PlanFileProcess([string] $Executable, [string[]] $Arguments, [st
 	return $response
 }
 
-function Add-PlanFileTrackedPath($Index, [string] $RelativePath) {
-	if ([string]::IsNullOrWhiteSpace($RelativePath)) { return }
-	$path = $RelativePath.Replace('\', '/')
-	if (-not $Index.ByPath.ContainsKey($path)) {
-		[void] $Index.Paths.Add($path)
-		$Index.ByPath[$path] = $path
-		$slash = $path.LastIndexOf('/')
-		while ($slash -gt 0) {
-			$directory = $path.Substring(0, $slash)
-			if (-not $Index.Directories.Add($directory)) { break }
-			$slash = $directory.LastIndexOf('/')
-		}
-		$basename = [IO.Path]::GetFileName($path)
-		if (-not [string]::IsNullOrWhiteSpace($basename)) {
-			if (-not $Index.ByBasename.ContainsKey($basename)) {
-				$Index.ByBasename[$basename] = [Collections.Generic.List[string]]::new()
-			}
-			[void] $Index.ByBasename[$basename].Add($path)
-		}
-	}
-}
-
-function Get-PlanFileTrackedIndex([string] $RepositoryRoot, [string] $CoretideRepository, [bool] $IncludeCoretide) {
-	$index = [pscustomobject]@{
-		Paths = [Collections.Generic.List[string]]::new()
-		ByPath = [Collections.Generic.Dictionary[string, string]]::new([StringComparer]::OrdinalIgnoreCase)
-		ByBasename = [Collections.Generic.Dictionary[string, Collections.Generic.List[string]]]::new([StringComparer]::OrdinalIgnoreCase)
-		Directories = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
-	}
-	foreach ($line in (Invoke-AgentGit @('-C', $RepositoryRoot, '-c', 'core.quotepath=false', 'ls-files'))) {
-		Add-PlanFileTrackedPath $index ([string] $line).Trim()
-	}
-	if ($IncludeCoretide -and -not [string]::IsNullOrWhiteSpace($CoretideRepository)) {
-		foreach ($line in (Invoke-AgentGit @('-C', $CoretideRepository, '-c', 'core.quotepath=false', 'ls-files'))) {
-			$trimmed = ([string] $line).Trim()
-			if (-not [string]::IsNullOrWhiteSpace($trimmed)) {
-				Add-PlanFileTrackedPath $index ('Projects/Coretide/' + $trimmed)
-			}
-		}
-	}
-	return $index
-}
-
-function Expand-PlanFileBraceToken([string] $Token) {
-	$pending = [Collections.Generic.Queue[string]]::new()
-	$expanded = [Collections.Generic.List[string]]::new()
-	$pending.Enqueue($Token)
-	while ($pending.Count -gt 0) {
-		$current = $pending.Dequeue()
-		$match = [regex]::Match($current, '^([^{}]*)\{([^{}]+)\}(.*)$')
-		if ($match.Success -and $match.Groups[2].Value.Contains(',')) {
-			$prefix = $match.Groups[1].Value
-			$suffix = $match.Groups[3].Value
-			foreach ($alternative in $match.Groups[2].Value.Split(',')) {
-				$pending.Enqueue($prefix + $alternative.Trim(' ', "`t") + $suffix)
-			}
-		} else {
-			[void] $expanded.Add($current)
-		}
-	}
-	return [string[]] @($expanded)
-}
-
-function Get-PlanFileTouchedPaths([string] $Text, $TrackedIndex) {
-	$touched = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
-	$inTouchedSection = $false
-	foreach ($line in ((Get-AgentMarkdownSearchText $Text -KeepInlineCode) -split "\r\n|\n|\r")) {
-		if ($line -cmatch '^##[ \t]+(.+?)[ \t]*$') {
-			$inTouchedSection = $Matches[1].Trim() -imatch '^(Critical files|In scope)$'
-			continue
-		}
-		if (-not $inTouchedSection) { continue }
-		foreach ($tokenMatch in [regex]::Matches($line, '`([^`]+)`')) {
-			$raw = $tokenMatch.Groups[1].Value.Trim(' ', "`t")
-			if ($raw.Length -eq 0) { continue }
-			$normalizedToken = ($raw.Replace('\', '/') -replace '^\./', '')
-			$normalizedToken = $normalizedToken -replace '::.*$', ''
-			$normalizedToken = $normalizedToken -replace ':\d+(?:-\d+)?(?:,\d+(?:-\d+)?)*$', ''
-			if ($normalizedToken.Length -eq 0) { continue }
-			foreach ($candidate in (Expand-PlanFileBraceToken $normalizedToken)) {
-				$candidate = $candidate.Trim(' ', "`t")
-				if ($candidate.Length -eq 0) { continue }
-				if ($candidate.Contains('*')) {
-					$escaped = [regex]::Escape($candidate)
-					$pattern = $escaped -replace '\\\*\\\*/', '(?:.*/)?' -replace '\\\*\\\*', '.*' -replace '\\\*', '[^/]*'
-					$matchedGlob = $false
-					foreach ($trackedPath in $TrackedIndex.Paths) {
-						if ($trackedPath -imatch ('^' + $pattern + '$')) {
-							[void] $touched.Add($trackedPath)
-							$matchedGlob = $true
-						}
-					}
-					if (-not $matchedGlob) {
-						foreach ($trackedPath in $TrackedIndex.Paths) {
-							if ($trackedPath -imatch ('(?:^|/)' + $pattern + '$')) {
-								[void] $touched.Add($trackedPath)
-							}
-						}
-					}
-				} elseif ($TrackedIndex.ByPath.ContainsKey($candidate)) {
-					[void] $touched.Add($TrackedIndex.ByPath[$candidate])
-				} elseif ($candidate.Contains('/')) {
-					$suffix = '/' + $candidate
-					$matchedSuffix = $false
-					foreach ($trackedPath in $TrackedIndex.Paths) {
-						if ($trackedPath.EndsWith($suffix, [StringComparison]::OrdinalIgnoreCase)) {
-							[void] $touched.Add($trackedPath)
-							$matchedSuffix = $true
-						}
-					}
-					if (-not $matchedSuffix -and -not $TrackedIndex.Directories.Contains($candidate) -and $candidate -notmatch '[\x00-\x1F<>:"|?*]') {
-						$segments = $candidate.Split('/')
-						$validPath = $segments.Count -ge 2
-						foreach ($segment in $segments) {
-							if ($segment.Length -eq 0 -or $segment.Trim(' ') -cne $segment -or $segment -ceq '.' -or $segment -ceq '..') {
-								$validPath = $false
-								break
-							}
-						}
-						if ($validPath) {
-							[void] $touched.Add($candidate)
-						}
-					}
-				} elseif ($TrackedIndex.ByBasename.ContainsKey($candidate) -and $TrackedIndex.ByBasename[$candidate].Count -eq 1) {
-					[void] $touched.Add($TrackedIndex.ByBasename[$candidate][0])
-				}
-			}
-		}
-	}
-	return ,$touched
-}
-
-function Test-PlanFileReaches([string] $Start, [string] $Target, [Collections.Generic.Dictionary[string, string[]]] $Edges) {
-	$visited = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
-	$queue = [Collections.Generic.Queue[string]]::new()
-	$queue.Enqueue($Start)
-	[void] $visited.Add($Start)
-	while ($queue.Count -gt 0) {
-		$current = $queue.Dequeue()
-		if (-not $Edges.ContainsKey($current)) { continue }
-		foreach ($next in $Edges[$current]) {
-			if ($next -ceq $Target) { return $true }
-			if ($visited.Add($next)) { $queue.Enqueue($next) }
-		}
-	}
-	return $false
-}
-
 try {
 	$repositoryRoot = Get-AgentCanonicalPath (Join-Path $PSScriptRoot '..\..')
 	$plansRoot = Get-AgentCanonicalPath (Join-Path $repositoryRoot 'Documents\Plans')
@@ -283,6 +135,9 @@ try {
 	}
 	if ($Name -cnotmatch '^[A-Z][A-Za-z0-9]*\.md$') {
 		Complete-PlanFile 1 'error' 'input.name-invalid' "Plan -Name must match '^[A-Z][A-Za-z0-9]*\.md$': '$Name'."
+	}
+	if ($PSBoundParameters.ContainsKey('AgentCli') -and -not ([string]::Equals($AgentCli, 'claude', [StringComparison]::Ordinal) -or [string]::Equals($AgentCli, 'codex', [StringComparison]::Ordinal) -or [string]::Equals($AgentCli, 'agy', [StringComparison]::Ordinal))) {
+		Complete-PlanFile 1 'error' 'input.agent-cli-invalid' "Plan -AgentCli must be one of 'claude', 'codex', or 'agy': '$AgentCli'."
 	}
 
 	# A session Coretide clone carries a second Plans root, Projects/Coretide/Documents/Plans (Documents/Plans/AGENTS.md).
@@ -335,10 +190,6 @@ try {
 		}
 	}
 
-	if ($UnresolvedFollowUp -and @($DependsOn).Count -gt 0) {
-		Complete-PlanFile 1 'error' 'input.depends-on-not-allowed' '-UnresolvedFollowUp cannot be combined with -DependsOn; unresolved-decision follow-up Plans must keep dependsOn empty.'
-	}
-
 	$normalized = [Collections.Generic.List[string]]::new()
 	# `pwsh -File` hands every argument over as one literal string, so the required invocation form can
 	# only deliver several dependencies as one comma-separated token.
@@ -365,47 +216,6 @@ try {
 	}
 	$commonDirectory = (Invoke-AgentGit @('-C', $repositoryRoot, 'rev-parse', '--path-format=absolute', '--git-common-dir') | Select-Object -First 1).ToString().Trim()
 
-	if (-not $UnresolvedFollowUp) {
-		$trackedIndex = Get-PlanFileTrackedIndex $repositoryRoot $coretideRepository $coretideArea
-		$candidateTouched = Get-PlanFileTouchedPaths $bodyText $trackedIndex
-		if ($candidateTouched.Count -gt 0) {
-			$inventoryRun = Invoke-PlanFileProcess $worktreeCli @('plan', 'validate', '--lint-only', '--repo', $commonDirectory, '--worktree', $repositoryRoot) $repositoryRoot
-			$inventory = $null
-			if ($inventoryRun.ExitCode -eq 0 -and -not [string]::IsNullOrWhiteSpace($inventoryRun.Stdout)) {
-				try { $inventory = $inventoryRun.Stdout.Trim() | ConvertFrom-Json -Depth 32 -ErrorAction Stop } catch { Write-PlanFileDiagnostic "plan validate --lint-only did not return one JSON value: $($_.Exception.Message)" }
-			}
-			if ($null -eq $inventory -or -not ($inventory.PSObject.Properties.Name -ccontains 'plans')) {
-				$detail = Limit-PlanFileText ((($inventoryRun.Stderr, $inventoryRun.Stdout) -join ' ').Trim())
-				Write-PlanFileDiagnostic "plan validate --lint-only exited $($inventoryRun.ExitCode): $detail"
-				Complete-PlanFile 1 'error' 'plan.inventory-failed' "Could not enumerate existing Plans through 'plan validate --lint-only' for overlap detection."
-			}
-			$dependsOnByPlan = [Collections.Generic.Dictionary[string, string[]]]::new([StringComparer]::Ordinal)
-			$inventoryPlans = @($inventory.plans)
-			foreach ($row in $inventoryPlans) {
-				$rowPath = [string] $row.path
-				$rowDeps = [Collections.Generic.List[string]]::new()
-				if ($row.PSObject.Properties.Name -ccontains 'dependsOn' -and $null -ne $row.dependsOn) {
-					foreach ($dep in @($row.dependsOn)) {
-						[void] $rowDeps.Add([string] $dep)
-					}
-				}
-				$dependsOnByPlan[$rowPath] = [string[]] @($rowDeps)
-			}
-			foreach ($row in $inventoryPlans) {
-				$planPath = [string] $row.path
-				if (-not $coretideArea -and $planPath.StartsWith('Projects/Coretide/', [StringComparison]::OrdinalIgnoreCase)) { continue }
-				if ($planPath -ceq $result.plan -or $normalized.Contains($planPath)) { continue }
-				if (Test-PlanFileReaches $planPath $result.plan $dependsOnByPlan) { continue }
-				$planFull = Join-Path $repositoryRoot ($planPath.Replace('/', '\'))
-				if (-not (Test-Path -LiteralPath $planFull -PathType Leaf)) { continue }
-				$planTouched = Get-PlanFileTouchedPaths ([IO.File]::ReadAllText($planFull)) $trackedIndex
-				if ($candidateTouched.Overlaps($planTouched)) {
-					[void] $normalized.Add($planPath)
-				}
-			}
-		}
-	}
-
 	$normalized.Sort([StringComparer]::Ordinal)
 	# Statement assignment, never an `if` expression: an if-expression sends its value through the
 	# pipeline, which unrolls an empty list into a null payload.
@@ -419,7 +229,8 @@ try {
 	$createdUtc = [DateTime]::UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", [Globalization.CultureInfo]::InvariantCulture)
 	$result.createdUtc = $createdUtc
 	$dependsOnJson = (@($normalized) | ForEach-Object { ConvertTo-Json $_ -Compress }) -join ','
-	$marker = '<!-- broken-engine-plan/v1 {"createdUtc":"' + $createdUtc + '","dependsOn":[' + $dependsOnJson + ']} -->'
+	$agentCliJson = if ($PSBoundParameters.ContainsKey('AgentCli')) { ',"agentCli":"' + $AgentCli + '"' } else { '' }
+	$marker = '<!-- broken-engine-plan/v2 {"createdUtc":"' + $createdUtc + '","dependsOn":[' + $dependsOnJson + ']' + $agentCliJson + '} -->'
 	[void] [IO.Directory]::CreateDirectory($areaFull)
 	# The marker must occupy byte zero, so the file is written with an explicit BOM-less UTF-8 encoding.
 	[IO.File]::WriteAllText($targetFull, $marker + "`n" + $bodyText, [Text.UTF8Encoding]::new($false))

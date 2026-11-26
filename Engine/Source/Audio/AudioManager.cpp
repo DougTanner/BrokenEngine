@@ -403,7 +403,7 @@ void AudioManager::AttemptSilentEngineRecovery()
 	}
 }
 
-void AudioManager::Update(const game::Frame* pFrame)
+void AudioManager::Update(const game::Frame* pFrame, GridCoord emitterCoordinate)
 {
 	ScopedCpuProfile scopedCpuProfile(kCpuTimerAudio);
 
@@ -491,9 +491,7 @@ void AudioManager::Update(const game::Frame* pFrame)
 		// Listener position must update first — UpdateLifecycle's priority/cull pass
 		// reads mVecListenerPosition and mfEffectiveFadeEnd computed here.
 		mpStaticVoices->UpdateListenerPosition();
-		// pFrame is the client cell's render frame (Main.cpp), so every persistent-sound position it carries is
-		// local to that cell.
-		mpStaticVoices->UpdateLifecycle(*pFrame, game::gpGame->mClientGridCoordinate, fDeltaTime);
+		mpStaticVoices->UpdateLifecycle(*pFrame, emitterCoordinate, fDeltaTime);
 	}
 
 	mpStaticVoices->UpdateVolumes();

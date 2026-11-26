@@ -16,6 +16,9 @@ $script:MarkerLineRegex = [regex]::new('^<!-- subdirectory-agents-md: ([^>\r\n]+
 $script:AgyPostInvocationHeaderRegex = [regex]::new('\A(?:The following is a <SYSTEM_MESSAGE>[^\n]*\r?\n\r?\n)?<SYSTEM_MESSAGE>\r?\nThe following system message was injected by a PostInvocation hook:\r?\n')
 $script:DirectReadCommands = @('get-content', 'gc', 'cat', 'type')
 $script:SkipOutputCommands = @('echo', 'write-output', 'write-host', 'printf')
+$script:MetadataPathCommands = @('get-childitem', 'gci', 'ls', 'dir', 'test-path', 'get-item', 'gi', 'resolve-path')
+$script:MetadataSearchCommands = @('select-string', 'sls', 'rg', 'grep')
+$script:HeadingPatternRegex = [regex]::new('^\^#+(?:\+|\{\d+(?:,\d*)?\})? $')
 $script:ApplyPatchHeaderRegex = [regex]::new('(?m)^\*\*\* (?:(?:Update|Add|Delete) File|Move to):\s*(.+?)\s*\r?$')
 $script:AgyFullReadRegex = [regex]::new('(?m)^Showing lines 1-(\d+) of \1\r?$')
 $script:AgyZeroExitRegex = [regex]::new('(?m)^Command exited with code 0\.\r?$')
@@ -267,6 +270,377 @@ function Get-DirectReadShellPlan([string] $Command, [string] $CwdComparable, [st
 	}
 }
 
+function Get-LeafName([string] $PathText) {
+	$slash = $PathText.LastIndexOfAny([char[]]'/\')
+	if ($slash -ge 0) { return $PathText.Substring($slash + 1) }
+	return $PathText
+}
+
+function Test-IsContentReadElement($El) {
+	if ($El.CommandIndex -lt 0) { return $false }
+	if ($script:DirectReadCommands -contains $El.Name) { return $true }
+	if ($script:MetadataSearchCommands -contains $El.Name -and -not (Test-IsMetadataLookupElement $El)) { return $true }
+	return $false
+}
+
+function Get-PreservedMetadataIndices($Tokens, $Elements, [bool] $PreserveAll) {
+	$preserved = [Collections.Generic.HashSet[int]]::new()
+	if ($Elements.Count -eq 0) { return , $preserved }
+	if ($PreserveAll) {
+		for ($i = 0; $i -lt $Elements.Count; $i++) { [void] $preserved.Add($i) }
+		return , $preserved
+	}
+
+	$isContentRead = [bool[]]::new($Elements.Count)
+	$hasAnyContentRead = $false
+	for ($i = 0; $i -lt $Elements.Count; $i++) {
+		if (Test-IsContentReadElement $Elements[$i]) {
+			$isContentRead[$i] = $true
+			$hasAnyContentRead = $true
+		}
+	}
+	if (-not $hasAnyContentRead) { return , $preserved }
+
+	# Walk tokens in lockstep with Elements to track enclosing content readers
+	# and pipeline stages across () and {} groups.
+	$nextPipeId = 0
+	$stack = [Collections.Generic.List[object]]::new()
+	$stack.Add([pscustomobject]@{
+		PipeId = $nextPipeId++
+		Stage = 0
+		AfterPipe = $false
+		StageHasContentRead = $false
+		OwnerIsContentRead = $false
+	})
+	$elPositions = [object[]]::new($Elements.Count)
+	$maxContentReadStage = [hashtable]::new()
+	$elIdx = 0
+	$inWordRun = $false
+
+	for ($ti = 0; $ti -lt $Tokens.Count; $ti++) {
+		$token = $Tokens[$ti]
+		if ($token -is [string]) {
+			if ($inWordRun) {
+				$elIdx++
+				$inWordRun = $false
+			}
+			$top = $stack[$stack.Count - 1]
+			if ($token -ceq '|') {
+				$top.Stage++
+				$top.AfterPipe = $true
+				$top.StageHasContentRead = $false
+			}
+			elseif ($token -ceq '(' -or $token -ceq '{') {
+				$top.AfterPipe = $false
+				$stack.Add([pscustomobject]@{
+					PipeId = $nextPipeId++
+					Stage = 0
+					AfterPipe = $false
+					StageHasContentRead = $false
+					OwnerIsContentRead = ($top.OwnerIsContentRead -or $top.StageHasContentRead)
+				})
+			}
+			elseif ($token -ceq ')' -or $token -ceq '}') {
+				if ($stack.Count -gt 1) {
+					$stack.RemoveAt($stack.Count - 1)
+				}
+			}
+			elseif ($token -ceq "`n") {
+				$keepPipeline = $top.AfterPipe
+				if (-not $keepPipeline) {
+					$nextIdx = $ti + 1
+					while ($nextIdx -lt $Tokens.Count -and $Tokens[$nextIdx] -is [string] -and $Tokens[$nextIdx] -ceq "`n") {
+						$nextIdx++
+					}
+					$keepPipeline = ($nextIdx -lt $Tokens.Count -and $Tokens[$nextIdx] -is [string] -and $Tokens[$nextIdx] -ceq '|')
+				}
+				if (-not $keepPipeline) {
+					$top.PipeId = $nextPipeId++
+					$top.Stage = 0
+					$top.AfterPipe = $false
+					$top.StageHasContentRead = $false
+				}
+			}
+			else {
+				$top.PipeId = $nextPipeId++
+				$top.Stage = 0
+				$top.AfterPipe = $false
+				$top.StageHasContentRead = $false
+			}
+			continue
+		}
+		if ($token.IsRedirectTarget) { continue }
+		if (-not $inWordRun) {
+			$inWordRun = $true
+			if ($elIdx -lt $Elements.Count) {
+				$top = $stack[$stack.Count - 1]
+				$top.AfterPipe = $false
+				if ($isContentRead[$elIdx]) {
+					$top.StageHasContentRead = $true
+					foreach ($frame in $stack) {
+						if (-not $maxContentReadStage.ContainsKey($frame.PipeId) -or $frame.Stage -gt $maxContentReadStage[$frame.PipeId]) {
+							$maxContentReadStage[$frame.PipeId] = $frame.Stage
+						}
+					}
+				}
+				if ($top.OwnerIsContentRead) {
+					[void] $preserved.Add($elIdx)
+				}
+				$positions = [Collections.Generic.List[object]]::new($stack.Count)
+				foreach ($frame in $stack) {
+					$positions.Add([pscustomobject]@{ PipeId = $frame.PipeId; Stage = $frame.Stage })
+				}
+				$elPositions[$elIdx] = $positions
+			}
+		}
+	}
+
+	for ($i = 0; $i -lt $Elements.Count; $i++) {
+		if ($preserved.Contains($i) -or $null -eq $elPositions[$i]) { continue }
+		foreach ($pos in $elPositions[$i]) {
+			if ($maxContentReadStage.ContainsKey($pos.PipeId) -and $maxContentReadStage[$pos.PipeId] -gt $pos.Stage) {
+				[void] $preserved.Add($i)
+				break
+			}
+		}
+	}
+
+	return , $preserved
+}
+
+function Test-IsMetadataLookupElement($El) {
+	if ($script:MetadataPathCommands -contains $El.Name) { return $true }
+
+	if ((Get-LeafName $El.Name).Equals('get-affectedagentsdocs.ps1', [StringComparison]::OrdinalIgnoreCase)) {
+		return $true
+	}
+	if ($El.Name -eq 'pwsh') {
+		for ($i = $El.CommandIndex + 1; $i -lt ($El.Words.Count - 1); $i++) {
+			$val = $El.Words[$i].Value
+			if ($val.Equals('-Command', [StringComparison]::OrdinalIgnoreCase) -or $val.Equals('-c', [StringComparison]::OrdinalIgnoreCase)) {
+				break
+			}
+			if ($val.Equals('-File', [StringComparison]::OrdinalIgnoreCase)) {
+				$next = $El.Words[$i + 1]
+				if (-not $next.HasVariable -and -not $next.HasSubstitution -and
+					(Get-LeafName $next.Value).Equals('get-affectedagentsdocs.ps1', [StringComparison]::OrdinalIgnoreCase)) {
+					return $true
+				}
+				break
+			}
+		}
+		return $false
+	}
+
+	if ($script:MetadataSearchCommands -notcontains $El.Name) { return $false }
+
+	if ($El.Name -eq 'rg' -or $El.Name -eq 'grep') {
+		if ($El.FollowedBy -ceq '(') { return $false }
+		$expectPattern = $false
+		$expectOtherValue = $false
+		$endOfFlags = $false
+		$hasMetadataOutputFlag = $false
+		$explicitPatternCount = 0
+		$patternValue = $null
+		$positionalPattern = $null
+		$positionalPatternDynamic = $false
+
+		$metadataShortFlags = @('l', 'c')
+		$metadataLongFlags = if ($El.Name -eq 'rg') {
+			@('--files-with-matches', '--files', '--count', '--count-matches')
+		}
+		else {
+			@('--files-with-matches', '--count')
+		}
+		$safeShortBoolFlags = @('i', 'n', 'H', 'h', 'w', 'q', 'a', 's', 'L', 'I')
+		$safeShortValueFlags = @('m', 'd')
+		$safeLongBoolFlags = @('--ignore-case', '--line-number', '--with-filename', '--no-filename',
+			'--word-regexp', '--quiet', '--silent', '--no-messages', '--follow')
+		$safeLongValueFlags = @('--max-count', '--color', '--encoding')
+		if ($El.Name -eq 'rg') {
+			$safeShortBoolFlags += @('S', 'u')
+			$safeShortValueFlags += @('g', 't', 'T', 'M', 'j', 'E')
+			$safeLongBoolFlags += @('--no-heading', '--heading', '--smart-case', '--case-sensitive',
+				'--hidden', '--no-ignore', '--unrestricted')
+			$safeLongValueFlags += @('--glob', '--iglob', '--type', '--type-not', '--max-depth',
+				'--max-columns', '--threads')
+		}
+		else {
+			$safeShortBoolFlags += @('E', 'r', 'R')
+			$safeLongBoolFlags += @('--extended-regexp', '--recursive', '--dereference-recursive')
+			$safeLongValueFlags += @('--include', '--exclude', '--exclude-dir', '--directories')
+		}
+
+		for ($i = $El.CommandIndex + 1; $i -lt $El.Words.Count; $i++) {
+			$w = $El.Words[$i]
+			if ($w.IsSplat) { return $false }
+			if (-not $endOfFlags -and ($w.HasVariable -or $w.HasSubstitution)) { return $false }
+			$val = $w.Value
+			if ($expectPattern) {
+				$explicitPatternCount++
+				$patternValue = $val
+				$expectPattern = $false
+				continue
+			}
+			if ($expectOtherValue) {
+				$expectOtherValue = $false
+				continue
+			}
+			if (-not $endOfFlags -and $val -ceq '--') {
+				$endOfFlags = $true
+				continue
+			}
+			if (-not $endOfFlags -and $val.StartsWith('--', [StringComparison]::Ordinal) -and $val.Length -gt 2) {
+				$eq = $val.IndexOf('=')
+				$flagName = if ($eq -ge 0) { $val.Substring(0, $eq) } else { $val }
+				$hasEq = $eq -ge 0
+				if ($flagName -ceq '--regexp') {
+					if ($hasEq) {
+						$explicitPatternCount++
+						$patternValue = $val.Substring($eq + 1)
+					}
+					else {
+						$expectPattern = $true
+					}
+					continue
+				}
+				if (-not $hasEq -and $metadataLongFlags -ccontains $flagName) {
+					$hasMetadataOutputFlag = $true
+					continue
+				}
+				if (-not $hasEq -and $safeLongBoolFlags -ccontains $flagName) {
+					continue
+				}
+				if ($safeLongValueFlags -ccontains $flagName) {
+					if (-not $hasEq) { $expectOtherValue = $true }
+					continue
+				}
+				return $false
+			}
+			if (-not $endOfFlags -and $val.StartsWith('-', [StringComparison]::Ordinal) -and $val.Length -gt 1) {
+				for ($ci = 1; $ci -lt $val.Length; $ci++) {
+					$ch = [string]$val[$ci]
+					if ($ch -ceq 'e') {
+						if ($ci + 1 -lt $val.Length) {
+							$explicitPatternCount++
+							$patternValue = $val.Substring($ci + 1)
+						}
+						else {
+							$expectPattern = $true
+						}
+						break
+					}
+					if ($metadataShortFlags -ccontains $ch) {
+						$hasMetadataOutputFlag = $true
+						continue
+					}
+					if ($safeShortBoolFlags -ccontains $ch) {
+						continue
+					}
+					if ($safeShortValueFlags -ccontains $ch) {
+						if ($ci + 1 -ge $val.Length) { $expectOtherValue = $true }
+						break
+					}
+					return $false
+				}
+				continue
+			}
+			if ($explicitPatternCount -eq 0 -and $null -eq $positionalPattern -and -not $positionalPatternDynamic) {
+				if ($w.HasVariable -or $w.HasSubstitution) { $positionalPatternDynamic = $true }
+				else { $positionalPattern = $val }
+			}
+		}
+
+		if ($expectPattern -or $expectOtherValue) { return $false }
+		if ($hasMetadataOutputFlag) { return $true }
+		if ($explicitPatternCount -gt 1) { return $false }
+		if ($explicitPatternCount -eq 1) { return $script:HeadingPatternRegex.IsMatch($patternValue) }
+		if ($positionalPatternDynamic -or $null -eq $positionalPattern) { return $false }
+		return $script:HeadingPatternRegex.IsMatch($positionalPattern)
+	}
+
+	# select-string / sls
+	$expectPattern = $false
+	$expectOtherValue = $false
+	$endOfFlags = $false
+	$patternCount = 0
+	$patternValue = $null
+	$positionalPattern = $null
+	$positionalPatternDynamic = $false
+	$safeValueFlags = @('path', 'literalpath', 'lp', 'pspath', 'encoding', 'include', 'exclude', 'culture')
+	$safeSwitchFlags = @('casesensitive', 'allmatches', 'list', 'quiet', 'raw', 'noemphasis')
+
+	for ($i = $El.CommandIndex + 1; $i -lt $El.Words.Count; $i++) {
+		$w = $El.Words[$i]
+		if ($w.IsSplat) { return $false }
+		$val = $w.Value
+		$nextStartsWithComma = ($i + 1 -lt $El.Words.Count) -and $El.Words[$i + 1].View.StartsWith(',', [StringComparison]::Ordinal)
+		if ($expectPattern) {
+			if ($w.HasVariable -or $w.HasSubstitution) { return $false }
+			if ($w.View.IndexOf(',') -ge 0 -or $nextStartsWithComma) { return $false }
+			$patternCount++
+			$patternValue = $val
+			$expectPattern = $false
+			continue
+		}
+		if ($expectOtherValue) {
+			$expectOtherValue = $w.View.EndsWith(',', [StringComparison]::Ordinal) -or $nextStartsWithComma
+			continue
+		}
+		if (-not $endOfFlags -and $val -ceq '--') {
+			$endOfFlags = $true
+			continue
+		}
+		if (-not $endOfFlags -and $val.StartsWith('-', [StringComparison]::Ordinal) -and $val.Length -gt 1) {
+			if ($w.HasVariable -or $w.HasSubstitution) { return $false }
+			if ($val -notmatch '^-([A-Za-z]+)(?::(.*))?$') { return $false }
+			$flag = $Matches[1].ToLowerInvariant()
+			$hasColon = $val.IndexOf(':') -ge 0
+			$inlineVal = if ($hasColon) { $Matches[2] } else { '' }
+			if ($flag -eq 'pattern') {
+				if ($hasColon) {
+					if ($w.View.IndexOf(',') -ge 0 -or $nextStartsWithComma) { return $false }
+					$patternCount++
+					$patternValue = $inlineVal
+				}
+				else {
+					$expectPattern = $true
+				}
+				continue
+			}
+			if ($safeValueFlags -contains $flag) {
+				if ($hasColon) {
+					$expectOtherValue = $w.View.EndsWith(',', [StringComparison]::Ordinal) -or $nextStartsWithComma
+				}
+				else {
+					$expectOtherValue = $true
+				}
+				continue
+			}
+			if ($safeSwitchFlags -contains $flag) {
+				if ($hasColon -and @('$true', '$false', 'true', 'false', '1', '0') -notcontains $inlineVal.ToLowerInvariant()) {
+					return $false
+				}
+				continue
+			}
+			return $false
+		}
+		if ($patternCount -eq 0 -and $null -eq $positionalPattern -and -not $positionalPatternDynamic) {
+			if ($w.HasVariable -or $w.HasSubstitution -or $w.View.IndexOf(',') -ge 0 -or $nextStartsWithComma) {
+				$positionalPatternDynamic = $true
+			}
+			else {
+				$positionalPattern = $val
+			}
+		}
+	}
+
+	if ($expectPattern -or $expectOtherValue -or $patternCount -gt 1) { return $false }
+	if ($patternCount -eq 1) { return $script:HeadingPatternRegex.IsMatch($patternValue) }
+	if ($positionalPatternDynamic -or $null -eq $positionalPattern) { return $false }
+	return $script:HeadingPatternRegex.IsMatch($positionalPattern)
+}
+
 function Get-ShellAccessedTargets([string] $Command, [string] $CwdComparable) {
 	$targets = [Collections.Generic.List[object]]::new()
 	try {
@@ -275,6 +649,8 @@ function Get-ShellAccessedTargets([string] $Command, [string] $CwdComparable) {
 	catch {
 		return , $targets
 	}
+	$parsedLists = [Collections.Generic.List[object]]::new($tokenLists.Count)
+	$hasContentReaderWithSubstitution = $false
 	for ($t = 0; $t -lt $tokenLists.Count; $t++) {
 		try {
 			$elements = Get-ShellElements $tokenLists[$t] $false
@@ -282,9 +658,28 @@ function Get-ShellAccessedTargets([string] $Command, [string] $CwdComparable) {
 		catch {
 			continue
 		}
-		foreach ($el in $elements) {
+		$parsedLists.Add([pscustomobject]@{ Index = $t; Tokens = $tokenLists[$t]; Elements = $elements })
+		if (-not $hasContentReaderWithSubstitution -and $tokenLists.Count -gt 1) {
+			foreach ($el in $elements) {
+				if (-not (Test-IsContentReadElement $el)) { continue }
+				for ($w = $el.CommandIndex + 1; $w -lt $el.Words.Count; $w++) {
+					if ($el.Words[$w].HasSubstitution) {
+						$hasContentReaderWithSubstitution = $true
+						break
+					}
+				}
+				if ($hasContentReaderWithSubstitution) { break }
+			}
+		}
+	}
+	foreach ($entry in $parsedLists) {
+		$elements = $entry.Elements
+		$preserved = Get-PreservedMetadataIndices $entry.Tokens $elements ($entry.Index -gt 0 -and $hasContentReaderWithSubstitution)
+		for ($i = 0; $i -lt $elements.Count; $i++) {
+			$el = $elements[$i]
 			if ($el.CommandIndex -lt 0) { continue }
 			if ($script:SkipOutputCommands -contains $el.Name) { continue }
+			if ((Test-IsMetadataLookupElement $el) -and -not $preserved.Contains($i)) { continue }
 			$isDirectRead = $script:DirectReadCommands -contains $el.Name
 			$cmdWord = $el.Words[$el.CommandIndex]
 			$wordsToScan = [Collections.Generic.List[object]]::new()

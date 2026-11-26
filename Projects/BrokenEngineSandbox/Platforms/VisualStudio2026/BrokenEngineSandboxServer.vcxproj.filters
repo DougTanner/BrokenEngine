@@ -112,9 +112,6 @@
     <Filter Include="DataFiles">
       <UniqueIdentifier>{e3cac6bc-4d0e-4867-af72-ef6f468edce5}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Game\Ui\Screens">
-      <UniqueIdentifier>{212658d4-68e3-46eb-b66e-07fd431eb65e}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\..\Engine\Data\Shaders\ShaderGlobalLayout.h">
@@ -324,45 +321,6 @@
     <ClInclude Include="..\..\..\..\Common\StackWalker.h">
       <Filter>Common</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Engine\Source\Ui\WrapperBase.h">
-      <Filter>Engine\Ui</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Engine\Source\Ui\PbrWrappersBase.h">
-      <Filter>Engine\Ui</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Engine\Source\Ui\TerrainWrappersBase.h">
-      <Filter>Engine\Ui</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Engine\Source\Ui\WaterWrappersBase.h">
-      <Filter>Engine\Ui</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Engine\Source\Ui\LightingWrappersBase.h">
-      <Filter>Engine\Ui</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Engine\Source\Ui\ShadowWrappersBase.h">
-      <Filter>Engine\Ui</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Engine\Source\Ui\SunMoonWrappersBase.h">
-      <Filter>Engine\Ui</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Engine\Source\Ui\MiscWrappersBase.h">
-      <Filter>Engine\Ui</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Engine\Source\Ui\SmokeWrappersBase.h">
-      <Filter>Engine\Ui</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Engine\Source\Ui\WindWrappersBase.h">
-      <Filter>Engine\Ui</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Engine\Source\Ui\GraphicsSettingsWrappersBase.h">
-      <Filter>Engine\Ui</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Engine\Source\Ui\HeightLerpWrapperQuartet.h">
-      <Filter>Engine\Ui</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Engine\Source\Ui\SoundSettingsWrappersBase.h">
-      <Filter>Engine\Ui</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Source\Frame\FlightPlaneTable.h">
       <Filter>Game\Frame</Filter>
     </ClInclude>
@@ -413,9 +371,6 @@
     </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Input\RawInputManager.h">
       <Filter>Engine\Input</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Source\Ui\WindDepositsWrappers.h">
-      <Filter>Game\Ui</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Common\Log\LogDifference.h">
       <Filter>Common\Log</Filter>
@@ -567,13 +522,7 @@
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\Collections\Pushers\Pushers.h">
       <Filter>Engine\Frame\Collections\Pushers</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Source\Ui\Screens\HudScreen.h">
-      <Filter>Game\Ui\Screens</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\LocalizationBase.h">
-      <Filter>Engine\Ui</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Engine\Source\Ui\MenuUtils.h">
       <Filter>Engine\Ui</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\Alignments.h">
@@ -898,9 +847,6 @@
     </ClCompile>
 
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\LocalizationBase.cpp">
-      <Filter>Engine\Ui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\MenuUtils.cpp">
       <Filter>Engine\Ui</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\Alignments.cpp">

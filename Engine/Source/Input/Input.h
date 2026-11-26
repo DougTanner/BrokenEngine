@@ -2,35 +2,35 @@
 
 #if defined(BT_CLIENT)
 
+#include "Input/Keybinds.h"
 #include "Input/RawInputManager.h"
 
 namespace engine
 {
 
+// MenuInputFlags carries fixed and debug inputs. Query remappable fullscreen, chat, and screenshot actions
+// through InputPoll::Pressed(KeyAction).
 enum class MenuInputFlags : uint64_t
 {
-	kPauseMenu         = 0x00000001,
-	kToggleFullscreen  = 0x00000002,
-	kMouseIsDown       = 0x00000004,
-	kMouseClick        = 0x00000008,
-	kGamepadButton     = 0x00000010,
-	kQuit              = 0x00000020,
-	kToggleProfileText = 0x00000040,
-	kTogglePauseFrame  = 0x00000080,
-	kOpenChat          = 0x00000100,
-	kQuicksave         = 0x00000200,
-	kQuickload         = 0x00000400,
-	kSaveReplay        = 0x00000800,
-	kLoadReplay        = 0x00001000,
-	kSlowTime          = 0x00002000,
-	kSpeedUpTime       = 0x00004000,
-	kSingleStep        = 0x00008000,
-	kMenuTweaks        = 0x00020000,
-	kToggleScreenshots = 0x00040000,
-	kMenuDebugTexture  = 0x00200000,
-	kDebugTextureNext  = 0x00400000,
-	kDebugTexturePrevious  = 0x00800000,
-	kToggleDebugRender = 0x01000000,
+	kPauseMenu            = 0x00000001,
+	kMouseIsDown          = 0x00000004,
+	kMouseClick           = 0x00000008,
+	kGamepadButton        = 0x00000010,
+	kQuit                 = 0x00000020,
+	kToggleProfileText    = 0x00000040,
+	kTogglePauseFrame     = 0x00000080,
+	kQuicksave            = 0x00000200,
+	kQuickload            = 0x00000400,
+	kSaveReplay           = 0x00000800,
+	kLoadReplay           = 0x00001000,
+	kSlowTime             = 0x00002000,
+	kSpeedUpTime          = 0x00004000,
+	kSingleStep           = 0x00008000,
+	kMenuTweaks           = 0x00020000,
+	kMenuDebugTexture     = 0x00200000,
+	kDebugTextureNext     = 0x00400000,
+	kDebugTexturePrevious = 0x00800000,
+	kToggleDebugRender    = 0x01000000,
 };
 using MenuInputFlags_t = common::Flags<MenuInputFlags>;
 
@@ -42,62 +42,102 @@ struct MenuInput
 	XMFLOAT2 f2Gamepad {};
 };
 
-// Borrowed view of the current and previous raw snapshots, handed out by BeginPoll so engine policy and the
-// game's ProcessGameMenuInput detect edges against the same pair, plus whether the UI owns the keyboard this poll.
-// It is only valid until the previous snapshot advances, so it must never outlive GameBase::ProcessInput.
-class InputPoll
+// Scoped RAII display-frame poll guard. Construction publishes the RawInput
+// snapshot, resolves active keybind capture (if any), and fills MenuInput and
+// gpCamera->mCameraInput through this single owning guard; destruction advances
+// Input::mPreviousRawInput after all consumers (including early-return paths
+// and game::ProcessGameMenuInput).
+class [[nodiscard]] InputPoll
 {
 public:
 
-	const RawInput& mrCurrent;
-	const RawInput& mrPrevious;
+	InputPoll(bool bLostFocus, bool bMenuVisible, MenuInput& rMenuInput);
+	~InputPoll();
 
-	bool KeyboardPressed(int64_t iKey) const
+	InputPoll(const InputPoll&) = delete;
+	InputPoll& operator=(const InputPoll&) = delete;
+
+	// Game action enums supply KeybindFor via ADL. Both queries return false for unbound actions and during
+	// capture. When UI owns the keyboard, only Pressed can report VK_TAB.
+	template <typename ACTION_ENUM>
+	bool Pressed(ACTION_ENUM eAction) const
 	{
-		return (iKey == VK_TAB || !mbUserInterfaceOwnsKeyboard) && mrCurrent.pbKeyboardKeys[iKey] && !mrPrevious.pbKeyboardKeys[iKey];
+		return PressedKey(KeybindFor(eAction));
 	}
-	bool MousePressed(MouseButtons eButton) const
+
+	template <typename ACTION_ENUM>
+	bool Held(ACTION_ENUM eAction) const
 	{
-		return (mrCurrent.mouseButtons & eButton) && !(mrPrevious.mouseButtons & eButton);
+		return HeldKey(KeybindFor(eAction));
 	}
-	bool GamepadPressed(GamepadButtons eButton) const
-	{
-		return (mrCurrent.gamepadButtons & eButton) && !(mrPrevious.gamepadButtons & eButton);
-	}
+
+	// Combines the four configured free-camera KeyAction directions using
+	// kfFreeCameraAxis. Returns {0, 0} while UI owns keyboard or capture runs.
+	XMFLOAT2 MoveAxis() const;
+
+	// Low-level key/device queries for fixed and debug shortcuts; keyboard
+	// queries are automatically suppressed while keybind capture is active.
+	bool PressedKey(VirtualKey key) const;
+	bool HeldKey(VirtualKey key) const;
+	bool KeyboardPressed(int64_t iKey) const;
+	bool MousePressed(MouseButtons eButton) const;
+	bool GamepadPressed(GamepadButtons eButton) const;
 
 private:
 
 	friend class Input;
 
-	InputPoll(const RawInput& rCurrent, const RawInput& rPrevious, bool bUserInterfaceOwnsKeyboard) : mrCurrent(rCurrent), mrPrevious(rPrevious), mbUserInterfaceOwnsKeyboard(bUserInterfaceOwnsKeyboard)
-	{
-	}
+	static constexpr uint8_t kuiFlagUserInterfaceOwnsKeyboard = 1ui32 << 0;
+	static constexpr uint8_t kuiFlagCaptureSuppressed         = 1ui32 << 1;
 
-	bool mbUserInterfaceOwnsKeyboard = false;
-
+	const RawInput& mrCurrent;
+	const RawInput& mrPrevious;
+	uint8_t muiPollFlags = 0; // UI keyboard ownership + capture suppression bits
 };
 
-class Input
+class Input : public common::Singleton<Input>
 {
 public:
 
-	InputPoll BeginPoll(bool bLostFocus, bool bMenuVisible, MenuInput& rMenuInput);
+	Input();
+
+	// Loads EngineKeybinds.bin and GameKeybinds.bin at startup and resolves any
+	// cross-domain duplicate keys (loaded file overrides default; engine wins
+	// tie between two loaded files with one kWarning).
+	void LoadAllKeybinds();
+
+	void BeginKeybindCapture(KeybindSlot slot);
+	void CancelKeybindCapture();
+	bool IsCapturingKeybind() const;
+	bool IsCapturingKeybind(KeybindSlot slot) const;
+
+	// Unbinds any previous owner across both engine and game tables, then
+	// assigns key (or VirtualKey::Unbound()) to slot.
+	void RebindSlot(KeybindSlot slot, VirtualKey key);
+
+	// Cancels active capture and resets both engine and game keybinds to defaults.
+	void ResetAllKeybinds();
+
+	// Keeps the opening key's WM_KEYDOWN and WM_SYSKEYDOWN repeats out of chat until release or focus loss.
+	VirtualKey mSuppressedChatOpenKey {};
 
 private:
+
+	friend class InputPoll;
 
 	enum class InputStateFlags : uint8_t
 	{
 		kScrollWheelInitialized = 1 << 0,
 		kGamepadMode            = 1 << 1,
+		kCapturingKeybind       = 1 << 2,
 	};
 
-	// Previous display frame's published snapshot. Also carries the scroll-wheel baseline, since the raw
-	// snapshot exposes only a lifetime accumulator.
-public:
-	RawInput mPreviousRawInput {};
-private:
+	void BeginPoll(bool bLostFocus, bool bMenuVisible, MenuInput& rMenuInput, InputPoll& rInputPoll);
+	void EndPoll();
 
-	common::Flags<InputStateFlags> mStateFlags;
+	RawInput mPreviousRawInput {};
+	KeybindSlot mCaptureSlot {};
+	common::Flags<InputStateFlags> mStateFlags {};
 };
 
 inline Input* gpInput = nullptr;

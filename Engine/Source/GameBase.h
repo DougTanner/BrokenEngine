@@ -44,6 +44,7 @@ enum class UiState
 
 	kGameSettings,
 	kGraphicsSettings,
+	kKeybinds,
 	kModal,
 	kPause,
 	kSound,

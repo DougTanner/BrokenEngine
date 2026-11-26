@@ -2,7 +2,9 @@
 
 #include "File/PackChunks.h"
 #include "Graphics/CameraBase.h"
+#if defined(BT_CLIENT)
 #include "Ui/GraphicsSettingsWrappersBase.h"
+#endif
 #include "ProfileManager.h"
 
 #include "Profile/ProfileRows.h"

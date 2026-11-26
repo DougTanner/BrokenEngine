@@ -8,15 +8,10 @@ inputs, modes, and the handoff form live in [`../SKILL.md`](../SKILL.md).
 1. Fix mode and components from the brief; on focused re-review, read its
    files, regions, and `First-round findings`, skipping step 2. Done when scope
    is settled.
-2. First-round: run below with no disk writes (`-Head` from `Baseline` if
-   committed; from `Scope`, `-UntrackedPath`/`-IncludeUntracked`, plus
-   `-PathPrefix "<prefixes>"` if set). Require `status` `pass`, else return
-   `BLOCKED` without rebuilding the diff. Done when regions and omitted count
-   print.
-
-```powershell
-pwsh -NoProfile -Command 'Import-Module ./.agents/scripts/SessionChangeInventory.psm1; Get-SessionChangeInventory -RepositoryRoot (Get-Location).Path -Baseline <baseline SHA> -Regions -CoherenceOnly|Select-Object status,coretide,counts,entries,regions|ConvertTo-Json -Depth 5'
-```
+2. Use the first-round inventory in [`../SKILL.md`](../SKILL.md) `## Inputs`.
+   For bridge input see [`codex-bridge.md`](../../../references/codex-bridge.md)
+   step 2. Require `status` `pass` or return `BLOCKED` without rebuilding the
+   diff.
 
 3. Read each region's old lines from baseline (`oldPath` on renames) and new
    lines from committed head or worktree; read `Projects/Coretide/` entries

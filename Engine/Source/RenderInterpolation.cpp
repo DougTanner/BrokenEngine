@@ -6,6 +6,7 @@
 
 #include "Graphics/Camera.h"
 #include "Profile/ProfileRows.h"
+#include "Game.h"
 
 namespace engine
 {
@@ -98,7 +99,7 @@ float RenderInterpolation::AdvanceRenderClock(double fWindowStartTime, bool bPau
 	return fDeltaTime;
 }
 
-void RenderInterpolation::UpdateRenderInterpolation(GameBase& rGame, const std::vector<GridCoord>& rActiveCoordinates, GridCoord cameraCoordinate, bool bHaveRenderableCamera)
+bool RenderInterpolation::UpdateRenderInterpolation(GameBase& rGame, const std::vector<GridCoord>& rActiveCoordinates, GridCoord cameraCoordinate, bool bHaveRenderableCamera)
 {
 	// Per-frame render interpolates and camera update before RenderGlobal so that
 	// mf4RenderVisibleArea and lighting area are computed from the current camera position
@@ -114,9 +115,12 @@ void RenderInterpolation::UpdateRenderInterpolation(GameBase& rGame, const std::
 			return !std::ranges::contains(rActiveCoordinates, rPair.first) || !rGame.IsCoordinateRenderable(rPair.first);
 		});
 	}
+	bool bObserverActive = gpCamera->meObserverState == CameraBase::ObserverState::kObserving && !(rGame.mGameFlags & GameFlags::kMainMenu);
 	if (rActiveCoordinates.empty())
 	{
-		return;
+		std::ignore = mRenderTimer.GetDeltaNs(true);
+		mfLastRenderFrameSeconds = 0.0;
+		return !bObserverActive;
 	}
 
 	gpProfileManager->CpuStart(game::kCpuTimerFrameUpdate);
@@ -124,6 +128,38 @@ void RenderInterpolation::UpdateRenderInterpolation(GameBase& rGame, const std::
 
 	double fSimulationDeltaSeconds = common::NanosecondsToFloatSeconds<double>(rGame.mTimeStep.WallToSimulation(mRenderTimer.GetDeltaNs(true)));
 	mfLastRenderFrameSeconds = fSimulationDeltaSeconds;
+	if (bObserverActive)
+	{
+		common::ScopedWorkbufferArena allowedCoordinatesArena = common::gpThreadLocal->mWorkbuffer.Push();
+		if (gpClient != nullptr)
+		{
+			for (const GridCoord& rCoordinate : rActiveCoordinates)
+			{
+				auto cellIt = rGame.mCells.find(rCoordinate);
+				if (cellIt == rGame.mCells.end() || cellIt->second.iSnapshotCount == 0 || cellIt->second.iConfirmedTick < 0)
+				{
+					continue;
+				}
+				bool bSubscribed = std::ranges::any_of(gpClient->mSubscriptions.mCoordinateSlots, [&](const ClientCoordSlot& rSlot)
+				{
+					return rSlot.eState == CoordSubscriptionState::kActive && rSlot.coordinate == rCoordinate;
+				});
+				if (bSubscribed)
+				{
+					allowedCoordinatesArena.mBuffer.PushBack<GridCoord>(rCoordinate);
+				}
+			}
+		}
+		std::span<const GridCoord> allowedCoordinates = allowedCoordinatesArena.mBuffer.Span<const GridCoord>();
+		if (allowedCoordinates.empty())
+		{
+			gpProfileManager->CpuStop(game::kCpuTimerFrameInterpolate);
+			gpProfileManager->CpuStop(game::kCpuTimerFrameUpdate);
+			return false;
+		}
+		gpCamera->StepObserverPan(static_cast<float>(mfLastRenderFrameSeconds), allowedCoordinates);
+	}
+	GridCoord basisCoordinate = bObserverActive ? gpCamera->mBasisCoordinate : cameraCoordinate;
 	// Without a renderable camera coord fDeltaTime stays 0; the per-coord interpolate below still runs.
 	float fDeltaTime = 0.0f;
 	float fSunDeltaTime = 0.0f;
@@ -176,7 +212,7 @@ void RenderInterpolation::UpdateRenderInterpolation(GameBase& rGame, const std::
 			// Label the copy with the cell its positions are local to and that cell's offset from the camera cell
 			// this same render entry point just resolved. Every renderer converts with this value at its one
 			// position-to-GPU point; the position columns are never rewritten.
-			mRenderInterpolates.at(rCoordinate).renderBasis = MakeRenderBasis(rCoordinate, cameraCoordinate);
+			mRenderInterpolates.at(rCoordinate).renderBasis = MakeRenderBasis(rCoordinate, basisCoordinate);
 		};
 		if (bHaveRenderableCamera)
 		{
@@ -211,14 +247,18 @@ void RenderInterpolation::UpdateRenderInterpolation(GameBase& rGame, const std::
 	{
 		UpdateCamera(rGame, cameraCoordinate, fSunDeltaTime);
 	}
+	return true;
 }
 
 void RenderInterpolation::UpdateCamera(const GameBase& rGame, GridCoord cameraCoordinate, float fSunDeltaTime)
 {
 	const game::FrameInterpolate& rFrameInterpolate = mRenderInterpolates.at(cameraCoordinate);
 	bool bMainMenuFrame = rGame.mGameFlags & GameFlags::kMainMenu;
-	CameraTarget pulledTarget = static_cast<game::Camera&>(*gpCamera).PullTarget(rFrameInterpolate);
-	gpCamera->Update(rFrameInterpolate, static_cast<float>(mfLastRenderFrameSeconds), fSunDeltaTime, bMainMenuFrame, pulledTarget);
+	game::Camera& rCamera = static_cast<game::Camera&>(*gpCamera);
+	CameraTarget pulledTarget = rCamera.PullTarget(rFrameInterpolate, mRenderInterpolates);
+	GridCoord basisCoordinate = (rCamera.meObserverState == CameraBase::ObserverState::kObserving && !bMainMenuFrame) ? rCamera.mBasisCoordinate : cameraCoordinate;
+	std::optional<XMVECTOR> optionalSubscriptionCenter = bMainMenuFrame ? std::nullopt : rCamera.PullSubscriptionCenter(mRenderInterpolates, basisCoordinate);
+	gpCamera->Update(rFrameInterpolate, static_cast<float>(mfLastRenderFrameSeconds), fSunDeltaTime, bMainMenuFrame, pulledTarget, optionalSubscriptionCenter);
 
 	// Vibration follows the shake Update just decayed.
 	float fVibration = std::pow(gpCamera->mfShake, 0.5f);

@@ -91,8 +91,8 @@ full bootstrap (Developer Mode → clone → primary ThirdParty builds → data 
 
 ## Windows Shell Tools
 
-- Git for Windows and PowerShell 7 are required for the documented AI coding
-  workflow. Git for Windows includes Git Bash.
+- Git for Windows (for `git`) and PowerShell 7 are required for the documented
+  AI coding workflow.
 	```powershell
 	winget install --id Git.Git --exact --source winget
 	```
@@ -116,10 +116,10 @@ full bootstrap (Developer Mode → clone → primary ThirdParty builds → data 
 	```powershell
 	winget install --id Microsoft.WindowsTerminal --exact --source winget
 	```
-- Close and reopen Windows Terminal after installation. Use its discovered Git
-  Bash profile for Claude Code and PowerShell profile for Codex CLI.
-- From Git Bash, verify both required tools are available:
-	```bash
+- Close and reopen Windows Terminal after installation and use its discovered
+  PowerShell profile for all AI coding CLIs.
+- From PowerShell 7, verify both required tools are available:
+	```powershell
 	git --version
 	pwsh --version
 	```
@@ -128,19 +128,7 @@ full bootstrap (Developer Mode → clone → primary ThirdParty builds → data 
 
 ### Optional Current Maintainer Shell Tweaks
 
-- Windows Terminal auto-discovers Git Bash and PowerShell. The current custom
-  Git Bash profile launches `C:\Program Files\Git\bin\bash.exe --login -i`,
-  preserves the caller's current directory, and leaves `startingDirectory` unset
-  instead of fixing it to one location.
-- The current Git Bash `~/.bashrc` appends each command to history and reports
-  the current directory to Windows Terminal with OSC 9;9:
-	```bash
-	shopt -s histappend
-	PROMPT_COMMAND='history -a; printf "\e]9;9;%s\e\\" "$(cygpath -w "$PWD")"'
-	```
-	If `PROMPT_COMMAND` already exists, merge these operations into it rather than
-	overwriting it blindly.
-- The current PowerShell 7 prompt also emits OSC 9;9 for Windows Terminal
+- The current PowerShell 7 prompt emits OSC 9;9 for Windows Terminal
   current-directory tracking; its full prompt override, history injection, and
   cosmetic settings are personal and intentionally omitted here.
 
@@ -150,10 +138,11 @@ The suggested launch commands below bypass permission prompts and other
 safeguards. Use them only in a repository and environment where that level of
 access is intentional.
 
-Use separate Windows Terminal profiles for the three clients: run Claude Code
-from Git Bash, and run Codex CLI and Antigravity CLI from PowerShell 7. The
-repository wrappers and command examples use the native syntax of those shells;
-`pwsh` must also be available to Git Bash for shared PowerShell helpers.
+Run all three clients (Claude Code, Codex CLI, and Antigravity CLI) from
+PowerShell 7 using the shared launcher
+`.\.agents\scripts\Start-AgentWorktreeSession.ps1 <client>` (and
+`-ReattachWorktree <path>` to reopen an existing session worktree). The
+repository launcher and command examples use PowerShell 7 syntax.
 
 ### Claude Code
 
@@ -164,17 +153,22 @@ repository wrappers and command examples use the native syntax of those shells;
 	```
 - Close and reopen the terminal, then verify the installation with
   `claude --version`.
-- Git for Windows is required for this documented native-Windows workflow. From
-  Git Bash at the repository root, use the provisioned-worktree wrapper:
-	```bash
-	./.claude/claude-worktree.sh
+- From a PowerShell 7 tab inside Windows Terminal, opened at the primary
+  checkout root, launch Claude Code in a UUID-named worktree:
+	```powershell
+	.\.agents\scripts\Start-AgentWorktreeSession.ps1 claude
 	```
-- The tracked `.claude/settings.json` sets `worktree.baseRef` to `head`, so
-  Claude-created worktrees branch from the commit currently checked out in the
-  session worktree; no per-user setting is required.
-- The wrapper creates and validates the report directory and stable primary
-  dependency links, writes the session's private-Git receipt, then tracks Claude
-  with kill-on-host-close lifetime. Do not bypass the wrapper. No one-time
+- The tracked `.claude/settings.json` sets `worktree.baseRef` to `head` and
+  enables Claude Code's native PowerShell tool
+  (`CLAUDE_CODE_USE_POWERSHELL_TOOL=1`), so Claude-created worktrees branch from
+  the commit currently checked out in the session worktree; no per-user setting
+  is required.
+- The wrapper creates branch `claude/<uuid>`, stores the worktree under
+  `~/.claude/worktrees/<repository>/<uuid>`, validates the report directory and
+  stable primary dependency links, writes the session's private-Git receipt,
+  then launches Claude with `--dangerously-skip-permissions` and tracks it with
+  kill-on-host-close lifetime (`-ReattachWorktree <path>` reopens an existing
+  session worktree with `--resume`). Do not bypass the wrapper. No one-time
   coordination-state initialization is required.
 
 #### Optional Current Maintainer Preferences
@@ -212,16 +206,17 @@ setting is needed to suppress that confirmation.
 - Run `codex login status` and confirm it reports a ChatGPT login. For the
   subscription-backed Codex Bridge route, do not set `OPENAI_API_KEY`; doing so
   switches it to metered API billing.
-- From a PowerShell 7 tab inside Windows Terminal, opened at the repository
-  root, launch Codex in a UUID-named worktree:
+- From a PowerShell 7 tab inside Windows Terminal, opened at the primary
+  checkout root, launch Codex in a UUID-named worktree:
 	```powershell
-	.\.codex\codex-worktree.ps1
+	.\.agents\scripts\Start-AgentWorktreeSession.ps1 codex
 	```
 - The wrapper creates branch `codex/<uuid>`, stores the worktree under
   `~/.codex/worktrees/<repository>/<uuid>`, validates the same links and report
   directory, and launches Codex with
-  `--dangerously-bypass-approvals-and-sandbox`. Every wrapper rebuilds the
-  shared primary binaries under a bootstrap mutex before launch, tracks the
+  `--dangerously-bypass-approvals-and-sandbox` (`-ReattachWorktree <path>`
+  reopens an existing session worktree). The wrapper rebuilds the shared primary
+  binaries under a bootstrap mutex before launching a new worktree, tracks the
   client with kill-on-host-close lifetime, propagates its exit code, and
   preserves partial artifacts on provisioning failure.
 - Non-Codex sessions (Claude Code, Antigravity CLI) dispatch routed review
@@ -314,7 +309,7 @@ Presentations, Template Creator, Sites, and OpenAI Templates, plus `js_repl`,
 - From a PowerShell 7 tab inside Windows Terminal, opened at the primary
   checkout root, launch `agy` in a UUID-named worktree:
 	```powershell
-	.\.antigravity\agy-worktree.ps1
+	.\.agents\scripts\Start-AgentWorktreeSession.ps1 agy
 	```
 - The wrapper creates branch `agy/<uuid>`, stores the worktree under
   `~/.agy/worktrees/<repository>/<uuid>`, and launches `agy` with

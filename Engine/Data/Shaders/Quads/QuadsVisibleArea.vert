@@ -54,7 +54,7 @@ void main()
 	}
 	else if (int(pushConstantsLayout.f4Pipeline.x) == kiAreaSelectorSmoke)
 	{
-		f4VisibleArea = globalLayout.pf4SmokeAreas[int(pushConstantsLayout.f4Pipeline.y)];
+		f4VisibleArea = globalLayout.f4SmokeArea;
 	}
 	else
 	{

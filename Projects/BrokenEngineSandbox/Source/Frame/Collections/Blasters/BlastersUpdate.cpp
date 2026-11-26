@@ -4,7 +4,9 @@
 
 #include "Data/Audio.h"
 #include "Frame/CellStaticData.h"
+#if defined(BT_CLIENT)
 #include "Ui/WrapperBase.h"
+#endif
 
 #include "Frame/HealthDamage.h"
 #if defined(BT_CLIENT)
