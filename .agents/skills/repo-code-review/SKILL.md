@@ -28,54 +28,42 @@ Delegation form: `../../references/subagent-reporting.md`
 
 ## Inputs
 
-Require a self-contained brief containing:
+Require a self-contained brief (`../../references/subagent-reporting.md`,
+`## Task brief`) containing:
 
-- the session baseline as a full Git SHA, complete immutable authorized C++
-  diff, and exact changed files/regions, separated from pre-existing and
+- `Baseline` as the repository root, full 40-character Git SHA, and committed
+  head when one applies, plus `Scope` for the authorized diff boundary and any
+  untracked files or path prefixes to include, separated from pre-existing and
   concurrently owned changes;
-- a `broken-engine-code-quality-targets/v1` targets file, produced for a
-  manager-saved run by
-  `pwsh -NoProfile -File .agents/scripts/Get-SessionChangeInventory.ps1 -RepositoryRoot '<absolute repository toplevel>' -Baseline <full 40-character SHA> -EmitTargets > Temp/code-review-targets.json`,
-  adding `-IncludeUntracked` for authorized untracked additions and
-  `-Head <commit>` for a committed head, from that authorized diff (or focused
-  re-review), listing the script-selected baseline and current C++ paths of
-  additions, deletions, and renames; its tracked changes are every change since
-  the session baseline. Its `paths` are the C++ target set selected by the same
-  run's `cpp` and `dual-language-header` classes, requiring no separately
-  supplied class decision. Those script class rules are the only statement of
-  which `.h` files are GLSL-only, and every `dual-language-header` entry routes
-  to both this C++ review and the GLSL review;
-- approved intent, plan and deltas, affected contracts, and declared
-  invariants;
-- implementation handoff, acceptance criteria, notes on which other code sites
-  the change may affect, and any prior findings relevant to a focused re-review;
+- approved intent, plan and deltas, affected contracts, and declared invariants;
+- implementation handoff, acceptance criteria, and notes on which other code
+  sites the change may affect;
 - checkout path and applicable repository instructions.
 
-The targets file is the authoritative supplied input. The dispatching manager
-saves one read-only run to a file with the targets-file bullet's invocation
-above, which redirects its stdout into the file and runs as one call of either
-shell tool. That invocation's gitignored `Temp/` path is the save-path
-convention, and the manager supplies the path, not the targets bytes, to the
-review worker. The run reports its own `status` rather than a field of the
-saved file: on `pass` (exit 0) stdout carries only the targets bytes, while
-`blocked` (exit 2) or `error` (exit 1) sends no targets bytes to the file, so
-the redirect leaves it empty while the envelope goes to stderr, and such a run
-counts as a missing targets file below. The saved file itself holds only
-`schemaVersion` and `paths`, so a check of that file confirms those two keys.
-Never rebuild the targets file or restate the class decision inline.
+Derive changed entries and regions in-process, including on bridge runs (which
+pass `Baseline` and `Scope`; add `-Head <commit>` for a committed head and
+`-UntrackedPath`/`-IncludeUntracked` and `-PathPrefix` from `Scope`):
 
-Return `BLOCKED` when the session baseline, diff boundary, targets file, intent,
-or invariants are missing or moving. Do not reconstruct them from a mutable
-merge base, derive a broader target selection from checkout changes, or expand a
-supplied review into an open-ended repository audit. After an accepted fix,
-review only the fixed region and directly affected paths unless a reproducible
-failure justifies another round.
+```powershell
+pwsh -NoProfile -NonInteractive -Command 'Import-Module ./.agents/scripts/SessionChangeInventory.psm1; Get-SessionChangeInventory -RepositoryRoot (Get-Location).Path -Baseline <baseline SHA> -Regions|Select-Object status,coretide,entries,regions|ConvertTo-Json -Depth 5'
+```
+
+Require inventory `status` `pass`; otherwise return `BLOCKED` without rebuilding
+the diff. Select only entries whose `class` is `cpp` or `dual-language-header`
+with their matching `regions` — those script class rules alone decide which `.h`
+files are GLSL-only (never restate them), and every `dual-language-header` entry
+routes to both this C++ review and `/glsl-review`.
+
+Return `BLOCKED` when the session baseline, inventory, diff boundary, intent, or
+invariants are missing or moving. Do not reconstruct them from a mutable merge
+base, derive a broader target selection from checkout changes, or expand a
+supplied review into an open-ended repository audit.
 
 ## Handoff
 
-Order findings by impact. `Critical` means data loss, broken functionality,
-determinism failure, or an equivalent contract breach; every other reported
-finding is `Required`. Give each finding a stable `CXX###` ID. Omit empty
+Order findings by impact and grade each by
+[`../../references/subagent-handoff.md`](../../references/subagent-handoff.md)
+`## Severity`. Give each finding a stable `CXX###` ID. Omit empty
 optional extension rows. Correctness and scope-authorization failures both go
 in the shared `Findings` field.
 
@@ -97,7 +85,7 @@ pending external verdict, size observation, or refactor observation, using
 Each `Findings` row is one line on this form:
 
 ```text
-CXX### Critical|Required path:line — claim — evidence and smallest correction
+CXX### Critical|High|Medium|Low path:line — claim — evidence and smallest correction
 ```
 
 `Changed files` and `Build required` are `none` because this findings-only
@@ -105,10 +93,11 @@ review never edits a file.
 
 Use `NEEDS_ACTION` when a finding or pending external verdict requires action,
 `BLOCKED` when required review evidence is unavailable, and `PASS` only when
-the review is clean. A clean `PASS` means every path in the targets file was
-traced; a review that leaves any targets-file path not fully traced is not clean
-and returns `NEEDS_ACTION` with an incomplete-trace `Residuals` row naming the
-path, or `BLOCKED` when the evidence needed to trace it is unavailable.
+the review is clean. A clean `PASS` means every path in the scope established
+by `## Inputs` was traced; a review that leaves any such path not fully traced
+is not clean and returns `NEEDS_ACTION` with an incomplete-trace `Residuals`
+row naming the path, or `BLOCKED` when the evidence needed to trace it is
+unavailable.
 
 ## References
 

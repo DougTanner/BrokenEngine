@@ -58,10 +58,12 @@ bool ParseLaunchOptions()
 		{
 			gLaunchOptions.flags.Set(LaunchOptionFlags::kLoopbackOnly);
 		}
+#if defined(BT_CLIENT)
 		else if (std::wcscmp(pArgumentValues[i], L"--renderdoc") == 0)
 		{
 			gLaunchOptions.flags.Set(LaunchOptionFlags::kRenderDoc);
 		}
+#endif
 		else if (std::wcscmp(pArgumentValues[i], L"--agent-port") == 0)
 		{
 			if (i + 1 < iArgumentCount)
@@ -136,6 +138,7 @@ bool ParseLaunchOptions()
 				bSuccess = false;
 			}
 		}
+#if defined(BT_CLIENT)
 		else if (std::wcscmp(pArgumentValues[i], L"--windowed") == 0)
 		{
 			if (i + 1 < iArgumentCount)
@@ -168,6 +171,7 @@ bool ParseLaunchOptions()
 				LOG(kDefault, kWarning, "Launch option --windowed missing value");
 			}
 		}
+#endif
 		else
 		{
 			LOG(kDefault, kWarning, "Unknown launch option: {}", std::wstring(pArgumentValues[i]));

@@ -102,9 +102,9 @@ void UnbindKey(VirtualKey key);
 std::span<const KeyAction> VisibleEngineKeyActions();
 KeybindRowInfo DescribeKeybind(KeyAction eAction);
 
-// Versioned binary persistence (EngineKeybinds.bin, kiVersion = 1).
-// LoadEngineKeybinds returns true when an existing file validated and loaded,
-// false when missing or rejected (leaving defaults in place).
+// Binary persistence uses kpcEngineKeybindsPath and EngineKeybindsFile::kiVersion.
+// LoadEngineKeybinds returns true after validating and loading an existing file.
+// A missing or rejected file leaves defaults in place.
 bool LoadEngineKeybinds();
 void SaveEngineKeybinds();
 void ResetEngineKeybinds();

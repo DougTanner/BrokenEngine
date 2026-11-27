@@ -64,7 +64,7 @@ inline Wrapper gSpreadOutputCompressEnd(2.5f, 0.0f, 4.0f);
 // Combine (Uchimura tone curve)
 inline Wrapper gCombineMaxBrightness(1.3f, 0.1f, 4.0f);
 inline Wrapper gCombineContrast(1.3f, 0.1f, 2.0f); // Contrast must stay positive: LightingUniforms.cpp divides by fCombineContrast when computing the tone-curve segment length.
-inline Wrapper gCombineLinearStart(0.3f / 1.3f, 0.01f, 0.8f); // Fraction of gCombineMaxBrightness; paired with gCombineMaxBrightness >= 0.1f and gCombineLinearLength <= 0.8f, bounds keep 0 < m < S1 < P, m >= 0.001f, and P - S1 >= 0.004f.
+inline Wrapper gCombineLinearStart(0.3f / 1.3f, 0.01f, 0.8f); // Fraction of gCombineMaxBrightness; paired with gCombineMaxBrightness's minimum and gCombineLinearLength's maximum, bounds keep 0 < m < S1 < P, m >= 0.001f, and P - S1 >= 0.004f.
 inline Wrapper gCombineLinearLength(0.5f, 0.01f, 0.8f);
 inline Wrapper gCombineToe(3.5f, 1.3f, 6.0f);
 inline Wrapper gCombineBlackTightness(0.0f, 0.0f, 1.0f); // Fraction of resolved linear start m; bounds keep 0 <= b <= m across the entire slider domain.

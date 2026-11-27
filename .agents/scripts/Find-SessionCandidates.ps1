@@ -297,9 +297,7 @@ function Test-Rule22SingleLine([string] $Path, [int] $Line) {
 		$text = (Get-NewSideLine $Path) -join "`n"
 		$found = [Collections.Generic.HashSet[int]]::new()
 		$braces = [Collections.Generic.Stack[object]]::new()
-		# Literals remain opaque tokens; comments are trivia. Numbers consume digit separators before
-		# the character-literal alternative can mistake an apostrophe for an opening quote.
-		$tokens = '(?<comment>//(?:[^\n]*\\\n)*[^\n]*|/\*[\s\S]*?(?:\*/|\z))|(?<literal>(?:u8|u|U|L)?R"(?<delimiter>[^\s()\\]{0,16})\([\s\S]*?\)\k<delimiter>"|\b[0-9][\w''.]*|"(?:\\[\s\S]|[^"\\])*"|''(?:\\[\s\S]|[^''\\])*'')|(?<space>\s+)|(?<code>.)'
+		$tokens = Get-AgentCppTokenPattern
 		$number = 1
 		$previous = ''
 		$onlyTrivia = $true

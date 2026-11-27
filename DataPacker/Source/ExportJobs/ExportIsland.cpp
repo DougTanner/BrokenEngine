@@ -176,8 +176,8 @@ static void EncodeMaterialMasks(const std::filesystem::path& rInputPath, const s
 
 	Texture texture(packedRgba.data(), iMaskWidth, iMaskHeight, 4);
 	texture.Crop(rBaked.iCropX, rBaked.iCropY, rBaked.iCropWidth, rBaked.iCropHeight);
-	// 4x reduction matches Elevation's downsample ratio; crop dims are multiples of 4*kiElevationDivisor=16
-	// so the post-Downsize dims stay multiples of 4 for BC alignment.
+	// Downsize matches the elevation reduction set by kiElevationDivisor. The bake's kiCropAlignment keeps
+	// the downsized mask BC-block aligned.
 	texture.Downsize(2);
 	// Post-Downsize dims (cropW/4 × cropH/4) match the heightmap exactly, so divisor = 1. All four
 	// mask channels go to zero underwater (no rock/sand/snow/flow override below the cut line).

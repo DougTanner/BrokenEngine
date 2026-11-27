@@ -54,7 +54,12 @@ path plus selector per
 [`subagent-handoff.md`](../../references/subagent-handoff.md) `## Handoffs`.
 A handoff the session never received is not a dispatch blocker; the worker gives
 its row a status under the acceptance-table step in
-[`references/worker.md`](references/worker.md).
+[`references/worker.md`](references/worker.md). For the step-2 record in
+[`landing-acceptance-table.md`](references/landing-acceptance-table.md), the
+brief also carries, as path plus selector, the saved Plan review outputs with
+the finding IDs main accepted, the `/external-grill-plan` decision-detail file's
+decision rows, and each `/resolve-findings` handoff's item table, omitting a
+round whose table names no fixed region.
 
 This skill owns final Plan preparation, landing-commit creation, reconciliation,
 acceptance-table production, the landing summary, the landing confirmation,
@@ -116,9 +121,11 @@ block on any unresolved receipt failure before presenting the summary.
 
 Main then presents the self-contained summary immediately before the question: a
 one-sentence change that names a superseded decision whenever the session record
-holds one, changed-file count and kind, session branch and the primary branch
-resolved as `<primary-branch>` below, the acceptance table's non-PASS rows if it
-has any, and the required line `**SmartGit review:** <status>` for `opened` and
+holds one, each review-driven or user-chosen change line from the handoff
+summary's `## What landed`, changed-file count and kind, session branch and the
+primary branch resolved as `<primary-branch>` below, the acceptance table's
+non-PASS rows if it has any, and the required line
+`**SmartGit review:** <status>` for `opened` and
 `**SmartGit review:** <status> — <manualCommand> — <message>` for `unavailable`
 and `failed`, filled from the fields just read — so the summary cannot be
 written before that receipt exists. When Coretide changes land, the summary
@@ -186,8 +193,12 @@ re-asking or halting for non-blocking checks or user-judgment prompts
 unacknowledged `(e)` pause warning, where main asks and waits.
 
 Confirmation binds the reviewed diff, not commit hashes. A clean byte-identical
-post-confirmation rebase lands with no re-asking, re-review, or rebuild;
-pre-summary rebuilds belong to `references/worker.md` step 5. After that build,
+post-confirmation rebase lands with no re-asking, re-review, or rebuild unless
+landing refuses it with an `inventory.review-round-*` code: recovery reproduces
+the rebased bytes on the session branch and returns before the acceptance
+table; main reruns the step script so a round covers them (a `/sweep` run:
+[`/sweep`](../sweep/SKILL.md) step 11), then redispatches the finalizer.
+Pre-summary rebuilds belong to `references/worker.md` step 5. After that build,
 main adds every `builder` `Changed files` path since that meaning-change handoff
 ([`/compile`](../compile/SKILL.md) `## Handoff`) and passes
 `-RequireExportOutputsRewritten` (`references/scripts.md` `## Invocation`) on

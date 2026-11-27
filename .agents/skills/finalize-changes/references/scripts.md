@@ -72,9 +72,11 @@ when the rules below call for the regeneration check,
 command when the rules below call for the message override,
 `-VerifiedCandidateCommit '<reviewed-commit>' -VerifiedCandidateTree
 '<reviewed-tree>'` to that same approval-preparation command to prove the
-reconciled session tree still equals a tree that was already reviewed, and
-`-LeaseSeconds`, `-CooperatingSessionOwner`, or `-WaitSeconds` only where the
-rules below call for a non-default value.
+reconciled session tree still equals a tree that was already reviewed,
+`-SavePlanPaths '<comma-separated paths>'` to the landing and Coretide `-Land`
+commands when the brief carries `Save-plan paths`, and `-LeaseSeconds`,
+`-CooperatingSessionOwner`, or `-WaitSeconds` only where the rules below call
+for a non-default value.
 A landing claim's `-Worktree` is `'<current-worktree>'`, because landing accepts
 the lease only when its recorded worktree matches the landing identity.
 A recovery invocation after a crash repeats that same landing command with its
@@ -333,12 +335,18 @@ review and overwrites the artifact.
   generated files are then committed over the approved source commit through a
   temporary index as one sole-parent commit with the frozen approved metadata;
   no branch ref moves while that object is built. The final result is
-  `broken-engine-finalize-landing/v6` and separates `approvedSource`,
+  `broken-engine-finalize-landing/v7` and separates `approvedSource`,
   `rebasedSource`, `historyUpdate`, and `final` commit/tree fields. The reviewed
   PNG deletion remains an ordinary source change; only the three generated paths
   are allowed after confirmation. When primary advanced first it makes at most
   one internal rebase requiring a provably identical patch outside those three
   paths (`Get-FinalizePatchId`, `.agents/scripts/FinalizeWorkflowCommon.psm1`).
+  Before each primary advance attempt, the one after its internal rebase
+  included, it refuses, exit 2 `blocked` before any primary change and with the
+  session branch on the confirmed commit, a commit `Test-ReviewRoundCoverage`
+  (`.agents/scripts/SessionChangeInventory.psm1`) reports uncovered, with that
+  function's code; `Invoke-FinalizeCoretide.ps1 -Land` applies the same check
+  to the commit it fast-forwards.
   Report the commit from the result's `landed` block rather than `candidate`. A
   blocked result reports its `disposition` and a `lock` projection; act on
   those, never a memorized code list. A `retryable-wait`
@@ -348,16 +356,13 @@ review and overwrites the artifact.
   through `Invoke-FinalizeLockClaim.ps1` first and pass the new owner token.
   When it acquired but did not release the lock (`lock.claimed` true,
   `lock.released` false), the claim is retained: handle it per the release
-  paragraph below before claiming anew. A `terminal` result ends this landing
-  attempt (do not re-invoke with the same arguments): `rebase.conflicted`
-  (branch restored), `rebase.patch-not-identical` (clean rebase changed patch),
-  and `history.source-changed` (approved source patch changes a reserved history
-  output path; never cured by rebase) return to main for recovery
-  ([`SKILL.md`](../SKILL.md#landing-confirmation),
-  [`worker.md`](worker.md#recovery)); every other `terminal` result (including
-  `rebase.abort-failed`, which leaves restoration unproven and retains the
-  lease) stops without recovery. `landing.retry-exhausted` is `retryable-wait`
-  and leaves the confirmed session commit restored. Blocked
+  paragraph below before claiming anew. Re-invoke neither a `recovery` nor a
+  `terminal` result with the same arguments. A `recovery` result returns to
+  main for recovery ([`SKILL.md`](../SKILL.md#landing-confirmation)); a
+  `terminal` result ends this landing attempt and stops without recovery
+  (including `rebase.abort-failed`, which leaves restoration unproven and
+  retains the lease). `landing.retry-exhausted` is `retryable-wait` and leaves
+  the confirmed session commit restored. Blocked
   `history.overlay-invalid` means the temporary overlay tree changed something
   other than exactly the three reserved history paths; its message names the
   unexpected paths, and any reserved path the overlay failed to add. That guard
@@ -388,16 +393,16 @@ review and overwrites the artifact.
   target. Pass `-ReleasePlanClaim` when a claimed Plan reached final
   preparation; the script then deletes the claim best-effort. Without the switch
   it invokes no `plan` command at all.
-- `Invoke-FinalizeCoretide.ps1` prints one `broken-engine-finalize-coretide/v1`
-  result (`status`, `code`, `message`, `coretideCommit`, `planClaim`,
-  `residuals`; header owns status/exit, rebase, `none` idempotency). `-Prepare`
-  `pass` fetches `coretideCommit` into primary Coretide moving no ref for
-  SmartGit (`error` `primary.coretide-absent` if missing). `-Land` requires a
-  live session/worktree `-OwnerToken` lease (`landing-lock.not-held`) and
-  advances primary to and reports the verified commit; rebase blocks return
-  `rebase.conflicted`, `rebase.patch-not-identical`, `rebase.verify-failed`, or
-  `rebase.abort-failed` (bullet above). Pass `-ReleasePlanClaim` only for
-  Coretide-only Plan landings.
+- `Invoke-FinalizeCoretide.ps1` prints one `broken-engine-finalize-coretide/v2`
+  result (`status`, `code`, `message`, `disposition`, `coretideCommit`,
+  `planClaim`, `residuals`; header owns status/exit, rebase, `none` idempotency,
+  and which refusals are `recovery`). `-Prepare` `pass` fetches `coretideCommit`
+  into primary Coretide moving no ref for SmartGit (`error`
+  `primary.coretide-absent` if missing). `-Land` requires a live
+  session/worktree `-OwnerToken` lease (`landing-lock.not-held`) and advances
+  primary to and reports the verified commit; a `blocked` result's
+  `disposition` takes the landing values, acted on as the bullet above states.
+  Pass `-ReleasePlanClaim` only for Coretide-only Plan landings.
 
 Release every caller-owned lease with `Invoke-FinalizeLockClaim.ps1 -Release`
 before an open-ended user wait, except on `rebase.abort-failed`

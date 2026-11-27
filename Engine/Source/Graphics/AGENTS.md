@@ -131,9 +131,10 @@ contracts, while Objects (`Objects/AGENTS.md`) own individual RAII handles.
   accumulates it, and the update decays it after `PullTarget` has read it. A
   tracked target's raw position updates the tracking velocity and last-known
   position; the offset is added only to the resolved target. The engine places
-  the initial position and Direct targets on the lowest flight plane. Tracked
-  and extrapolated targets retain their full height through the chase, raising
-  the look-at and eye together without changing tilt or framing.
+  the initial position and Direct targets at the base height
+  (`game::kfBaseHeightMeters`). Tracked and extrapolated targets retain their
+  full height through the chase, raising the look-at and eye together without
+  changing tilt or framing.
 - Camera position, easing, shake, and visual timers advance from the sim-scaled
   render delta the caller passes to `CameraBase::Update` (wall delta multiplied
   by the active time ratio; equal to wall time at ratio 1.0). Sun angle advances

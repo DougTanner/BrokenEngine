@@ -180,10 +180,6 @@ static int64_t MainThread(HINSTANCE hinstance)
 	// Agent command channel (loopback JSON control, drained on the main thread). Constructed after NetworkManager
 	// so WSAStartup (via ENet init) is done. Dormant unless --agent-port is passed; RAII teardown in reverse order.
 	std::unique_ptr<AgentCommandServer> pAgentCommandServer;
-	common::ScopedLambda clearAgentCommandServer([]()
-	{
-		gpAgentCommandServer = nullptr;
-	});
 #if defined(BT_CLIENT)
 	// Client-only synthetic-input + UI-registry layer, active alongside the agent channel. Ctors set their gp*
 	// globals; RAII teardown (reverse order) nulls them before the command server tears down.
@@ -209,7 +205,6 @@ static int64_t MainThread(HINSTANCE hinstance)
 				std::ignore = HandleEagerLoadCompletion();
 				return 1;
 			}
-			gpAgentCommandServer = pAgentCommandServer.get();
 #if defined(BT_CLIENT)
 			pAgentUiRegistry = std::make_unique<AgentUiRegistry>();
 			pAgentInput = std::make_unique<AgentInput>();
@@ -228,7 +223,6 @@ static int64_t MainThread(HINSTANCE hinstance)
 
 	// Construct the game before the window, so the window is destroyed while the game object the server WindowProcedure reads still exists.
 	auto pIslandTerrain = std::make_unique<IslandTerrain>();
-	auto pFlightPlanes = std::make_unique<FlightPlanes>();
 	gpIslandTerrain->WaitForElevationMaps(game::kNavigationGraphSpecs);
 
 	auto pGame = std::make_unique<game::Game>();
@@ -306,7 +300,6 @@ static int64_t MainThread(HINSTANCE hinstance)
 
 	// Create terrain collision data (before Graphics, which creates Islands that reads beach elevation)
 	auto pIslandTerrain = std::make_unique<IslandTerrain>();
-	auto pFlightPlanes = std::make_unique<FlightPlanes>();
 	auto pIslandTerrainResidency = std::make_unique<IslandTerrainResidency>();
 
 	// Wait for islands to load and initialize heightmaps before Graphics ctor. Graphics records its

@@ -5,6 +5,8 @@
 namespace game
 {
 
+inline constexpr float kfBaseHeightMeters = 2.0f;
+
 struct Frame;
 struct FramePostRender;
 struct StatusChange;

@@ -13,10 +13,13 @@ into one gitignored `Temp/` file, each under its own `##` heading. Write later
 accepted Plan review refinements and user-approved scope changes into the
 snapshot's copies of those two scope sections.
 
-Fill card `Roles` from the brief's Change Workflow step and role assignments,
-citing the brief as evidence and never reading the workflow itself. Under
-[`worker.md`](worker.md)'s Leftovers rule, include each small proven leftover
-in `Slices`.
+Fill card `Roles` for the classified tier from the brief's Change Workflow step
+and role assignments, citing the brief without reading the workflow when the
+tier matches; when the classified tier differs, derive its roles from
+[`change-workflow.md`](../../../references/change-workflow.md)
+(`### Delegation roles` and `### Steps`) so card `Roles` and `Harness checks`
+match without main rewriting the card. Under [`worker.md`](worker.md)'s
+Leftovers rule, include each small proven leftover in `Slices`.
 
 ## Investigation portion
 

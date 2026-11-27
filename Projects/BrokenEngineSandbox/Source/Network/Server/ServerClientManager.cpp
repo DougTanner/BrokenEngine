@@ -157,7 +157,7 @@ std::optional<engine::GridCoord> ServerClientManager::SpawnFleetMember(const eng
 		}
 		mbFleetSpawnBlocked = false;
 		rTakenSpawnPoints.mBuffer.PushBack(*optionalSpawnPoint);
-		spawnInfo.vecPosition = XMVectorSet(optionalSpawnPoint->x, optionalSpawnPoint->y, engine::gpFlightPlanes->Lowest().fHeightMeters, 1.0f);
+		spawnInfo.vecPosition = XMVectorSet(optionalSpawnPoint->x, optionalSpawnPoint->y, kfBaseHeightMeters, 1.0f);
 		spawnInfo.vecDirection = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
 		spawnInfo.arrivalGracePeriod = kArrivalGracePeriod;
 		QueueFleetSpawn(rClientGuid, rFleet, rMember, engine::kOriginCoordinate, spawnInfo);
@@ -220,10 +220,10 @@ std::optional<engine::GridCoord> ServerClientManager::SpawnFleetMember(const eng
 		}
 		case ShipType::kOmni:       return QueueSpawnPointSpawn(OmnisPostRender::SpawnInfo {});
 		case ShipType::kBattleship: return QueueSpawnPointSpawn(BattleshipsPostRender::SpawnInfo {});
-		default:
-			ASSERT(false);
-			std::unreachable();
+		case ShipType::kCount:      break;
 	}
+	ASSERT(false);
+	std::unreachable();
 }
 
 void ServerClientManager::OnClientDisconnected(int64_t iClientId, const engine::ClientGuid& rClientGuid)

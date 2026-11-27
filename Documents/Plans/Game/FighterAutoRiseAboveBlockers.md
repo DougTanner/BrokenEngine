@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v2 {"createdUtc":"2026-11-24T21:09:25.469Z","dependsOn":["Documents/Plans/Engine/ReplaceFlightPlanesWithBaseHeight.md","Documents/Plans/Game/FighterGracefulTerrainRise.md"]} -->
+<!-- broken-engine-plan/v2 {"createdUtc":"2026-11-24T21:09:25.469Z","dependsOn":["Documents/Plans/Game/FighterGracefulTerrainRise.md"]} -->
 # Fighter Auto-Rise Above Battleships and Navigation Blockers
 
 ## Context

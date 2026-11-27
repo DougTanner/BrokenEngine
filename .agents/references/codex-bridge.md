@@ -20,7 +20,7 @@ Dispatched per the Codex-bridge rule in
   `## Task brief`) with scoped host evidence per step 2.
 - Worktree — this session's worktree.
 - `-Skill` — bare skill name from the `-ListRoutes` key (`$routes` and
-  `$presets` own preset/sandbox selection and validation).
+  `$presets` own preset selection and validation).
 - `-Mode` — pass the `<mode>` suffix whenever the `-ListRoutes` key is
   `<skill>:<mode>`; omit otherwise.
 
@@ -58,8 +58,7 @@ Dispatched per the Codex-bridge rule in
      --no-textconv --find-renames` with `--` plus scoped literal paths. Preserve
      rename endpoints, deletion sides, and binary metadata. For approved
      untracked additions use `git diff --no-index` against `/dev/null` with the
-     same output options (exit 1 means differences). On re-review, keep only
-     hunks matching the findings and line selectors. Use the owning repository
+     same output options (exit 1 means differences). Use the owning repository
      and inventory revisions per `subagent-reporting.md`
      `## Delegated execution context`.
    - The reviewer reads accessible historical commits, refs, complete diffs,
@@ -104,38 +103,33 @@ Dispatched per the Codex-bridge rule in
 
    Duration alone is not a failure. Done on `completed`, `malformed`, or
    `failed`.
-5. Proceed on `completed` (`retried: true` needs no action); route `malformed`
-   or `failed` to `## Rules`. Done when handled.
+5. Proceed on `completed` (`retried: true` needs no action); route every run
+   failure `## Rules` names to `## Rules`. Done when handled.
 
 ## Rules
 
-- On a `failed` `read-only` receipt (see `Invoke-Codex.ps1` `.NOTES` for
-  exit-code semantics), diagnose the cause first by inspecting the run and
-  stderr records from the original launch environment (`$recordDirectory`,
-  `Get-RunRecordPath`, and `Get-StderrRecordPath` in `Invoke-Codex.ps1`) when
-  available, or using the receipt's `reason` when those records are missing. Fix
-  or report non-transient script, auth, or config errors immediately; for
-  transient failures, retry up to 2 more times with a fresh `<out>`, waiting 10
-  seconds before the first retry and 60 seconds before the second using a timer,
-  and report to the user with `reason` if retries still fail. Report
-  `malformed`, a non-zero `Invoke-Codex.ps1` process exit, or step 1 block/error
-  to the user with `reason` (or `checks`/`message`) without another diagnostic
-  call.
-- If a `completed` `read-only` result passes the verdict-line check but is
-  judged malformed (leaked notes or wrong task), re-dispatch the identical
-  prompt once with a fresh `<out>` and `-NoRetry`; a second malformed result is
-  a genuine failure.
-- `read-only` runs cannot write `<worktree>/Temp/` or `$env:TEMP`; keep handoffs
-  within the `subagent-handoff.md` `## Handoffs` shared character cap without
-  `Temp/` overflow writes (`Invoke-Codex.ps1` captures full output to `<out>`).
-- For `workspace-write` routes, attempt each run once (never re-dispatch; report
-  failed or judged-malformed outcomes with `git status`). Findings-only
-  `workspace-write` runs write only their skill's gitignored `Temp/` files,
-  never edit tracked files, and may run alongside `read-only` Step 6 peers.
-  While an editing `workspace-write` run is live, hold
-  `Invoke-StaticChecks.ps1`, concurrent writers, and any review reading C++ or
-  dual-language headers — such as an overlapping `/glsl-review` during Step 6
-  post-validator or post-round re-runs — until it terminates.
+- A run fails on a `failed` or `malformed` receipt (see `Invoke-Codex.ps1`
+  `.NOTES` for exit-code semantics), a non-zero `Invoke-Codex.ps1` process
+  exit, or a `completed` result main judges malformed (leaked notes or wrong
+  task). Read the receipt's `reason`, the launcher's stderr on a non-zero exit,
+  and the run and stderr records from the original launch environment
+  (`$recordDirectory`, `Get-RunRecordPath`, and `Get-StderrRecordPath` in
+  `Invoke-Codex.ps1`) when available. If they show the Codex usage limit is
+  used up (0% weekly remaining), fall back at once. Otherwise relaunch the
+  identical prompt up to 2 more times with a fresh `<out>`, waiting 10 seconds
+  before the first retry and 60 seconds before the second using a timer, and
+  fall back if the last retry fails.
+- Fall back by dispatching a native `implementer` with the same brief, its
+  `Role` line changed to `implementer` and step 2's verdict-line ending
+  removed, then send every later routed brief this session to a native
+  `implementer` without launching Codex; that `implementer` runs the routed
+  skill in place of the `reviewer` it names. Tell the user once, with the
+  failure cause and any script, auth, or config error to fix. Step 1 owns a
+  step 1 block or error; it is not a run failure.
+- Runs are `read-only` and cannot write `<worktree>/Temp/` or `$env:TEMP`; keep
+  handoffs within the `subagent-handoff.md` `## Handoffs` shared character cap
+  without `Temp/` overflow writes (`Invoke-Codex.ps1` captures full output to
+  `<out>`).
 - Verify launcher changes without Codex CLI from PowerShell 7 by running step
   3's launch command with a stub `codex` first on `PATH`:
   ```powershell

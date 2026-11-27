@@ -16,13 +16,11 @@ Skip this phase in audit-only mode.
    editing. For C++ changes, the conventions to apply are in
    [`../../../references/cpp-conventions.md`](../../../references/cpp-conventions.md).
    - Done when every listed source has been read and each remains current.
-2. Before introducing a new function, type, helper, or substantial logic block,
-   search with `rg` for the proposed identifier, the responsibility terms
-   describing the behavior, the closest sibling implementation, and direct
-   callers or consumers, then read plausible matches.
-   - Done when an existing mechanism satisfying the current contract has been
-     reused, or the concrete mismatch of each rejected candidate is established
-     in the implementation reasoning.
+2. Apply the reuse-before-adding bullet of that conventions reference to every
+   language the slice changes.
+   - Done when the found mechanism is reused or adapted, or the concrete
+     mismatch of each rejected candidate is established in the implementation
+     reasoning.
 3. Implement the smallest complete assigned change, preserving all snapshotted
    pre-existing work and leaving unrelated cleanup alone.
    - Done when every assigned item is implemented or stopped under step 4, and

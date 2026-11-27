@@ -7,6 +7,7 @@
 namespace engine
 {
 
+#if defined(BT_CLIENT)
 enum class ProfileScreen : uint8_t
 {
 	kOff,
@@ -15,6 +16,7 @@ enum class ProfileScreen : uint8_t
 	kNetwork,
 	kCount,
 };
+#endif // BT_CLIENT
 
 enum class ProfileRowFlags : uint8_t
 {
@@ -291,6 +293,7 @@ enum BootTimers : int64_t
 {
 	kBootTimerTotal,
 		kBootTimerWaitForDataFile,
+#if defined(BT_CLIENT)
 		kBootTimerWaitForTexturesFile,
 		kBootTimerWaitForPriorityTextures,
 		kBootTimerWaitForIslands,
@@ -302,12 +305,15 @@ enum BootTimers : int64_t
 			kBootTimerPipelineManager,
 			kBootTimerCommandBufferManager,
 			kBootTimerBufferManager,
+#endif // BT_CLIENT
 			kBootTimerIslands,
+#if defined(BT_CLIENT)
 			kBootTimerTextureManager,
 				kBootTimerTextureUpload,
 				kModelTexturesGeneration,
 			kBootTimerRecordCommandBuffers,
 			kBootTimerRenderPresent,
+#endif // BT_CLIENT
 
 	kBootTimerCount
 };
@@ -317,6 +323,7 @@ inline constexpr std::string_view kpBootTimerNames[]
 {
 	"Total",
 	"    Wait for data file",
+#if defined(BT_CLIENT)
 	"    Wait for textures file",
 	"    Wait for priority textures",
 	"    Wait for priority islands",
@@ -328,12 +335,15 @@ inline constexpr std::string_view kpBootTimerNames[]
 	"      PipelineManager",
 	"      CommandBufferManager",
 	"      BufferManager",
+#endif // BT_CLIENT
 	"      Islands",
+#if defined(BT_CLIENT)
 	"      TextureManager",
 	"          TextureUpload",
 	"          Pbr textures",
 	"      Record command buffers",
 	"      Render present",
+#endif // BT_CLIENT
 };
 static_assert(std::size(kpBootTimerNames) == static_cast<size_t>(kBootTimerCount));
 
@@ -420,7 +430,9 @@ public:
 	void Create();
 	void Destroy();
 
+#if defined(BT_CLIENT)
 	void ToggleProfileText();
+#endif // BT_CLIENT
 
 	void CpuStart(int64_t iCpuTimer, int64_t iThreads = 1);
 	void CpuStop(int64_t iCpuTimer, CpuStopFlags_t flags = {});
@@ -479,7 +491,9 @@ public:
 	common::InTheLastSecond mFullUpdatesInTheLastSecond;
 	common::InTheLastSecond mInterpolateUpdatesInTheLastSecond;
 
+#if defined(BT_CLIENT)
 	ProfileScreen meProfileScreen = kbShowProfileTextByDefault ? ProfileScreen::kCpu : ProfileScreen::kOff;
+#endif // BT_CLIENT
 
 protected:
 

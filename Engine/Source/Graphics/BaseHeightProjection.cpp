@@ -65,7 +65,7 @@ XMVECTOR ProjectToBaseHeight(XMVECTOR vecLocalPosition, const RenderBasis& rBasi
 	XMVECTOR vecRenderPosition = Rebase(rBasis, vecLocalPosition);
 	// Orthographic eye lines run parallel to the view direction rather than through the (virtual) eye.
 	XMVECTOR vecLinePoint = engine::gpCamera->mbOrthographicProjection ? XMVectorAdd(vecRenderPosition, engine::gpCamera->mVecToEyeNormal) : engine::gpCamera->mVecEyePosition;
-	return common::ToBaseHeight(vecRenderPosition, vecLinePoint, std::max(fElevation, gpFlightPlanes->Lowest().fHeightMeters));
+	return common::ToBaseHeight(vecRenderPosition, vecLinePoint, std::max(fElevation, game::kfBaseHeightMeters));
 }
 
 } // namespace engine

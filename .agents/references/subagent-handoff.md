@@ -12,9 +12,9 @@ Return only decision-relevant evidence:
 
 ```text
 Status: PASS | NEEDS_ACTION | BLOCKED
-Findings: <review roles and skill-declared verification failures only; one row each: ID Critical|Required|Recommended path:line — claim — evidence>
+Findings: <review roles and skill-declared verification failures only; one row each: ID Critical|High|Medium|Low path:line — claim — evidence>
 Changed files: <one row each, path and region; or none>
-Decisive checks: <one row each, command or read and its result>
+Decisive checks: <command/read, observed verdict (exit code/counts if helpful)>
 Build required: <exact targets, or none>
 Evidence: <one row each, existing or Temp/ path plus selector — one-line description of what it holds; or none>
 Residuals: <actionable blocker or none>
@@ -25,13 +25,16 @@ extension fields, row forms, and typed blocks the assigned skill's `## Handoff`
 declares, and the final verdict line a Codex bridge run places after the
 complete handoff ([`codex-bridge.md`](codex-bridge.md) step 2) —
 and `Status` carries exactly one of the three tokens alone on its line. Every
-row is one line. Do not quote code and do not repeat a row from another field.
-The whole returned handoff stays under 4,000 characters; no skill sets its own
-cap. Before returning, the worker estimates the drafted handoff's character
-count; when it may reach the cap, the full material of the fields that push it
-over moves to an existing file or log, or to a `Temp/` file when no existing
-file holds it, with one `##` heading per section of that material, and
-`Evidence` carries one table-of-contents row per section:
+row is one line. Do not quote code, repeat a field, or restate a plan
+snapshot/execution card's mechanism or check/fixture text: cite its
+worktree-relative path + only needed `##` selectors (e.g., `## Execution card`);
+keep results, verdicts, new focus, post-plan deltas, and required fields
+inline. The whole returned handoff stays under 4,000 characters; no skill sets
+its own cap. Before returning, the worker estimates the drafted handoff's
+character count; when it may reach the cap, the full material of the fields
+that push it over moves to an existing file or log, or to a `Temp/` file when
+no existing file holds it, with one `##` heading per section of that material,
+and `Evidence` carries one table-of-contents row per section:
 `<path> ## <heading> — <one-line description of what the section holds>`. A
 selector into a Markdown file is a `##` heading in it. The handoff itself still
 carries the decision-relevant summary of each moved field, such as the count in
@@ -74,6 +77,31 @@ Main consumes each dispatched worker's handoff once, from the host's own
 delivery of it; the no-progress and terminal-failure route in
 [`subagent-reporting.md`](subagent-reporting.md) interrupts that worker and
 replaces it.
+
+## Severity
+
+Every `Findings` row grades its finding by the worst consequence it reaches; a
+plan review grades the consequence of the change the plan would make.
+
+- `Critical` — changed code, shader, or script is wrong on a reachable path: a
+  crash, hang, wrong result, data loss or corruption, leak, determinism or CRC
+  break, wire, serialization, or save mismatch, missing trust-boundary
+  validation, or a caller, client/server, or CPU/GPU mirror left inconsistent;
+  or a build, static check, or harness check fails.
+- `High` — an approved plan requirement or acceptance criterion is missing, a
+  change falls outside approved scope, backward-compatibility code is added, a
+  `.agents/references/cpp-conventions.md` rule other than its reuse bullet or a
+  GLSL layout or binding contract is broken, or an instruction or script rule
+  makes an agent take a wrong action or cannot be followed as written.
+- `Medium` — words that do not match code (a comment class
+  `comment-classes.md` rates `Medium`, a stale `AGENTS.md`), a near-copy of an
+  existing helper under the `cpp-conventions.md` reuse bullet,
+  over-engineering or dead code left behind, or a progressive-disclosure
+  violation.
+- `Low` — a nit: wording, size, or a naming preference.
+
+What each level triggers is the step script's round close
+(`.agents/scripts/Get-ChangeWorkflowSteps.ps1` header).
 
 ## Continuation capsule
 

@@ -42,28 +42,37 @@ sampled normals, reflections, lighting, shadows, and smoke.
 
 ## Retained Foam
 
-- Foam is bounded coverage in the undisplaced visible-area footprint. Native
-  displacement-normal W supplies the Jacobian source: foam compression must
-  survive visual framing fades while still respecting mesh-quad Nyquist
-  attenuation (`MainLayout` in `ShaderMainLayout.h` and `PopulateGerstnerBand`
-  in `WaterUniforms.cpp`). Terrain masking and the compression threshold apply
-  at each native sample before bilinear source interpolation. Coverage
-  resolution does not increase native source detail.
+- Foam is bounded coverage in an undisplaced world-space footprint
+  ([Render Area Roles](../../../Source/Graphics/Render/AGENTS.md#area-roles)).
+  Native displacement-normal W supplies a Jacobian source built from raw,
+  un-Nyquist-filtered base amplitudes (`MainLayout` and `bComputeFoam` in
+  `WaterDisplacement.comp` own the packed coefficient, formula, and enable
+  condition). When emission is enabled, native source sampling is restricted to
+  the visible area (`WaterFoam.comp`), so margin texels outside it emit zero
+  and their retained coverage decays when foam time advances. Visual
+  displacement and normals keep mesh-quad Nyquist filtering and camera-framing
+  fades (`MainLayout` and `PopulateGerstnerWaves` own the filtered fields,
+  amplitude-scale publication, and vertex fetch gate). Foam generation fades
+  independently with camera height, and retained coverage continues decaying
+  once generation reaches zero (`ComputeWaterFoamEmissionRate` and
+  `WaterFoam.comp` own the fade-endpoint and source-sampling conditions).
+  Terrain masking and the compression threshold apply at each native sample
+  before bilinear source interpolation. Coverage resolution does not increase
+  native source detail.
 - After terrain rejection, fixed Glass noise sampled at mip 0 at the undisplaced
   native position adds a signed offset to J before the compression threshold.
   Negative offsets promote emission and positive offsets suppress it; zero
   amplitude preserves the unmodified J source. Spawn amplitude and tile size
-  are independent of material breakup controls. As mesh quads outgrow low-band
-  wavelengths, the Jacobian source hands off to a procedural high-zoom whitecap
-  source (`NativeSource` in `WaterFoam.comp`), whose UV transform must keep CPU
-  origin and scroll wraps seamless (`NativeSource` and `ShaderMainLayout.h`).
+  are independent of material breakup controls.
 - Reproject history from mip 0, rejecting beyond its half-texel border before
-  sampling. Integrate emission toward saturation and half-life decay with the
-  exact exponential update, then write the whole allocation. Reset skips
-  history. Inactive foam skips the coverage pass and all fragment foam sampling,
-  lighting, and blending while preserving ordinary water reflection attenuation;
-  activation and history policy belongs to
-  [Render Precision and History](../../../Source/Graphics/Render/AGENTS.md#precision-and-history).
+  sampling; when the footprint grows to a coarser bucket, preserve narrow
+  retained peaks (`WaterFoam.comp` `main` owns the local-maximum sampling rule
+  and width-ratio cutoff). Integrate emission toward saturation and half-life
+  decay with the exact exponential update when foam time advances, then write
+  the whole allocation. Reset skips history. Inactive foam skips the coverage
+  pass and all fragment foam sampling, lighting, and blending while preserving
+  ordinary water reflection attenuation; activation and history policy belongs
+  to [Render Precision and History](../../../Source/Graphics/Render/AGENTS.md#precision-and-history).
 - Presentation samples generated history mips at the undisplaced position.
   Independently selected BC7 UNORM primary color and BC4 UNORM secondary noise
   each have their own tile size independent of color noise: the primary read

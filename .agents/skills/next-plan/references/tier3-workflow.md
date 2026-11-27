@@ -36,9 +36,11 @@ receives the next brief. Main alone interviews the user and decides, recording
 the exact questions, answers, decisions, and refinements; it performs no
 repository read or search work, and the idempotent claim invocation `/next-plan`
 assigns to main is the one scheduler command it still runs. The final handoff
-preserves that record and the worker updates the card. A decision-complete plan
-yields a PASS audit and a no-question brief; do not manufacture findings or
-interview questions to justify the review.
+preserves that record and the worker updates the card; whenever a Tier-3 grill
+worker updates the card, its handoff returns the refreshed `/prepare-change`
+fields (`Pre-edit checks`, `Harness checks`, `Approval summary`) from the
+updated card. A decision-complete plan yields a PASS audit and a no-question
+brief; do not manufacture findings or interview questions to justify the review.
 
 ## Implementation and stop rule
 

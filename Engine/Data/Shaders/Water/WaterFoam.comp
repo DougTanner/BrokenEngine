@@ -30,44 +30,16 @@ float NativeSource(ivec2 i2Coord, ivec2 i2Active)
 	{
 		return 0.0f;
 	}
-	float fHighZoomBlend = mainLayout.fWaterFoamHighZoomBlend;
-	vec2 f2WorldPosition = vec2(0.0f);
-	vec2 f2NoiseUv = vec2(0.0f);
-	if (globalLayout.fWaterFoamSpawnNoiseAmount != 0.0f || fHighZoomBlend > 0.0f)
+	float fJEffective = texelFetch(normalTextureSampler, i2Coord, 0).w;
+	if (globalLayout.fWaterFoamSpawnNoiseAmount != 0.0f)
 	{
-		f2WorldPosition = VisibleAreaToWorld(f2NativeUv, globalLayout.f4VisibleArea);
+		vec2 f2WorldPosition = VisibleAreaToWorld(f2NativeUv, globalLayout.f4VisibleArea);
 		vec2 f2LocalPosition = f2WorldPosition - vec2(globalLayout.fWaterOriginX, globalLayout.fWaterOriginY);
-		f2NoiseUv = globalLayout.fWaterFoamSpawnNoiseInverseTileSize * f2LocalPosition + globalLayout.f2WaterFoamSpawnNoiseReducedOrigin;
+		vec2 f2NoiseUv = globalLayout.fWaterFoamSpawnNoiseInverseTileSize * f2LocalPosition + globalLayout.f2WaterFoamSpawnNoiseReducedOrigin;
+		float fSignedNoise = 2.0f * TextureLodPatched(globalLayout, spawnNoiseTextureSampler, f2NoiseUv, 0.0f, globalLayout.waterFoamSpawnNoisePatchLattice, f2WorldPosition, globalLayout.fWaterFoamSpawnNoisePatchBlend).r - 1.0f;
+		fJEffective += globalLayout.fWaterFoamSpawnNoiseAmount * fSignedNoise;
 	}
-
-	float fJacobianSource = 0.0f;
-	if (fHighZoomBlend < 1.0f)
-	{
-		float fJEffective = texelFetch(normalTextureSampler, i2Coord, 0).w;
-		// Zero spawn amplitude leaves J unmodified, so the noise read is skipped.
-		if (globalLayout.fWaterFoamSpawnNoiseAmount != 0.0f)
-		{
-			float fSignedNoise = 2.0f * TextureLodPatched(globalLayout, spawnNoiseTextureSampler, f2NoiseUv, 0.0f, globalLayout.waterFoamSpawnNoisePatchLattice, f2WorldPosition, globalLayout.fWaterFoamSpawnNoisePatchBlend).r - 1.0f;
-			fJEffective += globalLayout.fWaterFoamSpawnNoiseAmount * fSignedNoise;
-		}
-		fJacobianSource = clamp((globalLayout.fWaterFoamJStart - fJEffective) * globalLayout.fWaterFoamJInverseRange, 0.0f, 1.0f);
-	}
-
-	if (fHighZoomBlend <= 0.0f)
-	{
-		return fJacobianSource;
-	}
-
-	// Second octave uses an integral 2x scale and 90-degree rotation so modulo-2 CPU origin and scroll wraps stay
-	// exact multiples of the mirrored sampler's 2-tile period.
-	vec2 f2UvOne = f2NoiseUv + mainLayout.f2WaterFoamHighZoomScroll;
-	vec2 f2UvTwo = 2.0f * vec2(-f2NoiseUv.y, f2NoiseUv.x) + vec2(0.37f, 0.71f) - mainLayout.f2WaterFoamHighZoomScroll;
-	float fOctaveOne = TextureLodPatched(globalLayout, spawnNoiseTextureSampler, f2UvOne, 0.0f, globalLayout.waterFoamSpawnNoisePatchLattice, f2WorldPosition, globalLayout.fWaterFoamSpawnNoisePatchBlend).r;
-	float fOctaveTwo = TextureLodPatched(globalLayout, spawnNoiseTextureSampler, f2UvTwo, 0.0f, globalLayout.waterFoamSpawnNoisePatchLattice, f2WorldPosition, globalLayout.fWaterFoamSpawnNoisePatchBlend).r;
-	float fCrest = sqrt(fOctaveOne * fOctaveTwo);
-	float fSyntheticJ = 1.0f - fCrest;
-	float fHighZoomSource = clamp((globalLayout.fWaterFoamJStart - fSyntheticJ) * globalLayout.fWaterFoamJInverseRange, 0.0f, 1.0f);
-	return mix(fJacobianSource, fHighZoomSource, fHighZoomBlend);
+	return clamp((globalLayout.fWaterFoamJStart - fJEffective) * globalLayout.fWaterFoamJInverseRange, 0.0f, 1.0f);
 }
 
 void main()
@@ -92,17 +64,39 @@ void main()
 		vec2 f2HalfTexel = 0.5f / vec2(kiWaterFoamWidth, kiWaterFoamHeight);
 		if (all(greaterThanEqual(f2PreviousUv, f2HalfTexel)) && all(lessThanEqual(f2PreviousUv, 1.0f - f2HalfTexel)))
 		{
-			fPrevious = textureLod(historyTextureSampler, f2PreviousUv, 0.0f).x;
+			if (globalLayout.f2WaterFoamAreaSize.x * globalLayout.f2WaterFoamPreviousAreaInverseSize.x > 1.5f)
+			{
+				// Preserve narrow wave-crest peaks across 2x zoom-out octave transitions.
+				vec2 f2UvMinimum = max(f2PreviousUv - f2HalfTexel, f2HalfTexel);
+				vec2 f2UvMaximum = min(f2PreviousUv + f2HalfTexel, 1.0f - f2HalfTexel);
+				float fSample00 = textureLod(historyTextureSampler, vec2(f2UvMinimum.x, f2UvMinimum.y), 0.0f).x;
+				float fSample10 = textureLod(historyTextureSampler, vec2(f2UvMaximum.x, f2UvMinimum.y), 0.0f).x;
+				float fSample01 = textureLod(historyTextureSampler, vec2(f2UvMinimum.x, f2UvMaximum.y), 0.0f).x;
+				float fSample11 = textureLod(historyTextureSampler, vec2(f2UvMaximum.x, f2UvMaximum.y), 0.0f).x;
+				fPrevious = max(max(fSample00, fSample10), max(fSample01, fSample11));
+			}
+			else
+			{
+				fPrevious = textureLod(historyTextureSampler, f2PreviousUv, 0.0f).x;
+			}
 		}
 	}
 
-	ivec2 i2Active = ivec2(mainLayout.iWaterActiveQuadX, mainLayout.iWaterActiveQuadY);
-	vec2 f2Native = f2Uv * vec2(i2Active);
-	ivec2 i2Native = ivec2(floor(f2Native));
-	vec2 f2Fraction = fract(f2Native);
-	float fSource = mix(mix(NativeSource(i2Native, i2Active), NativeSource(i2Native + ivec2(1, 0), i2Active), f2Fraction.x),
-	                   mix(NativeSource(i2Native + ivec2(0, 1), i2Active), NativeSource(i2Native + ivec2(1, 1), i2Active), f2Fraction.x), f2Fraction.y);
-	float fEmission = globalLayout.fWaterFoamEmissionRate * fSource;
+	float fEmission = 0.0f;
+	if (globalLayout.fWaterFoamEmissionRate > 0.0f)
+	{
+		vec2 f2VisibleUv = WorldToVisibleArea(vec3(f2Position, 0.0f), globalLayout.visibleAreaToUv);
+		if (all(greaterThanEqual(f2VisibleUv, vec2(0.0f))) && all(lessThanEqual(f2VisibleUv, vec2(1.0f))))
+		{
+			ivec2 i2Active = ivec2(mainLayout.iWaterActiveQuadX, mainLayout.iWaterActiveQuadY);
+			vec2 f2Native = f2VisibleUv * vec2(i2Active);
+			ivec2 i2Native = ivec2(floor(f2Native));
+			vec2 f2Fraction = fract(f2Native);
+			float fSource = mix(mix(NativeSource(i2Native, i2Active), NativeSource(i2Native + ivec2(1, 0), i2Active), f2Fraction.x),
+			                    mix(NativeSource(i2Native + ivec2(0, 1), i2Active), NativeSource(i2Native + ivec2(1, 1), i2Active), f2Fraction.x), f2Fraction.y);
+			fEmission = globalLayout.fWaterFoamEmissionRate * fSource;
+		}
+	}
 	float fRate = fEmission + globalLayout.fWaterFoamDecayRate;
 	float fCoverage = fPrevious;
 	if (fRate > 0.0f && globalLayout.fWaterFoamDeltaTime > 0.0f)

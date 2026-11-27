@@ -570,14 +570,11 @@ void StaticVoices::UpdateListenerPosition()
 		mListenerCoordinate = engine::gpCamera->mBasisCoordinate;
 	}
 
-	// mVecListenerPosition sits above the camera look-at at a fixed height just over the highest flight plane, so
-	// emitter altitude contributes to manual fade distance while field of view and projection do not move the listener.
-	// mX3dAudioListener.Position is the camera look-at for pan/Doppler.
-	// ApplyThreeDimensionalVolume flattens every emitter to its Z, so the XY-only vector keeps screen-left audible on the
-	// left rather than collapsed toward center by altitude or emitter height. Listener velocity is zero because RTS
-	// camera-motion Doppler is negligible and snap/jump easing must not add artifacts.
-	static constexpr float kfListenerHeightPerHighestPlane = 1.1f;
-	mVecListenerPosition = XMVectorSetZ(engine::gpCamera->mVecPosition, gpFlightPlanes->Highest().fHeightMeters * kfListenerHeightPerHighestPlane);
+	// Both mVecListenerPosition (3D manual fade distance) and mX3dAudioListener.Position (pan/Doppler) sit at the
+	// camera look-at. ApplyThreeDimensionalVolume flattens every emitter to the look-at Z for pan/Doppler so
+	// screen-left stays audible on the left rather than collapsing toward center with emitter height. Listener velocity
+	// is zero because RTS camera-motion Doppler is negligible and snap/jump easing must not add artifacts.
+	mVecListenerPosition = engine::gpCamera->mVecPosition;
 	XMFLOAT3A f3PanPosition {};
 	XMStoreFloat3A(&f3PanPosition, engine::gpCamera->mVecPosition);
 	mX3dAudioListener.OrientFront = {0.0f, 0.0f, -1.0f};
@@ -585,12 +582,8 @@ void StaticVoices::UpdateListenerPosition()
 	mX3dAudioListener.Position = f3PanPosition;
 	mX3dAudioListener.Velocity = {0.0f, 0.0f, 0.0f};
 
-	// Fade band + X3DAudio curve are camera-height-lerped per the canonical "Camera-Height-
-	// Conditional Uniforms" pattern. Each
-	// quantity owns four wrappers (startHeight, endHeight, low, high) in SoundSettingsWrappersBase
-	// and is exposed in the Sound > Tweaks sub-tab. Distances on the consumer side
-	// (ApplyThreeDimensionalVolume / ComputeAttenuatedVolume) are 3D against mVecListenerPosition (above the
-	// highest flight plane); the bands widen with framing as the camera zooms out.
+	// Sound > Tweaks controls how camera framing drives the fade band and X3DAudio curve. The default fade band widens
+	// as framing increases. Manual attenuation uses the full 3D distance to the camera look-at.
 	float fFraming = engine::gpCamera->mfCameraFraming;
 	mfEffectiveFadeStart = engine::LerpAtHeight(fFraming, gListenerDistanceStart);
 	mfEffectiveFadeEnd = engine::LerpAtHeight(fFraming, gListenerDistanceEnd);

@@ -72,17 +72,16 @@ evidence; use `none` when absent.
 Each `Findings` row is one line on this form:
 
 ```text
-ADV### Critical|Required path:line — claim — reachable evidence and smallest correction
+ADV### Critical|High|Medium|Low path:line — claim — reachable evidence and smallest correction
 ```
 
 `Changed files` and `Build required` are `none` because this findings-only
 review never edits a file.
 
 Use `NEEDS_ACTION` for findings or pending external verification and `BLOCKED`
-only when required evidence could not be obtained. Critical means data loss,
-broken functionality, determinism failure, or equivalent contract breach;
-everything else reported is required, never optional. Use `PASS` only when the
-disproof attempt is complete and clean.
+only when required evidence could not be obtained. Grade each finding by
+[`../../references/subagent-handoff.md`](../../references/subagent-handoff.md)
+`## Severity`. Use `PASS` only when the disproof attempt is complete and clean.
 
 ## References
 

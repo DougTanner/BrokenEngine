@@ -34,7 +34,7 @@ using PusherFlags_t = common::Flags<PusherFlags>;
 struct PushersInterpolate : public Collection<PushersInterpolate, CollectionFlags::kIdToIndex>
 {
 	// Bump on any SOA layout or push behavior change — feeds the Frame::kiVersion save/replay gate
-	static constexpr int64_t kiVersion = 8;
+	static constexpr int64_t kiVersion = 10;
 
 	static void AllocateAndCopy(PushersInterpolate& rCurrent, const PushersInterpolate& rPrevious);
 
@@ -55,9 +55,9 @@ struct PushersInterpolate : public Collection<PushersInterpolate, CollectionFlag
 	// Zone system - builds spatial acceleration structure each frame over the cell's bounding rectangle
 	static void SetupZones(const game::Frame& __restrict rFrame);
 
-	// Query spherical falloff with horizontal force once per peer sharing an occupied flight-plane layer.
-	// Occupied layers are derived from registered heights. Each near-coincident XY peer adds an X separation to
-	// rfPositionCorrectionX, which the caller initializes, instead of force.
+	// Query spherical falloff with horizontal force once per eligible peer in the query's XY zone (passing flag masks
+	// and 3D radius check). Eligible peers near-coincident in XY add X separation to rfPositionCorrectionX, which the
+	// caller initializes, instead of force.
 	static XMVECTOR XM_CALLCONV ApplyPush(const game::FrameInterpolate& rFrameInterpolate, id_t selfPusher, float& rfPositionCorrectionX, PusherFlags_t includeFlags = PusherFlags::kTypeDefault, PusherFlags_t excludeFlags = PusherFlags::kTypeMines);
 
 	XMVECTOR* __restrict pVecPositions = nullptr;

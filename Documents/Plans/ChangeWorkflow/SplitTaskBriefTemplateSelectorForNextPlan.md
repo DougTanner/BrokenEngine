@@ -1,89 +1,161 @@
-<!-- broken-engine-plan/v2 {"createdUtc":"2026-11-26T02:34:18.379Z","dependsOn":[]} -->
-# Fix: .agents/skills/next-plan — step 4 cites full Task brief section instead of dedicated brief-template selector
+<!-- broken-engine-plan/v2 {"createdUtc":"2026-11-26T02:34:18.379Z","dependsOn":[],"agentCli":"claude"} -->
+# Shrink subagent-reporting.md Task brief section by promoting non-template subtopics
 
 ## Context
-- 2026-11-25 (`agy/d7526070-354e-4684-946f-69451661d537`): selector
-  `.agents/references/subagent-reporting.md` lines 24-111; observed: full
-  `## Task brief` read in main; bounding: give main a dedicated selector for
-  the brief template and governing-path lookup.
-- 2026-11-25 (`agy/8546d4d8-447a-43bf-bb88-7607c7955b01`): selector
-  `.agents/references/subagent-reporting.md:24-111` (5,169 chars); bounding:
-  give main the brief schema and `/next-plan` baseline mapping while citing
-  worker instructions for dispatched roles.
-- 2026-11-25 (`agy/67048fc4-9412-489e-bec4-ad39620046af`): selector
-  `.agents/references/subagent-reporting.md:24-111`; bounding: keep the brief
-  template and session identity mapping in main and leave worker verification
-  instructions to each receiving role.
+Three `/next-plan` runs flagged full reads of
+`.agents/references/subagent-reporting.md` `## Task brief` (lines 24-111, 88
+lines / ~5,169 chars) in the main session before preparation dispatch:
+
+- 2026-11-25 (`agy/d7526070-354e-4684-946f-69451661d537`): main read lines
+  24-111 to compose the step 4 brief.
+- 2026-11-25 (`agy/8546d4d8-447a-43bf-bb88-7607c7955b01`): main read lines
+  24-111 (5,169 chars) for the brief schema and `/next-plan` identity mapping.
+- 2026-11-25 (`agy/67048fc4-9412-489e-bec4-ad39620046af`): main read lines
+  24-111, pulling in unrelated session-baseline, pre-dispatch inventory,
+  bounded-reading, and worker-verification prose.
 
 In the current tree, `.agents/skills/next-plan/SKILL.md` step 4 (lines 66-68)
-and step 6 (line 134) cite `.agents/references/subagent-reporting.md`
-`## Task brief`, which spans lines 24-111 with no sub-headings separating the
-brief template and `/next-plan` identity mapping from pre-dispatch inventory
-rules, bounded-reading guidance, and worker verification instructions.
+cites `.agents/references/subagent-reporting.md` `## Task brief` (step 6, lines
+130-134, already cites `claim-results.md` instead). Because `## Task brief`
+currently bundles four distinct topics (the brief template and `/next-plan`
+identity mapping, session baseline and `Get-AgentWorktreeSessionContext`,
+pre-dispatch inventory and bounded-reading exemptions, and worker verification
+conduct), it exceeds the small-read floor in
+`.agents/skills/next-plan-checkpoint-review/scripts/Get-TranscriptProjection.ps1`
+(`$script:SmallReadMaxLines` and `$script:SmallReadMaxChars`).
 
-Session provenance (machine-local; not reproducible after cleanup). The Client
-through Worktree fields name the session that observed the friction — the
-session `/next-plan-review` must reach — while the `Landing ref` line names a
-ref whose tree actually contains this Plan:
-- Client: agy
-- Conversation session ID: bc6732d0-b89b-4893-a756-20026e542517
-- Worktree/branch UUID: 67048fc4-9412-489e-bec4-ad39620046af
-- Session branch: agy/67048fc4-9412-489e-bec4-ad39620046af
-- Worktree: .agy\worktrees\BrokenEngine\67048fc4-9412-489e-bec4-ad39620046af
-- Landing ref: agy/67048fc4-9412-489e-bec4-ad39620046af
-  The review ref the invoker passes to `/next-plan-review` resolves this ref to
-  the commit that added this Plan with
-  `git log --follow --diff-filter=A -n 1 --format=%H <ref> -- <this plan path>`
-  and passes that commit. When the recorded ref is gone or that command prints
-  nothing (a later session moved this Plan), run the same command with `<ref>`
-  omitted. Review the result only when the commit is attributable to the
-  observing session recorded above alone (its diff limited to that session's
-  files); never review an aggregate or multi-session squash commit.
-- Run the review before `/cleanup-worktrees` removes the worktree recorded
-  above: `agy` review requires the conversation session ID above.
+`.agents/skills/next-plan/SKILL.md` is already over the skill token threshold,
+so shrinking `## Task brief` in place by promoting the unrelated subtopics to
+sibling `##` sections (and moving worker verification conduct into
+`## Delegated execution context`) brings `## Task brief` within both small-read
+size limits without editing `.agents/skills/next-plan/SKILL.md` or adding
+sub-headings inside `## Task brief`. Note that `Get-TranscriptProjection.ps1`
+exempts a small read only when no second read of the same file occurs in the
+same checkpoint span; if step 4 also follows `prepare-change/SKILL.md`
+`## Inputs` into `## Pre-dispatch inventory and bounded reading`, avoiding a
+repeat read of `subagent-reporting.md` is a separate check from size.
 
 ## Design
-First root-cause the friction from the current tree and this Plan's
-`## Context`. Only when the transcript is genuinely needed, in a new session
-run `/next-plan-review <review ref>` in bounded friction mode, with the review
-ref the provenance block above defines, supplying client `agy` and the recorded
-conversation session ID. Then make the smallest fix inside the `## In scope`
-boundary below — for example, adding focused `###` sub-headings inside
-`.agents/references/subagent-reporting.md` `## Task brief` for the brief
-template, `/next-plan` identity mapping, and governing-path lookup and updating
-`.agents/skills/next-plan/SKILL.md` step 4 (and step 6 if applicable) to cite
-those narrower selectors instead of the whole `## Task brief` section. If
-root-causing shows the fix lies outside that boundary, surface it for
-re-planning instead of expanding scope.
+1. Restructure `.agents/references/subagent-reporting.md` with no net prose
+   growth (reorganizing existing paragraphs only):
+   - Move the worker verification paragraph (currently lines 109-111, "Workers
+     verify supplied hints against the tree...") to the end of
+     `## Delegated execution context` (currently lines 3-22), which already
+     owns reporting-local worker conduct.
+   - Keep `## Task brief` holding only:
+     - the opening line, fenced brief template, and `Required sections` /
+       readable-review-outputs paragraph (currently lines 26-45),
+     - the `/next-plan` `Get-NextPlanContext` identity-mapping paragraph
+       (currently lines 65-71), and
+     - the empty-fields / `Get-AffectedAgentsDocs.ps1` / no-pasting paragraph
+       (currently lines 101-107).
+     This leaves `## Task brief` at ~38 lines / ~1,940 chars, well within
+     `Get-TranscriptProjection.ps1`'s `$script:SmallReadMaxLines` and
+     `$script:SmallReadMaxChars` limits.
+   - Promote the session-baseline and `Get-AgentWorktreeSessionContext`
+     paragraphs (currently lines 47-63 and lines 73-80, keeping "The leading
+     `./` is required..." and "That output's `SessionId`..." directly after
+     the `Import-Module` PowerShell block) into a new sibling section
+     `## Session baseline` immediately after `## Task brief`.
+   - Promote the pre-dispatch `Get-SessionChangeInventory.ps1` receipt and
+     whole-read / bounded-reading paragraph (currently lines 82-99) into a new
+     sibling section `## Pre-dispatch inventory and bounded reading`
+     immediately after `## Session baseline`.
+2. Leave `.agents/skills/next-plan/SKILL.md` untouched: its existing step 4
+   citation (lines 66-68) to `subagent-reporting.md` `## Task brief` now
+   targets the shrunk ~38-line section.
+3. Update only the repository callers that specifically cite
+   `subagent-reporting.md` `## Task brief` (or `#task-brief`) for one of the
+   promoted subtopics:
+   - `AGENTS.md` (lines 97-99, `## Directives` `Bounded reading`): change
+     `## Task brief` whole-read exemptions to
+     `## Pre-dispatch inventory and bounded reading` whole-read exemptions
+     (leave lines 33-34 citing `## Task brief`).
+   - `.agents/skills/prepare-change/SKILL.md` (lines 53-54, `## Inputs`
+     `mode: claimed-plan`): change `subagent-reporting.md` `## Task brief` for
+     workflow-reference reads to
+     `## Pre-dispatch inventory and bounded reading` (leave lines 33-34, 41, and
+     143-144 citing `## Task brief`).
+   - `.agents/skills/eod/SKILL.md` (lines 33-35, `## Steps` step 4): change
+     the `Get-AgentWorktreeSessionContext` citation from `## Task brief` to
+     `## Session baseline`.
+   - `.agents/skills/next-plan/references/claim-results.md` (lines 16-18,
+     `## Session baseline and the sync object`): change
+     `../../../references/subagent-reporting.md#task-brief` to
+     `../../../references/subagent-reporting.md#session-baseline`.
+   - `.agents/skills/next-plan-review/SKILL.md` (lines 40-43, `## Inputs`):
+     cite both `## Task brief` and `## Session baseline` on the bullet naming
+     shared task-brief fields including repository identity and session
+     baseline.
+4. Leave all other `subagent-reporting.md` `## Task brief` citations unchanged,
+   as they refer to the brief template, field rules, or readable-review-output
+   citation rule that remain in `## Task brief`.
 
 ## Critical files
-- `.agents/skills/next-plan/SKILL.md`
 - `.agents/references/subagent-reporting.md`
+- `AGENTS.md`
+- `.agents/skills/prepare-change/SKILL.md`
+- `.agents/skills/eod/SKILL.md`
+- `.agents/skills/next-plan/references/claim-results.md`
+- `.agents/skills/next-plan-review/SKILL.md`
 
 ## In scope
-- Root-cause investigation as `## Design` states
-- The smallest resulting fix, confined to `.agents/skills/next-plan/SKILL.md`
-  (`## Steps` step 4 and step 6 citation) and
-  `.agents/references/subagent-reporting.md` (`## Task brief`)
+- `.agents/references/subagent-reporting.md`: `## Delegated execution context`
+  (lines 3-22), `## Task brief` (lines 24-111), and new sibling sections
+  `## Session baseline` and `## Pre-dispatch inventory and bounded reading`
+- `AGENTS.md`: `## Directives` `Bounded reading` bullet (lines 97-101)
+- `.agents/skills/prepare-change/SKILL.md`: `## Inputs` `mode: claimed-plan`
+  ordinary-claim bullet (lines 50-56)
+- `.agents/skills/eod/SKILL.md`: `## Steps` step 4 (lines 33-37)
+- `.agents/skills/next-plan/references/claim-results.md`:
+  `## Session baseline and the sync object` (lines 16-18)
+- `.agents/skills/next-plan-review/SKILL.md`: `## Inputs` shared task-brief
+  fields bullet (lines 40-43)
 
 ## Out of scope
-- The landed change the session produced
-- Unrelated skills/scripts; any transcript path or transcript text in the repo
+- `.agents/skills/next-plan/SKILL.md` (explicitly unchanged)
+- Any other skill, reference, or script citing `subagent-reporting.md`
+  `## Task brief` for the brief template, field rules, or review-output
+  citations
+- Rewriting the rules inside the moved paragraphs beyond minimal heading
+  transitions, or changing `Get-TranscriptProjection.ps1` thresholds
+- Any transcript path or transcript text in the repository
 
 ## Risk tier and invariants
-Expected Tier 2 (scoped tool behavior); escalate if the fix reaches
-build/bootstrap coordination. Never embed transcript paths or home paths.
+Tier 1 (mechanical documentation restructure with no behavioral change to
+scripts, tools, or build/bootstrap coordination; net prose stays flat).
+Invariants:
+- Every rule currently in `subagent-reporting.md` `## Task brief` remains
+  intact in its new section with no dropped requirements.
+- Every citation across the repository to `subagent-reporting.md` sections or
+  anchors resolves to the section owning the cited rule.
+- Never embed transcript paths or home paths.
 
 ## Acceptance criteria
-- The recorded symptom no longer reproduces under the documented `/next-plan`
-  step 4 invocation: main reads only the dedicated brief-template, `/next-plan`
-  identity-mapping, and governing-path lookup selectors rather than the full
-  `## Task brief` section
+- `.agents/references/subagent-reporting.md` `## Task brief` contains only the
+  brief template, field and review-output rules, `/next-plan` identity mapping,
+  and governing-path lookup rules, and fits within
+  `Get-TranscriptProjection.ps1`'s `$script:SmallReadMaxLines` and
+  `$script:SmallReadMaxChars` limits.
+- `.agents/references/subagent-reporting.md` has sibling sections
+  `## Session baseline` and `## Pre-dispatch inventory and bounded reading`,
+  and `## Delegated execution context` holds the worker verification paragraph.
+- `.agents/skills/next-plan/SKILL.md` is unmodified.
+- The five caller citations in `## In scope` point to the matching new section
+  or anchor, and no remaining `subagent-reporting.md` `## Task brief` or
+  `#task-brief` citation in the repository points to a moved subtopic.
 - The static-checks runner, invoked as `.agents/references/change-workflow.md`
   `#### Step 5 — Run targeted pre-review checks` documents it, reports every
-  row the change triggers passing
+  row the change triggers passing.
 
 ## Notes
-- Converted from three distinct session-branch rows in
-  `Documents/Investigations/ChangeWorkflow/WorkflowIncidents.md` for key
-  `(.agents/skills/next-plan, step 4 cites full Task brief section instead of dedicated brief-template selector)`.
+- Originally converted from two archived rows in
+  `Documents/Investigations/ChangeWorkflow/WorkflowIncidents.md` at commit
+  `c0f69b15e` (lines 106 and 110) for key `(.agents/skills/next-plan, step 4
+  cites full Task brief section instead of dedicated brief-template selector)`
+  (removed from the current ledger in commit `6fd9c57dc`), plus the third
+  observation recorded in the original Plan at commit `6fd9c57dc` (lines
+  13-16 of this file).
+- Revised to specify Option 2 (promoting non-template subtopics to sibling `##`
+  sections) so `## Task brief` fits the small-read size limits without editing
+  `.agents/skills/next-plan/SKILL.md`.

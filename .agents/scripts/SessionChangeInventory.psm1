@@ -4,13 +4,16 @@
 # stderr, or disk, and performs no JSON serialization (GIT_OPTIONAL_LOCKS=0 keeps Git from
 # refreshing the index). A session Coretide clone at Projects/Coretide is inventoried by the same
 # pipeline in that repository, from the merge base of its HEAD and upstream, and its rows are
-# merged under that prefix.
+# merged under that prefix; a commit-valued head whose message carries a Coretide-Snapshot line
+# (a review-round snapshot) sets the Coretide head to that commit instead of the clone's HEAD,
+# and its Coretide-Baseline line replaces that merge base.
+# Get-ReviewRoundState and Test-ReviewRoundCoverage read the review-round chain the
+# Get-ChangeWorkflowSteps.ps1 header documents.
 
 Set-StrictMode -Version Latest
 Import-Module (Join-Path $PSScriptRoot 'AgentScriptCommon.psm1')
 Import-Module (Join-Path $PSScriptRoot 'SourceAffinity.psm1')
 
-$script:MaximumEntries = 500
 $script:MaximumSymbolLength = 96
 $script:MaximumMessageLength = 256
 
@@ -37,10 +40,6 @@ $script:AcceptanceSkeletonChecks = [ordered]@{
 $script:ClassNames = @('dual-language-header', 'glsl', 'cpp', 'skill', 'plan', 'script', 'vcxproj', 'doc', 'binary', 'other')
 $script:ManifestModes = @('100644', '100755')
 $script:ManifestRoots = @('Common', 'DataPacker', 'Engine', 'Projects', 'Tools')
-# -EmitTargets is the C++ review target list its consumers read, so it omits paths under these first path
-# components (upstream libraries, agent tooling, scratch) except the repository's own wrappers under
-# ThirdParty/Prebuilts/Source, which are reviewed like any other changed C++ (Test-ManifestCorpusPath).
-$script:ManifestExcludedRoots = @('ThirdParty', '.agents', '.claude', 'Temp')
 # Ordinal planning-root prefixes accepted by -SavePlanPaths; a rooted, UNC, or drive-qualified path
 # cannot match any of these after separator normalization and removing at most one leading './'.
 $script:SavePlanRoots = @(
@@ -55,6 +54,32 @@ $script:ZeroOid = '0000000000000000000000000000000000000000'
 $script:CoretidePrefix = 'Projects/Coretide/'
 $script:Utf8 = [Text.UTF8Encoding]::new($false)
 $script:InventoryModulePath = Join-Path $PSScriptRoot 'SessionChangeInventory.psm1'
+# The per-run state Get-SessionChangeInventory sets; the review-round gate saves and restores it around its own runs.
+$script:Root = $null
+$script:BaselineSha = ''
+$script:HeadSha = ''
+$script:HeadPaths = $null
+$script:Coretide = $null
+$script:EngineSide = $null
+$script:BlobHashes = @{}
+$script:ReviewRoundRef = 'refs/worktree/review-rounds'
+# The review keys in the Get-ChangeWorkflowSteps.ps1 header: the group that decides the phase, and the inventory
+# trigger that owes each key. /adversarial-review is owed at Tier 3 with any trigger, /verify-acceptance by the rules.
+$script:ReviewRoundKeys = [ordered]@{
+	'/repo-code-review' = @{ Group = 'code'; Trigger = 'repoCodeReview' }
+	'/glsl-review' = @{ Group = 'code'; Trigger = 'glslReview' }
+	'/comment-review' = @{ Group = 'words'; Trigger = 'commentReview' }
+	'/progressive-disclosure-review' = @{ Group = 'words'; Trigger = 'progressiveDisclosureReview' }
+	'/coherence-review' = @{ Group = 'neutral'; Trigger = 'coherenceReview' }
+	'/external-skill-creator' = @{ Group = 'neutral'; Trigger = 'validateSkill' }
+	'/adversarial-review' = @{ Group = 'neutral'; Trigger = $null }
+	'/verify-acceptance' = @{ Group = 'acceptance'; Trigger = $null }
+}
+# The checks a Tier-1 combined /coherence-review row carries; a combined snapshot's Owes lines name the ones it carried.
+$script:CombinedCarriedKeys = @('/external-skill-creator', '/progressive-disclosure-review', '/verify-acceptance')
+$script:ReviewSeverityRank = @{ none = 0; Low = 1; Medium = 2; High = 3; Critical = 4 }
+# The routing triggers a proven comment-text-only modification never fires on a -Since run.
+$script:CodeOnlyTriggers = @('repoCodeReview', 'overEngineeringReview', 'glslReview', 'updateAffectedCode', 'updateClaudeDocs')
 
 function Set-InventoryOutcome([pscustomobject] $Result, [string] $Status, [string] $Code, [string] $Message) {
 	$text = if ($null -eq $Message) { '' } else { $Message }
@@ -257,11 +282,15 @@ function Get-InventoryEntry([hashtable] $Row, [hashtable] $BinaryPaths, [bool] $
 	}
 }
 
+function Test-ReviewExemptEntry([object] $Entry) {
+	# A deleted Plan file owes no review: /next-plan completion deletes the claimed Plan.
+	# A modified refactor-candidate or workflow incident log owes none either: their rows are added after review.
+	if ($Entry.Status -ceq 'D' -and $Entry.Class -ceq 'plan') { return $true }
+	return $Entry.Status -ceq 'M' -and $Entry.Path -cin @('Documents/Investigations/Engine/RefactorCandidates.md', 'Documents/Investigations/ChangeWorkflow/WorkflowIncidents.md')
+}
+
 function Test-CoherenceReviewEntry([object] $Entry) {
-	# A deleted Plan file never fires this trigger: /next-plan completion deletes the claimed Plan, and that deletion owes no review row.
-	# A modified refactor-candidate or workflow incident log never fires it either: their rows are added after review.
-	if ($Entry.Status -ceq 'D' -and $Entry.Class -ceq 'plan') { return $false }
-	if ($Entry.Status -ceq 'M' -and $Entry.Path -cin @('Documents/Investigations/Engine/RefactorCandidates.md', 'Documents/Investigations/ChangeWorkflow/WorkflowIncidents.md')) { return $false }
+	if (Test-ReviewExemptEntry $Entry) { return $false }
 	return $script:CoherenceReviewClasses -ccontains $Entry.Class -or ($null -ne $Entry.OldClass -and $script:CoherenceReviewClasses -ccontains $Entry.OldClass)
 }
 
@@ -628,7 +657,7 @@ function Test-SavePlanOnlyReviewedRows([Collections.Generic.List[object]] $Revie
 	return $AuthorizedPaths.SetEquals($paths)
 }
 
-function Get-LandingState([string] $BaselineSha, [string] $HeadSha, [ref] $Truncation, [Collections.Generic.HashSet[string]] $SavePlanAuthorizedPaths = $null) {
+function Get-LandingState([string] $BaselineSha, [string] $HeadSha, [ref] $Truncation, [ref] $Refusal, [Collections.Generic.HashSet[string]] $SavePlanAuthorizedPaths = $null) {
 	# The reviewed diff is the session's own three-dot range, resolved to its merge base once so the
 	# script's own entry pipeline answers it: `git diff A...B` is defined as the diff from
 	# merge-base(A, B) to B, so the two-dot pair below compares the same two trees.
@@ -687,6 +716,9 @@ function Get-LandingState([string] $BaselineSha, [string] $HeadSha, [ref] $Trunc
 	if ($null -ne $SavePlanAuthorizedPaths -and (Test-SavePlanOnlyReviewedRows $reviewed $SavePlanAuthorizedPaths)) {
 		$reviewedTriggers.coherenceReview = $false
 	}
+	# The clone's HEAD is the commit Invoke-FinalizeCoretide.ps1 -Prepare made before this run.
+	$coretideCandidate = if ($null -ne $script:Coretide) { $script:Coretide.HeadSha } else { '' }
+	$Refusal.Value = Get-ReviewRoundCoverageFailure $script:Root $BaselineSha $HeadSha $coretideCandidate $SavePlanAuthorizedPaths
 	# The rows this landing owes, each left BLOCKED for the finalizer to fill with evidence. The
 	# Executable Plan row is decided from the reviewed paths rather than from planTouched, whose
 	# `plan` class deliberately excludes the Plans tree's own AGENTS.md.
@@ -720,6 +752,471 @@ function Get-LandingState([string] $BaselineSha, [string] $HeadSha, [ref] $Trunc
 		planTouched = $planTouched
 		acceptanceSkeleton = [object[]] $skeleton.ToArray()
 	}
+}
+
+function Save-InventoryState() {
+	return @{ Root = $script:Root; BaselineSha = $script:BaselineSha; HeadSha = $script:HeadSha; HeadPaths = $script:HeadPaths; Coretide = $script:Coretide; EngineSide = $script:EngineSide; BlobHashes = $script:BlobHashes }
+}
+
+function Restore-InventoryState([hashtable] $State) {
+	$script:Root = $State.Root
+	$script:BaselineSha = $State.BaselineSha
+	$script:HeadSha = $State.HeadSha
+	$script:HeadPaths = $State.HeadPaths
+	$script:Coretide = $State.Coretide
+	$script:EngineSide = $State.EngineSide
+	$script:BlobHashes = $State.BlobHashes
+}
+
+# A Git run in an explicit repository, so the review-round readers never depend on the per-run state.
+function Invoke-ReviewChainGit([string] $Repository, [string[]] $Arguments, [bool] $AllowFailure = $true) {
+	$run = Invoke-AgentProcess 'git' (@('-C', $Repository, '--no-pager') + $Arguments) $Repository
+	if (-not $AllowFailure -and $run.ExitCode -ne 0) { throw "git $($Arguments -join ' ') failed with exit $($run.ExitCode): $($run.Stderr.Trim())" }
+	return $run
+}
+
+# The fields of a review-round snapshot or close message in the Get-ChangeWorkflowSteps.ps1 header forms, or null
+# when the subject is neither or any line breaks the form.
+function ConvertFrom-ReviewRoundMessage([string] $Message) {
+	$lines = [Collections.Generic.List[string]]::new([string[]] ($Message -split "`n"))
+	while ($lines.Count -gt 0 -and $lines[$lines.Count - 1] -ceq '') { $lines.RemoveAt($lines.Count - 1) }
+	if ($lines.Count -lt 3 -or $lines[1] -cne '') { return $null }
+	$subject = [regex]::Match($lines[0], '^Review round ([1-9][0-9]{0,8})( closed)?$')
+	if (-not $subject.Success) { return $null }
+	$number = [int] $subject.Groups[1].Value
+	$values = @{}
+	for ($i = 2; $i -lt $lines.Count; $i++) {
+		$line = [regex]::Match($lines[$i], '^([A-Za-z-]+): (\S(?:.*\S)?)$')
+		if (-not $line.Success) { return $null }
+		$name = $line.Groups[1].Value
+		if (-not $values.ContainsKey($name)) { $values[$name] = [Collections.Generic.List[string]]::new() }
+		$values[$name].Add($line.Groups[2].Value)
+	}
+	$single = { param([string] $Name) if ($values.ContainsKey($Name) -and $values[$Name].Count -eq 1) { $values[$Name][0] } else { $null } }
+	if ($subject.Groups[2].Success) {
+		foreach ($name in $values.Keys) { if ($name -cnotin @('Closes', 'Result', 'Next')) { return $null } }
+		$next = & $single 'Next'
+		if ((& $single 'Closes') -cne "$number" -or $next -cnotin @('repeat', 'check', 'done')) { return $null }
+		$results = [Collections.Generic.List[object]]::new()
+		$highest = 'none'
+		if ($values.ContainsKey('Result')) {
+			foreach ($value in $values['Result']) {
+				$result = [regex]::Match($value, '^(\S+) (none|Low|Medium|High|Critical)$')
+				if (-not $result.Success -or -not $script:ReviewRoundKeys.Contains($result.Groups[1].Value)) { return $null }
+				if (@($results | Where-Object { $_.Key -ceq $result.Groups[1].Value }).Count -gt 0) { return $null }
+				$results.Add([pscustomobject] @{ Key = $result.Groups[1].Value; Severity = $result.Groups[2].Value })
+				if ($script:ReviewSeverityRank[$result.Groups[2].Value] -gt $script:ReviewSeverityRank[$highest]) { $highest = $result.Groups[2].Value }
+			}
+		}
+		return [pscustomobject] @{ IsClose = $true; Number = $number; Results = [object[]] $results.ToArray(); Next = $next; Highest = $highest }
+	}
+	foreach ($name in $values.Keys) { if ($name -cnotin @('Round', 'Baseline', 'Phase', 'Kind', 'Tier', 'Owes', 'Coretide-Snapshot', 'Coretide-Baseline')) { return $null } }
+	$baseline = & $single 'Baseline'
+	$phase = & $single 'Phase'
+	$kind = & $single 'Kind'
+	$tier = & $single 'Tier'
+	if ((& $single 'Round') -cne "$number" -or $baseline -cnotmatch '^[0-9a-f]{40}$' -or $phase -cnotin @('code', 'words', 'combined', 'acceptance', 'sweep') -or $kind -cnotin @('ordinary', 'check')) { return $null }
+	if ($values.ContainsKey('Tier') -eq ($phase -ceq 'sweep') -or ($phase -cne 'sweep' -and $tier -cnotin @('1', '2', '3'))) { return $null }
+	$owes = [string[]] @()
+	if ($values.ContainsKey('Owes')) { $owes = [string[]] $values['Owes'].ToArray() }
+	foreach ($key in $owes) { if (-not $script:ReviewRoundKeys.Contains($key)) { return $null } }
+	if (@($owes | Sort-Object -Unique -CaseSensitive).Count -ne $owes.Count -or (($phase -ceq 'sweep') -ne ($owes.Count -eq 0))) { return $null }
+	$coretideSnapshot = & $single 'Coretide-Snapshot'
+	$coretideBaseline = & $single 'Coretide-Baseline'
+	if ($values.ContainsKey('Coretide-Snapshot') -ne $values.ContainsKey('Coretide-Baseline')) { return $null }
+	if ($values.ContainsKey('Coretide-Snapshot') -and ($coretideSnapshot -cnotmatch '^[0-9a-f]{40}$' -or $coretideBaseline -cnotmatch '^[0-9a-f]{40}$')) { return $null }
+	return [pscustomobject] @{ IsClose = $false; Number = $number; Baseline = $baseline; Phase = $phase; Kind = $kind; Tier = $(if ($null -ne $tier) { [int] $tier } else { 0 }); Owes = $owes; CoretideSnapshot = $coretideSnapshot; CoretideBaseline = $coretideBaseline }
+}
+
+# The engine chain by the reading rule, rounds oldest first: walking first parents from the ref tip, only the tip
+# round may be open, every close sits on the snapshot of the round it names with that snapshot's tree, a result for
+# each owed key and otherwise only /adversarial-review, and the Next its results and the snapshot's Kind give, a Tier
+# line except on a sweep round, a sweep round is ordinary and closed with no result, numbers descend by one to round
+# 1, and every Coretide-Snapshot resolves in the clone. Anything else, a symbolic ref included, reads as no chain,
+# never repaired. Tip is the ref's value as read here (the zero OID when absent), the old value of the compare-and-swap
+# of a writer that planned from this read.
+function Read-ReviewRoundChain([string] $Root) {
+	$tip = Invoke-ReviewChainGit $Root @('rev-parse', '--verify', '--quiet', $script:ReviewRoundRef)
+	$tipSha = if ($tip.ExitCode -eq 0) { $tip.Stdout.Trim() } else { $script:ZeroOid }
+	$unreadable = [pscustomobject] @{ Readable = $false; Rounds = [object[]] @(); Tip = $tipSha }
+	if ($tip.ExitCode -ne 0) { return $unreadable }
+	if ((Invoke-ReviewChainGit $Root @('symbolic-ref', '--quiet', $script:ReviewRoundRef)).ExitCode -eq 0) { return $unreadable }
+	$rounds = [Collections.Generic.List[object]]::new()
+	$close = $null
+	$sha = $tipSha
+	while ($true) {
+		$commit = Invoke-ReviewChainGit $Root @('cat-file', 'commit', $sha)
+		if ($commit.ExitCode -ne 0) { return $unreadable }
+		$split = $commit.Stdout.IndexOf("`n`n")
+		if ($split -lt 0) { return $unreadable }
+		$header = $commit.Stdout.Substring(0, $split)
+		$parent = [regex]::Match($header, '(?m)^parent ([0-9a-f]{40})$')
+		$tree = [regex]::Match($header, '(?m)^tree ([0-9a-f]{40})$').Groups[1].Value
+		$fields = ConvertFrom-ReviewRoundMessage $commit.Stdout.Substring($split + 2)
+		if ($null -eq $fields) { return $unreadable }
+		$expected = if ($null -ne $close) { $close.Number } elseif ($rounds.Count -gt 0) { $rounds[$rounds.Count - 1].Number - 1 } else { $fields.Number }
+		if ($fields.Number -ne $expected) { return $unreadable }
+		if ($fields.IsClose) {
+			if ($null -ne $close) { return $unreadable }
+			$close = [pscustomobject] @{ Commit = $sha; Tree = $tree; Number = $fields.Number; Results = $fields.Results; Next = $fields.Next; Highest = $fields.Highest }
+		}
+		else {
+			if ($null -eq $close -and $rounds.Count -gt 0) { return $unreadable }
+			if ($fields.Phase -ceq 'sweep' -and ($null -eq $close -or $fields.Kind -cne 'ordinary' -or $close.Results.Count -gt 0)) { return $unreadable }
+			if ($null -ne $close) {
+				# Only the close -CloseRound would write for this snapshot reads.
+				$resultKeys = [string[]] @($close.Results | ForEach-Object { $_.Key })
+				if ($close.Tree -cne $tree) { return $unreadable }
+				if (@($fields.Owes | Where-Object { $resultKeys -cnotcontains $_ }).Count -gt 0) { return $unreadable }
+				if (@($resultKeys | Where-Object { $fields.Owes -cnotcontains $_ -and $_ -cne '/adversarial-review' }).Count -gt 0) { return $unreadable }
+				$next = if ($close.Highest -cin @('High', 'Critical')) { 'repeat' } elseif ($fields.Kind -ceq 'ordinary' -and $close.Highest -cin @('Medium', 'Low')) { 'check' } else { 'done' }
+				if ($close.Next -cne $next) { return $unreadable }
+			}
+			$rounds.Add([pscustomobject] @{
+				Number = $fields.Number; Snapshot = $sha; Baseline = $fields.Baseline; Phase = $fields.Phase; Kind = $fields.Kind; Tier = $fields.Tier; Owes = $fields.Owes
+				Carried = [string[]] @(if ($fields.Phase -ceq 'combined') { $fields.Owes | Where-Object { $script:CombinedCarriedKeys -ccontains $_ } })
+				CoretideSnapshot = $fields.CoretideSnapshot; CoretideBaseline = $fields.CoretideBaseline; Close = $close
+			})
+			$close = $null
+			if ($fields.Number -eq 1) { break }
+		}
+		if (-not $parent.Success) { return $unreadable }
+		$sha = $parent.Groups[1].Value
+	}
+	$clone = $null
+	foreach ($round in $rounds) {
+		if ($null -eq $round.CoretideSnapshot) { continue }
+		if ($null -eq $clone) { $clone = Get-AgentCoretideRepository $Root }
+		if ($null -eq $clone) { return $unreadable }
+		foreach ($revision in @($round.CoretideSnapshot, $round.CoretideBaseline)) {
+			if ((Invoke-ReviewChainGit $clone @('cat-file', '-e', "$revision^{commit}")).ExitCode -ne 0) { return $unreadable }
+		}
+	}
+	$rounds.Reverse()
+	return [pscustomobject] @{ Readable = $true; Rounds = [object[]] $rounds.ToArray(); Tip = $tipSha }
+}
+
+# The closed rounds, counted back from the last, whose highest result is Critical or High; 0 when the last is open.
+function Get-ReviewRoundConsecutiveHigh([object[]] $Rounds) {
+	$count = 0
+	for ($i = $Rounds.Count - 1; $i -ge 0; $i--) {
+		if ($null -eq $Rounds[$i].Close -or $Rounds[$i].Close.Highest -cnotin @('High', 'Critical')) { break }
+		$count++
+	}
+	return $count
+}
+
+function Get-ReviewRoundInventory([string] $Root, [string] $Baseline, [string] $Since, [string] $Head) {
+	$parameters = @{ RepositoryRoot = $Root; Baseline = $Baseline }
+	if (-not [string]::IsNullOrEmpty($Since)) { $parameters.Since = $Since }
+	if (-not [string]::IsNullOrEmpty($Head)) { $parameters.Head = $Head } else { $parameters.IncludeUntracked = $true }
+	$document = Get-SessionChangeInventory @parameters
+	if ($null -eq $document -or $document.status -cne 'pass') {
+		$reason = if ($null -ne $document) { "$($document.code): $($document.message)" } else { 'no result returned' }
+		$exception = [InvalidOperationException]::new("the session change inventory did not pass: $reason")
+		$exception.Data['ReviewRoundInventory'] = $true
+		throw $exception
+	}
+	return $document
+}
+
+# The next round after Rounds (oldest first, every one closed) by the Get-ChangeWorkflowSteps.ps1 header rules, from
+# each key's diff D(S_k) to Head (the working tree when empty).
+function Get-ReviewRoundPlan([string] $Root, [object[]] $Rounds, [string] $Head, [string] $Baseline, [int] $Tier, [bool] $Landing) {
+	$last = if ($Rounds.Count -gt 0) { $Rounds[$Rounds.Count - 1] } else { $null }
+	$since = @{}
+	$high = @{}
+	foreach ($key in $script:ReviewRoundKeys.Keys) { $since[$key] = ''; $high[$key] = $false }
+	foreach ($round in $Rounds) {
+		if ($round.Phase -ceq 'sweep') { foreach ($key in $script:ReviewRoundKeys.Keys) { $since[$key] = $round.Snapshot; $high[$key] = $false }; continue }
+		foreach ($result in $round.Close.Results) {
+			$high[$result.Key] = $result.Severity -cin @('High', 'Critical')
+			if (-not $high[$result.Key]) { $since[$result.Key] = $round.Snapshot }
+		}
+	}
+	$bSince = if ($null -ne $last) { $last.Snapshot } else { '' }
+	$docs = @{}
+	foreach ($point in @(@($since.Values) + @($bSince) | Sort-Object -Unique -CaseSensitive)) { $docs[$point] = Get-ReviewRoundInventory $Root $Baseline $point $Head }
+	$owed = [ordered]@{}
+	$reviewTriggers = @($script:ReviewRoundKeys.Values | Where-Object { $null -ne $_.Trigger } | ForEach-Object { $_.Trigger })
+	$anyFires = { param($Triggers) @($reviewTriggers | Where-Object { $Triggers.$_ }).Count -gt 0 }
+	foreach ($key in $script:ReviewRoundKeys.Keys) {
+		$t = $docs[$since[$key]].triggers
+		$trigger = $script:ReviewRoundKeys[$key].Trigger
+		$adversarial = $key -ceq '/adversarial-review'
+		$fires = if ($adversarial) { $Tier -eq 3 -and (& $anyFires $t) } elseif ($null -ne $trigger) { [bool] $t.$trigger } else { $false }
+		if (($fires -or $high[$key]) -and ($adversarial -or $null -ne $trigger) -and -not $docs.ContainsKey('')) { $docs[''] = Get-ReviewRoundInventory $Root $Baseline '' $Head }
+		$owed[$key] = ($fires -or $high[$key]) -and $(if ($adversarial) { & $anyFires $docs[''].triggers } else { $null -eq $trigger -or [bool] $docs[''].triggers.$trigger })
+	}
+	$db = $docs[$bSince]
+	$keysIn = { param([string] $Group) [string[]] @($owed.Keys | Where-Object { $owed[$_] -and $script:ReviewRoundKeys[$_].Group -ceq $Group }) }
+	$code = @(& $keysIn 'code')
+	$words = @(& $keysIn 'words')
+	$neutral = @(& $keysIn 'neutral')
+	$plan = [pscustomobject] @{
+		Done = $false; Phase = ''; Kind = $(if ($null -ne $last -and $last.Close.Next -ceq 'check') { 'check' } else { 'ordinary' })
+		Keys = [string[]] @(); Carried = [string[]] @(); OverEngineering = [bool] $db.triggers.overEngineeringReview; DB = $db; DW = $docs[$since['/comment-review']]
+	}
+	# T1: no words key prints while a code key is owed; a withheld key keeps its S_k.
+	if ($code.Count -gt 0) { $plan.Phase = 'code'; $plan.Keys = $code + $neutral }
+	elseif ($words.Count -gt 0) { $plan.Phase = 'words'; $plan.Keys = $words + $neutral }
+	elseif ($neutral.Count -gt 0) { $plan.Phase = 'code'; $plan.Keys = $neutral }
+	elseif (-not $Landing -and ($owed['/verify-acceptance'] -or $null -eq $last -or $since['/verify-acceptance'] -cne $last.Snapshot)) {
+		$plan.Phase = 'acceptance'
+		$plan.Keys = [string[]] @('/verify-acceptance')
+		return $plan
+	}
+	else {
+		$plan.Done = $true
+		return $plan
+	}
+	if ($Tier -eq 1 -and $plan.Keys -ccontains '/coherence-review' -and @($plan.Keys | Where-Object { $_ -cin @('/repo-code-review', '/glsl-review', '/comment-review') }).Count -eq 0) {
+		$plan.Phase = 'combined'
+		$plan.Carried = [string[]] @(@('/external-skill-creator', '/progressive-disclosure-review') | Where-Object { $plan.Keys -ccontains $_ }) + @(if (-not $Landing) { '/verify-acceptance' })
+		$plan.Keys = [string[]] @(@('/coherence-review') + @($plan.Keys | Where-Object { $_ -ceq '/adversarial-review' }))
+	}
+	return $plan
+}
+
+# The engine review-round chain and, unless -ChainOnly, the round it owes next from the diffs to -Head (the working
+# tree when omitted): an open last round is owed again as recorded. -Baseline defaults to the last round's. -Chain
+# takes the state an earlier -ChainOnly call returned instead of reading the ref again, so a writer plans from the
+# same read whose Tip it compares and swaps. Failure names an inventory that did not pass; Plan.Done means the loop is
+# done.
+function Get-ReviewRoundState {
+	[CmdletBinding()]
+	param(
+		[Parameter(Mandatory)][string] $RepositoryRoot,
+		[string] $Baseline,
+		[string] $Head,
+		[ValidateRange(0, 3)][int] $Tier = 0,
+		[switch] $Landing,
+		[switch] $ChainOnly,
+		[object] $Chain
+	)
+
+	$ErrorActionPreference = 'Stop'
+	$root = Get-AgentCanonicalPath $RepositoryRoot
+	if ($null -eq $Chain) { $Chain = Read-ReviewRoundChain $root }
+	$rounds = [object[]] $Chain.Rounds
+	$last = if ($rounds.Count -gt 0) { $rounds[$rounds.Count - 1] } else { $null }
+	$state = [pscustomobject] @{
+		Readable = $Chain.Readable
+		Tip = $Chain.Tip
+		Rounds = $rounds
+		Last = $last
+		Open = $null -ne $last -and $null -eq $last.Close
+		Number = $(if ($null -ne $last) { $last.Number + 1 } else { 1 })
+		ConsecutiveHigh = Get-ReviewRoundConsecutiveHigh $rounds
+		Plan = $null
+		Failure = $null
+	}
+	if ($ChainOnly) { return $state }
+	if ([string]::IsNullOrEmpty($Baseline)) {
+		if ($null -eq $last) { throw '-Baseline is required when no review round exists.' }
+		$Baseline = $last.Baseline
+	}
+	try {
+		if ($state.Open) {
+			$plan = Get-ReviewRoundPlan $root ([object[]] @($rounds | Select-Object -First ($rounds.Count - 1))) $last.Snapshot $Baseline $Tier $Landing.IsPresent
+			$plan.Done = $false
+			$plan.Phase = $last.Phase
+			$plan.Kind = $last.Kind
+			$plan.Carried = $last.Carried
+			$plan.Keys = [string[]] @($last.Owes | Where-Object { $last.Carried -cnotcontains $_ })
+			$state.Plan = $plan
+		}
+		else { $state.Plan = Get-ReviewRoundPlan $root $rounds $Head $Baseline $Tier $Landing.IsPresent }
+	}
+	catch {
+		if (-not $_.Exception.Data.Contains('ReviewRoundInventory')) { throw }
+		$state.Failure = $_.Exception.Message
+	}
+	return $state
+}
+
+# The landing gate: null when no review is owed for the landing candidate (the engine candidate, or HEAD with an empty
+# engine diff when only a Coretide candidate is supplied, with the clone's HEAD as the Coretide side), the question the
+# step script asks of the working tree; else the refusal's code and message. A candidate the rounds cannot be evaluated
+# at is refused as inventory.round-evaluation-failed, which no further round cures. Saves and restores the per-run state.
+function Get-ReviewRoundCoverageFailure([string] $Root, [string] $EngineBase, [string] $EngineCandidate, [string] $CoretideCandidate, [Collections.Generic.HashSet[string]] $SavePlanAuthorizedPaths) {
+	$saved = Save-InventoryState
+	try {
+		$engineSide = -not [string]::IsNullOrEmpty($EngineCandidate)
+		$coretideSide = -not [string]::IsNullOrEmpty($CoretideCandidate)
+		$script:Root = $Root
+		$script:BlobHashes = @{}
+		$script:HeadPaths = $null
+		$script:EngineSide = $null
+		$script:Coretide = $null
+		$script:BaselineSha = ''
+		$script:HeadSha = ''
+		$engineHead = (Invoke-InventoryGit @('rev-parse', '--verify', "$(if ($engineSide) { $EngineCandidate } else { 'HEAD' })^{commit}")).Stdout.Trim()
+		$engineMergeBase = if ($engineSide) { (Invoke-InventoryGit @('merge-base', $EngineBase, $engineHead)).Stdout.Trim() } else { '' }
+		if ($coretideSide) {
+			$clone = Get-AgentCoretideRepository $Root
+			if ($null -eq $clone) { throw "'$Root' holds no Coretide clone for the Coretide candidate." }
+			$coretideHead = (Invoke-ReviewChainGit $clone @('rev-parse', '--verify', "$CoretideCandidate^{commit}") $false).Stdout.Trim()
+			if ((Invoke-ReviewChainGit $clone @('rev-parse', '--verify', 'HEAD^{commit}') $false).Stdout.Trim() -cne $coretideHead) { throw "The Coretide candidate $coretideHead is not the clone's HEAD." }
+			$coretideBase = (Invoke-ReviewChainGit $clone @('merge-base', $coretideHead, '@{upstream}') $false).Stdout.Trim()
+			$script:Coretide = @{ Root = $clone; BaselineSha = $coretideBase; HeadSha = $coretideHead; HeadPaths = $null }
+		}
+		if ($null -ne $SavePlanAuthorizedPaths) {
+			$reviewed = [Collections.Generic.List[object]]::new()
+			if ($engineSide) {
+				$script:HeadSha = $engineHead
+				$script:BaselineSha = $engineMergeBase
+				foreach ($row in (Get-InventoryRawRow $script:BaselineSha $script:HeadSha)) { $reviewed.Add([pscustomobject] @{ status = $row.Status; path = $row.Path; currentMode = $row.DestinationMode }) }
+			}
+			if ($coretideSide) {
+				Enter-CoretideSide
+				try { foreach ($row in (Get-InventoryRawRow $script:BaselineSha $script:HeadSha)) { $reviewed.Add([pscustomobject] @{ status = $row.Status; path = $script:CoretidePrefix + $row.Path; currentMode = $row.DestinationMode }) } }
+				finally { Exit-CoretideSide }
+			}
+			# Only the supplied sides' authorized paths, so a save spanning both repositories passes each landing script.
+			$sidePaths = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+			foreach ($path in $SavePlanAuthorizedPaths) {
+				$coretidePath = $path.StartsWith($script:CoretidePrefix, [StringComparison]::Ordinal)
+				if (($coretidePath -and $coretideSide) -or (-not $coretidePath -and $engineSide)) { [void] $sidePaths.Add($path) }
+			}
+			if (Test-SavePlanOnlyReviewedRows $reviewed $sidePaths) { return $null }
+		}
+		$chain = Get-ReviewRoundState -RepositoryRoot $Root -ChainOnly
+		if ($chain.Open) {
+			return [pscustomobject] @{ Code = 'inventory.review-round-unfinished'; Message = "Review round $($chain.Last.Number) is open; close it with Get-ChangeWorkflowSteps.ps1 -CloseRound and finish the rounds it owes." }
+		}
+		$baseline = if ($engineSide) { $engineMergeBase } else { $engineHead }
+		# The tier the last non-sweep round recorded, so /adversarial-review is owed as the step script owes it.
+		$tier = 0
+		foreach ($round in $chain.Rounds) { if ($round.Tier -gt 0) { $tier = $round.Tier } }
+		$at = Get-ReviewRoundState -RepositoryRoot $Root -Chain $chain -Baseline $baseline -Head $engineHead -Tier $tier -Landing
+		if ($null -ne $at.Failure) {
+			return [pscustomobject] @{ Code = 'inventory.round-evaluation-failed'; Message = "The review rounds could not be evaluated at the landing candidate: $($at.Failure)" }
+		}
+		if ($at.Plan.Done) { return $null }
+		$owed = "a $($at.Plan.Phase) round owing $((@($at.Plan.Keys) + @($at.Plan.Carried)) -join ', ')"
+		if ($chain.Rounds.Count -eq 0) {
+			return [pscustomobject] @{ Code = 'inventory.review-round-missing'; Message = "No readable review round covers this change and $owed is owed; run the review rounds Get-ChangeWorkflowSteps.ps1 prints before landing." }
+		}
+		return [pscustomobject] @{ Code = 'inventory.review-round-unfinished'; Message = "At the landing candidate $owed is owed after review round $($chain.Last.Number); rerun Get-ChangeWorkflowSteps.ps1." }
+	}
+	finally { Restore-InventoryState $saved }
+}
+
+# Test-ReviewRoundCoverage -RepositoryRoot <engine worktree> [-EngineBase <commit> -EngineCandidate <commit>]
+# [-CoretideCandidate <commit>] [-SavePlanPaths '<comma-separated paths>']: nothing when no review is owed for the
+# landing candidate, else an object with the refusal's Code and its Message.
+function Test-ReviewRoundCoverage {
+	[CmdletBinding()]
+	param(
+		[Parameter(Mandatory)][string] $RepositoryRoot,
+		[string] $EngineBase,
+		[string] $EngineCandidate,
+		[string] $CoretideCandidate,
+		[string] $SavePlanPaths
+	)
+
+	$ErrorActionPreference = 'Stop'
+	$authorized = $null
+	if (-not [string]::IsNullOrWhiteSpace($SavePlanPaths)) {
+		$saveError = $null
+		$authorized = Get-SavePlanAuthorizedPaths $SavePlanPaths ([ref] $saveError)
+		if ($null -eq $authorized) { return [pscustomobject] @{ Code = 'inventory.save-plan-paths-invalid'; Message = $saveError } }
+	}
+	return Get-ReviewRoundCoverageFailure (Get-AgentCanonicalPath $RepositoryRoot) $EngineBase $EngineCandidate $CoretideCandidate $authorized
+}
+
+# The Baseline, Coretide-Snapshot, and Coretide-Baseline lines of a commit's message, each null when absent.
+function Get-InventoryRoundField([string] $Sha) {
+	$message = (Invoke-InventoryGit @('show', '-s', '--format=%B', $Sha)).Stdout
+	$field = { param([string] $Name) $m = [regex]::Match($message, "(?m)^$([regex]::Escape($Name)): ([0-9a-f]{40})\r?$"); if ($m.Success) { $m.Groups[1].Value } else { $null } }
+	return [pscustomobject] @{ Baseline = & $field 'Baseline'; CoretideSnapshot = & $field 'Coretide-Snapshot'; CoretideBaseline = & $field 'Coretide-Baseline' }
+}
+
+# One side's entries from DiffBase to the head, untracked entries included. On a -Since run (Since holds the round
+# snapshot's own Baseline, or null, and the side's session baseline), an untracked path the since commit's tree holds
+# is compared with that entry by git hash-object (equal drops both rows, different leaves one M entry), and only rows
+# whose path or old path is a session path are kept; RoundPaths receives the since commit's own session paths.
+function Get-InventorySideEntry([string] $DiffBase, [string] $HeadSha, [bool] $WorkingTreeHead, [object[]] $Untracked, [object] $Since, [Collections.Generic.HashSet[string]] $RoundPaths) {
+	$binaryPaths = Get-InventoryBinaryPath $DiffBase $HeadSha
+	$untrackedByPath = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal)
+	if ($null -ne $Since) { foreach ($entry in $Untracked) { $untrackedByPath[$entry.Path] = $entry } }
+	$reconciled = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+	$entries = [Collections.Generic.List[object]]::new()
+	foreach ($row in (Get-InventoryRawRow $DiffBase $HeadSha)) {
+		if ($row.Status -ceq 'D' -and $untrackedByPath.ContainsKey($row.Path)) {
+			[void] $reconciled.Add($row.Path)
+			if ((Invoke-InventoryGit @('hash-object', '--', $row.Path)).Stdout.Trim() -ceq $row.SourceOid) { continue }
+			$current = $untrackedByPath[$row.Path]
+			$entries.Add([pscustomobject] @{
+				Status = 'M'
+				Path = $row.Path
+				OldPath = $null
+				Baseline = Get-InventoryIdentity $row.SourceMode $row.SourceOid $row.Path
+				Current = $current.Current
+				Class = $current.Class
+				OldClass = Get-PathClass $row.Path $row.SourceMode $false
+				Untracked = $true
+			})
+			continue
+		}
+		$entries.Add((Get-InventoryEntry $row $binaryPaths $WorkingTreeHead))
+	}
+	foreach ($entry in $Untracked) { if (-not $reconciled.Contains($entry.Path)) { $entries.Add($entry) } }
+	if ($null -eq $Since) { return , $entries }
+	if ($null -ne $Since.Baseline) {
+		foreach ($row in (Get-InventoryRawRow $Since.Baseline $DiffBase)) { foreach ($side in @($row.Path, $row.OldPath)) { if ($null -ne $side) { [void] $RoundPaths.Add($side) } } }
+	}
+	$sessionPaths = [Collections.Generic.HashSet[string]]::new($RoundPaths, [StringComparer]::Ordinal)
+	$sessionRows = Get-InventoryRawRow $Since.SessionBaseline $HeadSha
+	foreach ($row in $sessionRows) { foreach ($side in @($row.Path, $row.OldPath)) { if ($null -ne $side) { [void] $sessionPaths.Add($side) } } }
+	foreach ($entry in $Untracked) { [void] $sessionPaths.Add($entry.Path) }
+	$kept = [Collections.Generic.List[object]]::new()
+	$keptPaths = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+	foreach ($entry in $entries) {
+		if ($sessionPaths.Contains($entry.Path) -or ($null -ne $entry.OldPath -and $sessionPaths.Contains($entry.OldPath))) {
+			$kept.Add($entry)
+			foreach ($side in @($entry.Path, $entry.OldPath)) { if ($null -ne $side) { [void] $keptPaths.Add($side) } }
+		}
+	}
+	if ($null -eq $Since.Baseline) { return , $kept }
+	# A session path that was not one at the since commit is new to review even when its bytes equal that commit's, so
+	# it keeps its session row.
+	$sessionBinaryPaths = $null
+	foreach ($row in $sessionRows) {
+		$new = @(@($row.Path, $row.OldPath) | Where-Object { $null -ne $_ -and -not $RoundPaths.Contains($_) -and -not $keptPaths.Contains($_) })
+		if ($new.Count -eq 0) { continue }
+		if ($null -eq $sessionBinaryPaths) { $sessionBinaryPaths = Get-InventoryBinaryPath $Since.SessionBaseline $HeadSha }
+		$kept.Add((Get-InventoryEntry $row $sessionBinaryPaths $WorkingTreeHead))
+		foreach ($side in @($row.Path, $row.OldPath)) { if ($null -ne $side) { [void] $keptPaths.Add($side) } }
+	}
+	return , $kept
+}
+
+# True when a modified C++ or GLSL path's change is proven to touch comment text alone: both sides tokenize into the
+# same number of tokens, every non-comment token is byte-identical, and each comment pair holds as many line feeds.
+function Test-InventoryCommentOnlyChange([string] $Path) {
+	$before = Get-InventorySideText $false $Path
+	$after = Get-InventorySideText $true $Path
+	if ($null -eq $before -or $null -eq $after) { return $false }
+	# The compiler splices a backslash, trailing whitespace, and the line break after it before it finds tokens, so a
+	# splice anywhere on either side can move a token boundary away from where this tokenizer puts it.
+	$splice = '\\[ \t\v\f]*\r?\n'
+	if ($before -cmatch $splice -or $after -cmatch $splice) { return $false }
+	$pattern = Get-AgentCppTokenPattern
+	$beforeTokens = [regex]::Matches($before, $pattern)
+	$afterTokens = [regex]::Matches($after, $pattern)
+	if ($beforeTokens.Count -ne $afterTokens.Count) { return $false }
+	for ($i = 0; $i -lt $beforeTokens.Count; $i++) {
+		$left = $beforeTokens[$i]
+		$right = $afterTokens[$i]
+		if ($left.Groups['comment'].Success -ne $right.Groups['comment'].Success) { return $false }
+		if ($left.Groups['comment'].Success) {
+			if (($left.Value.Split("`n").Count) -ne ($right.Value.Split("`n").Count)) { return $false }
+		}
+		elseif ($left.Value -cne $right.Value) { return $false }
+	}
+	return $true
 }
 
 function Test-ManifestRootPath([string] $Path) {
@@ -769,38 +1266,6 @@ function Get-SessionManifest([string] $CommitSha, [string] $TreeSha, [object[]] 
 	}
 }
 
-function Test-ManifestCorpusPath([string] $Path) {
-	return ($script:ManifestExcludedRoots -cnotcontains $Path.Split('/')[0]) -or (Test-InventoryPathInScope $Path @('ThirdParty/Prebuilts/Source'))
-}
-
-function Get-SessionTargets([pscustomobject] $Result, [object[]] $Entries) {
-	# Emits the session's changed ordinary-file C++ paths that Test-ManifestCorpusPath admits. Each side
-	# qualifies on its own class, mode, and path, so a rename that crosses a class or root boundary and a
-	# type change between an ordinary file and a gitlink contribute only the eligible side's path. A
-	# gitlink side holds no reviewable C++ text, so it is skipped rather than blocked; consumers derive
-	# pairing and renames from the emitted paths.
-	$paths = [Collections.Generic.HashSet[string]]::new([string[]] @(), [StringComparer]::Ordinal)
-	foreach ($entry in $Entries) {
-		$baselinePath = if ($null -ne $entry.OldPath) { $entry.OldPath } else { $entry.Path }
-		$baselineClass = if ($null -ne $entry.OldClass) { $entry.OldClass } else { $entry.Class }
-		if ($null -ne $entry.Baseline -and $script:CppClasses -ccontains $baselineClass -and (Test-ManifestCorpusPath $baselinePath) -and $script:ManifestModes -ccontains $entry.Baseline.mode) {
-			[void] $paths.Add($baselinePath)
-		}
-		if ($null -ne $entry.Current -and $script:CppClasses -ccontains $entry.Class -and (Test-ManifestCorpusPath $entry.Path) -and $script:ManifestModes -ccontains $entry.Current.mode) {
-			[void] $paths.Add($entry.Path)
-		}
-	}
-	if ($paths.Count -gt $script:MaximumEntries) {
-		return Set-InventoryOutcome $Result 'blocked' 'inventory.manifest-cap-exceeded' "The targets hold $($paths.Count) paths, above the cap of $($script:MaximumEntries); truncated targets would narrow an authorized review."
-	}
-	$ordered = [Collections.Generic.List[string]]::new($paths)
-	$ordered.Sort([StringComparer]::Ordinal)
-	return [pscustomobject][ordered]@{
-		schemaVersion = 'broken-engine-code-quality-targets/v1'
-		paths = [string[]] $ordered.ToArray()
-	}
-}
-
 function Get-SessionChangeInventory {
 	[CmdletBinding()]
 	param(
@@ -813,9 +1278,11 @@ function Get-SessionChangeInventory {
 		[switch] $Regions,
 		[switch] $CoherenceOnly,
 		[switch] $Landing,
-		[switch] $EmitTargets,
 		[switch] $EmitManifest,
 		[string] $SavePlanPaths,
+		# Module-only: entries, counts, and triggers describe the diff from this commit (a review-round snapshot) to
+		# the head, kept to session paths, with the comment-text-only rule (Get-ChangeWorkflowSteps.ps1 header).
+		[string] $Since,
 		[ref] $Envelope
 	)
 
@@ -848,14 +1315,14 @@ function Get-SessionChangeInventory {
 	if ($null -ne $Envelope) { $Envelope.Value = $result }
 
 	try {
-		$modes = @(@($Regions.IsPresent, $Landing.IsPresent, $EmitTargets.IsPresent) | Where-Object { $_ })
-		$manifestConflict = $EmitManifest -and ($modes.Count -gt 0 -or $PSBoundParameters.ContainsKey('Head') -or $IncludeUntracked -or $PSBoundParameters.ContainsKey('UntrackedPath'))
-		# Those three modes never read the filtered entries or regions, so they would silently ignore the filter.
-		$prefixConflict = $PSBoundParameters.ContainsKey('PathPrefix') -and ($Landing -or $EmitTargets -or $EmitManifest)
-		$coherenceConflict = $CoherenceOnly -and ($Landing -or $EmitTargets -or $EmitManifest)
+		$manifestConflict = $EmitManifest -and ($Regions -or $Landing -or $PSBoundParameters.ContainsKey('Head') -or $IncludeUntracked -or $PSBoundParameters.ContainsKey('UntrackedPath'))
+		# Those two modes never read the filtered entries or regions, so they would silently ignore the filter.
+		$prefixConflict = $PSBoundParameters.ContainsKey('PathPrefix') -and ($Landing -or $EmitManifest)
+		$coherenceConflict = $CoherenceOnly -and ($Landing -or $EmitManifest)
 		$savePlanConflict = $PSBoundParameters.ContainsKey('SavePlanPaths') -and -not $Landing
-		if ($modes.Count -gt 1 -or $manifestConflict -or $prefixConflict -or $coherenceConflict -or $savePlanConflict) {
-			$message = if ($manifestConflict) { 'The -EmitManifest mode is exclusive with -Regions, -Landing, -EmitTargets, -Head, -IncludeUntracked, and -UntrackedPath.' } elseif ($prefixConflict) { 'The -PathPrefix filter is exclusive with -Landing, -EmitTargets, and -EmitManifest.' } elseif ($coherenceConflict) { 'The -CoherenceOnly filter is exclusive with -Landing, -EmitTargets, and -EmitManifest.' } elseif ($savePlanConflict) { 'The -SavePlanPaths option is valid only with -Landing.' } else { 'Supply at most one of -Regions, -Landing, and -EmitTargets.' }
+		$sinceConflict = $PSBoundParameters.ContainsKey('Since') -and ($Regions -or $Landing -or $EmitManifest)
+		if (($Regions -and $Landing) -or $manifestConflict -or $prefixConflict -or $coherenceConflict -or $savePlanConflict -or $sinceConflict) {
+			$message = if ($manifestConflict) { 'The -EmitManifest mode is exclusive with -Regions, -Landing, -Head, -IncludeUntracked, and -UntrackedPath.' } elseif ($prefixConflict) { 'The -PathPrefix filter is exclusive with -Landing and -EmitManifest.' } elseif ($coherenceConflict) { 'The -CoherenceOnly filter is exclusive with -Landing and -EmitManifest.' } elseif ($savePlanConflict) { 'The -SavePlanPaths option is valid only with -Landing.' } elseif ($sinceConflict) { 'The -Since option is exclusive with -Regions, -Landing, and -EmitManifest.' } else { 'Supply at most one of -Regions and -Landing.' }
 			return Set-InventoryOutcome $result 'blocked' 'inventory.mode-conflict' $message
 		}
 		$script:Root = Get-AgentCanonicalPath $RepositoryRoot
@@ -903,6 +1370,16 @@ function Get-SessionChangeInventory {
 			$script:HeadSha = $headSha
 			$result.headSha = $headSha
 		}
+		$sinceSha = ''
+		$sinceFields = $null
+		if ($PSBoundParameters.ContainsKey('Since')) {
+			$sinceRun = Invoke-InventoryGit @('rev-parse', '--verify', '--quiet', "$Since^{commit}") $true
+			if ($sinceRun.ExitCode -ne 0) {
+				return Set-InventoryOutcome $result 'blocked' 'inventory.since-unresolved' "The -Since revision does not resolve to a commit in this repository: '$Since'."
+			}
+			$sinceSha = $sinceRun.Stdout.Trim()
+			$sinceFields = Get-InventoryRoundField $sinceSha
+		}
 		if ($EmitManifest) {
 			$treeRun = Invoke-InventoryGit @('rev-parse', '--verify', "$baselineSha^{tree}")
 			$treeSha = $treeRun.Stdout.Trim()
@@ -916,10 +1393,10 @@ function Get-SessionChangeInventory {
 		$untrackedFilter = [Collections.Generic.List[string]]::new()
 		if ($hasUntrackedFilter) { $untrackedFilter = ConvertTo-NormalizedPathFilter $UntrackedPath $false }
 
-		$binaryPaths = Get-InventoryBinaryPath $baselineSha $headSha
-		$entries = [Collections.Generic.List[object]]::new()
 		$workingTreeHead = [string]::IsNullOrEmpty($headSha)
-		foreach ($row in (Get-InventoryRawRow $baselineSha $headSha)) { $entries.Add((Get-InventoryEntry $row $binaryPaths $workingTreeHead)) }
+		# On a -Since run every diff, and routing's baseline-side text, starts at the since commit.
+		$diffBase = if ($sinceSha) { $sinceSha } else { $baselineSha }
+		$script:BaselineSha = $diffBase
 		$unlistedUntracked = 0
 		$untrackedEntries = @()
 		if ($workingTreeHead) {
@@ -927,23 +1404,34 @@ function Get-SessionChangeInventory {
 			$unlistedReference = 0
 			$untrackedEntries = @(Get-InventoryUntrackedEntry $IncludeUntracked.IsPresent $hasUntrackedFilter $untrackedFilter '' ([ref] $unlistedReference))
 			$unlistedUntracked = $unlistedReference
-			foreach ($entry in $untrackedEntries) { $entries.Add($entry) }
 		}
+		$sinceSide = if ($sinceSha) { [pscustomobject] @{ Baseline = $sinceFields.Baseline; SessionBaseline = $baselineSha } } else { $null }
+		# The since commit's own session paths, both repositories, where the comment-text-only rule may apply.
+		$roundPaths = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+		$entries = Get-InventorySideEntry $diffBase $headSha $workingTreeHead ([object[]] $untrackedEntries) $sinceSide $roundPaths
+		$headFields = if ($workingTreeHead) { $null } else { Get-InventoryRoundField $headSha }
 		$coretideRegions = [Collections.Generic.List[object]]::new()
 		$coretideRoot = Get-AgentCoretideRepository $script:Root
 		if ($null -ne $coretideRoot) {
 			$script:Coretide = @{ Root = $coretideRoot; BaselineSha = ''; HeadSha = ''; HeadPaths = $null }
 			Enter-CoretideSide
 			try {
-				# With a commit-valued engine head the clone's HEAD stands for its side and its working tree is left out.
-				$script:BaselineSha = (Invoke-InventoryGit @('merge-base', 'HEAD', '@{upstream}')).Stdout.Trim()
-				if (-not $workingTreeHead) { $script:HeadSha = (Invoke-InventoryGit @('rev-parse', '--verify', 'HEAD^{commit}')).Stdout.Trim() }
+				# A review-round head's Coretide-Baseline is the merge base its snapshot froze, so a later rebase of the
+				# clone onto upstream never reads as a session change at that snapshot.
+				$coretideSessionBaseline = if ($null -ne $headFields -and $null -ne $headFields.CoretideBaseline) { $headFields.CoretideBaseline } else { (Invoke-InventoryGit @('merge-base', 'HEAD', '@{upstream}')).Stdout.Trim() }
+				# With a commit-valued engine head the clone's HEAD, or the Coretide snapshot a review-round head names,
+				# stands for its side and its working tree is left out.
+				if (-not $workingTreeHead) {
+					$coretideHead = if ($null -ne $headFields.CoretideSnapshot) { "$($headFields.CoretideSnapshot)^{commit}" } else { 'HEAD^{commit}' }
+					$coretideHeadRun = Invoke-InventoryGit @('rev-parse', '--verify', '--quiet', $coretideHead) $true
+					if ($coretideHeadRun.ExitCode -ne 0) {
+						return Set-InventoryOutcome $result 'blocked' 'inventory.head-unresolved' "The Coretide head does not resolve to a commit in the clone: '$coretideHead'."
+					}
+					$script:HeadSha = $coretideHeadRun.Stdout.Trim()
+				}
+				$script:BaselineSha = if ($sinceSha -and $null -ne $sinceFields.CoretideSnapshot) { $sinceFields.CoretideSnapshot } else { $coretideSessionBaseline }
 				$script:Coretide.BaselineSha = $script:BaselineSha
 				$script:Coretide.HeadSha = $script:HeadSha
-				$coretideBinaryPaths = Get-InventoryBinaryPath $script:BaselineSha $script:HeadSha
-				foreach ($row in (Get-InventoryRawRow $script:BaselineSha $script:HeadSha)) {
-					$entries.Add((Add-CoretidePrefix (Get-InventoryEntry $row $coretideBinaryPaths $workingTreeHead)))
-				}
 				$coretideUntracked = @()
 				if ($workingTreeHead) {
 					$unlistedReference = 0
@@ -956,11 +1444,16 @@ function Get-SessionChangeInventory {
 						$coretideRegions.Add($region)
 					}
 				}
-				foreach ($entry in $coretideUntracked) { $entries.Add((Add-CoretidePrefix $entry)) }
+				$coretideSince = if ($sinceSha) { [pscustomobject] @{ Baseline = $sinceFields.CoretideBaseline; SessionBaseline = $coretideSessionBaseline } } else { $null }
+				$coretideRoundPaths = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+				foreach ($entry in (Get-InventorySideEntry $script:BaselineSha $script:HeadSha $workingTreeHead ([object[]] $coretideUntracked) $coretideSince $coretideRoundPaths)) {
+					$entries.Add((Add-CoretidePrefix $entry))
+				}
+				foreach ($path in $coretideRoundPaths) { [void] $roundPaths.Add($script:CoretidePrefix + $path) }
 			}
 			finally { Exit-CoretideSide }
 			$result.coretide = [pscustomobject][ordered]@{
-				baselineSha = $script:Coretide.BaselineSha
+				baselineSha = $coretideSessionBaseline
 				headSha = if ($workingTreeHead) { $null } else { $script:Coretide.HeadSha }
 			}
 		}
@@ -970,13 +1463,23 @@ function Get-SessionChangeInventory {
 			return [string]::CompareOrdinal($left.Path, $right.Path)
 		})
 
-		if ($EmitTargets) {
-			return Get-SessionTargets $result ([object[]] $sorted.ToArray())
-		}
-
 		# Counts and triggers always describe the complete inventory, never the scoped emission.
 		$result.counts = Get-InventoryCount ([object[]] $sorted.ToArray()) $unlistedUntracked
-		$result.triggers = Get-RoutingTrigger ([object[]] $sorted.ToArray())
+		$triggers = Get-RoutingTrigger ([object[]] $sorted.ToArray())
+		if ($sinceSha) {
+			# A modification of one of the since commit's own session paths proven to touch comment text alone
+			# fires none of the code-only triggers; every other entry keeps every trigger.
+			$codeEntries = [Collections.Generic.List[object]]::new()
+			foreach ($entry in $sorted) {
+				if ($entry.Status -ceq 'M' -and $script:SourceMembershipClasses -ccontains $entry.Class -and $roundPaths.Contains($entry.Path) -and (Test-InventoryCommentOnlyChange $entry.Path)) { continue }
+				$codeEntries.Add($entry)
+			}
+			if ($codeEntries.Count -ne $sorted.Count) {
+				$codeTriggers = Get-RoutingTrigger ([object[]] $codeEntries.ToArray())
+				foreach ($name in $script:CodeOnlyTriggers) { $triggers.$name = $codeTriggers.$name }
+			}
+		}
+		$result.triggers = $triggers
 		$scoped = $sorted
 		if ($prefixes.Count -gt 0) {
 			$scoped = [Collections.Generic.List[object]]::new()
@@ -1016,9 +1519,10 @@ function Get-SessionChangeInventory {
 			foreach ($region in $allRegions) { if ($keptPaths.Contains($region.path)) { $regionList.Add($region) } }
 		}
 		$landingTruncation = $null
+		$landingRefusal = $null
 		if ($Landing) {
 			$landingReference = $null
-			$result.landing = Get-LandingState $baselineSha $headSha ([ref] $landingReference) $savePlanAuthorizedPaths
+			$result.landing = Get-LandingState $baselineSha $headSha ([ref] $landingReference) ([ref] $landingRefusal) $savePlanAuthorizedPaths
 			$landingTruncation = $landingReference
 		}
 
@@ -1031,6 +1535,7 @@ function Get-SessionChangeInventory {
 			landing = $landingTruncation
 			outputBytes = 0
 		}
+		if ($null -ne $landingRefusal) { return Set-InventoryOutcome $result 'blocked' $landingRefusal.Code $landingRefusal.Message }
 		return Set-InventoryOutcome $result 'pass' 'ok' "Inventoried $($sorted.Count) change(s) against baseline $baselineSha."
 	}
 	catch {
@@ -1038,4 +1543,4 @@ function Get-SessionChangeInventory {
 	}
 }
 
-Export-ModuleMember -Function Get-SessionChangeInventory
+Export-ModuleMember -Function Get-SessionChangeInventory, Get-ReviewRoundState, Test-ReviewRoundCoverage

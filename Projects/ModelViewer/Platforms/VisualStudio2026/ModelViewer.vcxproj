@@ -94,7 +94,6 @@
     <ClCompile Include="..\..\..\..\Engine\Source\File\FileManager.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\File\PackChunkLoader.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\File\PackChunks.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Frame\FlightPlanes.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\IslandChainPlacement.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\IslandTerrain.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\IslandTerrainResidency.cpp" />
@@ -245,7 +244,6 @@
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\Collections\WindRadials\WindRadials.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\Collections\WindTrails\WindTrails.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\Collision.h" />
-    <ClInclude Include="..\..\..\..\Engine\Source\Frame\FlightPlanes.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\FrameBase.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\FrameRegistry.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\FrameUtils.h" />
@@ -340,7 +338,6 @@
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\WaterWrappersBase.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\WindWrappersBase.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\WrapperBase.h" />
-    <ClInclude Include="..\..\Source\Frame\FlightPlaneTable.h" />
     <ClInclude Include="..\..\Source\Frame\Frame.h" />
     <ClInclude Include="..\..\Source\Game.h" />
     <ClInclude Include="..\..\Source\Graphics\Camera.h" />

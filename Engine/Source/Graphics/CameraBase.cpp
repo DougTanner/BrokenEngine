@@ -57,14 +57,14 @@ static constexpr float Smoothstep(float fParameter)
 }
 
 // Bounding rectangle (minX, maxY, maxX, minY), relative to the look-at, of the four screen-corner rays meeting Z = 0
-// and the highest flight plane, for an eye orbiting the look-at by fTilt radians about +X. It takes no look-at XY, so
+// and the base height, for an eye orbiting the look-at by fTilt radians about +X. It takes no look-at XY, so
 // it stays bit-stable while the camera pans, and at tilt 0 it is exactly symmetric about the look-at.
 static XMFLOAT4 TiltedFootprint(float fTilt, bool bOrthographic, float fEyeDistance, float fFramingHalfHeight, float fTangentHalfFieldOfView, float fAspectRatio, float fLookAtHeight)
 {
 	float fSine = std::sin(fTilt);
 	float fCosine = std::cos(fTilt);
 	XMFLOAT4 f4Footprint {std::numeric_limits<float>::max(), std::numeric_limits<float>::lowest(), std::numeric_limits<float>::lowest(), std::numeric_limits<float>::max()};
-	for (float fHeight : {0.0f, gpFlightPlanes->Highest().fHeightMeters})
+	for (float fHeight : {0.0f, game::kfBaseHeightMeters})
 	{
 		// -1 is the bottom (south) screen edge, +1 the top (north) one.
 		for (float fVertical : {-1.0f, 1.0f})
@@ -117,8 +117,8 @@ CameraTarget CameraTarget::Extrapolate()
 CameraBase::CameraBase(const CameraSetup& rCameraSetup)
 : common::Singleton<CameraBase>(gpCamera, this)
 {
-	// Match the Direct menu target's lowest-plane height so the opening pose needs no chase-blend ease.
-	mVecPosition = XMVectorSetZ(rCameraSetup.vecInitialPosition, gpFlightPlanes->Lowest().fHeightMeters);
+	// Match the Direct menu target's base height so the opening pose needs no chase-blend ease.
+	mVecPosition = XMVectorSetZ(rCameraSetup.vecInitialPosition, game::kfBaseHeightMeters);
 }
 
 void CameraBase::ClearCellLoadedArea()
@@ -177,7 +177,7 @@ void CameraBase::StepObserverPan(float fDeltaTime, std::span<const GridCoord> al
 		}
 	}
 
-	float fBaseHeight = gpFlightPlanes->Lowest().fHeightMeters;
+	float fBaseHeight = game::kfBaseHeightMeters;
 	if (!IsAllowedCell(mBasisCoordinate))
 	{
 		GridCoord nearestCoordinate = allowedCoordinates.front();
@@ -494,7 +494,7 @@ XMVECTOR CameraBase::ResolveTarget(const CameraTarget& rCameraTarget)
 {
 	if (rCameraTarget.meKind == CameraTarget::Kind::kDirect)
 	{
-		return XMVectorSetZ(rCameraTarget.mVecPosition, gpFlightPlanes->Lowest().fHeightMeters);
+		return XMVectorSetZ(rCameraTarget.mVecPosition, game::kfBaseHeightMeters);
 	}
 
 	if (rCameraTarget.meKind == CameraTarget::Kind::kExtrapolate)

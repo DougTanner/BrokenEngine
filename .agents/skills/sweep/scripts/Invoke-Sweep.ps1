@@ -8,6 +8,9 @@
 # -Spec <path> -Model <slug> -Batch <name> runs one batch (resumable); -Unit <stem> runs one unit only.
 # -Throttle <n> sets how many units of a -Batch run execute in parallel (default 8).
 # -Spec <path> -Model <slug> -Close runs the stage close: Cleanup, Ordering, and the deferred-fixes ledger.
+# -Spec <path> -ReviewRound, once Status.txt reads CLOSE-DONE and with HEAD the sweep baseline, writes the sweep's
+# closed review round, the form the .agents/scripts/Get-ChangeWorkflowSteps.ps1 header defines, and prints
+# "round <n> closed: done".
 param(
 	[string] $Spec,
 	[string] $Model,
@@ -16,6 +19,7 @@ param(
 	[switch] $List,
 	[switch] $ListModels,
 	[switch] $Close,
+	[switch] $ReviewRound,
 	[int] $Throttle = 8
 )
 
@@ -102,10 +106,55 @@ $units = $files | Group-Object { $_ -replace '\.(h|cpp)$', '' } | ForEach-Object
 	[pscustomobject] @{ Stem = $stem; Id = ($stem -replace '[/\\]', '_'); Files = @($_.Group); Batch = ($dir -replace '/', '_') }
 }
 
+# Reads Temp/Sweep/Baseline.txt (line 1: baseline SHA, line 2: owning spec path) and verifies HEAD and ownership.
+function Read-SweepBaseline
+{
+	$lines = @(Get-Content -LiteralPath $baselineFile -TotalCount 2)
+	$baseline = if ($lines.Count -ge 1) { $lines[0].Trim() } else { '' }
+	$recordedSpec = if ($lines.Count -ge 2) { $lines[1].Trim() } else { '' }
+	if (-not $baseline) { throw 'Temp/Sweep/Baseline.txt is missing its baseline SHA on line 1' }
+	if (-not $recordedSpec) { throw 'Temp/Sweep/Baseline.txt is missing its sweep spec path on line 2' }
+	$headRaw = git -C $root rev-parse HEAD
+	if ($LASTEXITCODE -ne 0) { throw "Failed to resolve HEAD in '$root' (git rev-parse HEAD exited $LASTEXITCODE)" }
+	$head = $headRaw.Trim()
+	if ($baseline -cne $head)
+	{
+		throw "Temp/Sweep/Baseline.txt belongs to commit $baseline (HEAD is $head); delete Temp/Sweep before starting a new sweep"
+	}
+	if (-not [string]::Equals($recordedSpec, $specRel, [StringComparison]::OrdinalIgnoreCase))
+	{
+		throw "Temp/Sweep/Baseline.txt belongs to '$recordedSpec', not '$specRel'"
+	}
+	return $baseline
+}
+
 if ($List)
 {
 	$order = @($ownBatchDirs -replace '/', '_')
 	$units | Group-Object Batch | Sort-Object { $i = [array]::IndexOf($order, $_.Name); if ($i -lt 0) { $order.Count } else { $i } }, Name | ForEach-Object { '{0} {1}' -f $_.Name, $_.Count }
+	return
+}
+
+if ($ReviewRound)
+{
+	if (-not (Test-Path -LiteralPath $baselineFile)) { throw 'no -Batch run has written Temp/Sweep/Baseline.txt' }
+	$baseline = Read-SweepBaseline
+	$closeLine = if (Test-Path -LiteralPath $status) { Get-Content -LiteralPath $status -TotalCount 1 } else { '' }
+	if ("$closeLine" -cnotmatch '^CLOSE-DONE ') { throw "Temp/Sweep/Status.txt does not read CLOSE-DONE; run -Close to completion first" }
+	Import-Module (Join-Path $root '.agents\scripts\SessionChangeInventory.psm1') -Force
+	Import-Module (Join-Path $root '.agents\scripts\ReviewRounds.psm1') -Force
+	$chain = Get-ReviewRoundState -RepositoryRoot $root -ChainOnly
+	if ($chain.Open) { throw "review round $($chain.Last.Number) is open; close it before the sweep's round" }
+	# One read of the ref: the parent comes from it and the compare-and-swap from its Tip.
+	$engineOld = $chain.Tip
+	$parent = if ($chain.Readable) { $chain.Last.Close.Commit } else { (git -C $root rev-parse --verify 'HEAD^{commit}').Trim() }
+	$coretide = New-ReviewRoundCoretideSnapshot $root $chain.Number
+	$tree = New-ReviewRoundTree $root
+	$snapshot = New-ReviewRoundCommit $root $tree $parent (Format-ReviewRoundSnapshotMessage $chain.Number $baseline 'sweep' 'ordinary' 0 @() $coretide)
+	$closeCommit = New-ReviewRoundCommit $root $tree $snapshot (Format-ReviewRoundCloseMessage $chain.Number @() 'done')
+	if ($null -ne $coretide -and -not (Update-ReviewRoundRef $coretide.Root $coretide.Commit $coretide.Old)) { throw "the Coretide clone's refs/worktree/review-rounds moved; rerun -ReviewRound" }
+	if (-not (Update-ReviewRoundRef $root $closeCommit $engineOld)) { throw 'refs/worktree/review-rounds moved; rerun -ReviewRound' }
+	"round $($chain.Number) closed: done"
 	return
 }
 
@@ -158,28 +207,6 @@ function Get-BuildFields([string] $Since)
 	$profiled = @(git -C $root grep -l 'BT_PROFILE' -- '*.h' '*.cpp')
 	$profileBuild = if ($cpp | Where-Object { $profiled -contains $_ }) { 'yes' } else { 'no' }
 	return "cpp=yes builds=$($builds -join ',') profile=$profileBuild"
-}
-
-# Reads Temp/Sweep/Baseline.txt (line 1: baseline SHA, line 2: owning spec path) and verifies HEAD and ownership.
-function Read-SweepBaseline
-{
-	$lines = @(Get-Content -LiteralPath $baselineFile -TotalCount 2)
-	$baseline = if ($lines.Count -ge 1) { $lines[0].Trim() } else { '' }
-	$recordedSpec = if ($lines.Count -ge 2) { $lines[1].Trim() } else { '' }
-	if (-not $baseline) { throw 'Temp/Sweep/Baseline.txt is missing its baseline SHA on line 1' }
-	if (-not $recordedSpec) { throw 'Temp/Sweep/Baseline.txt is missing its sweep spec path on line 2' }
-	$headRaw = git -C $root rev-parse HEAD
-	if ($LASTEXITCODE -ne 0) { throw "Failed to resolve HEAD in '$root' (git rev-parse HEAD exited $LASTEXITCODE)" }
-	$head = $headRaw.Trim()
-	if ($baseline -cne $head)
-	{
-		throw "Temp/Sweep/Baseline.txt belongs to commit $baseline (HEAD is $head); delete Temp/Sweep before starting a new sweep"
-	}
-	if (-not [string]::Equals($recordedSpec, $specRel, [StringComparison]::OrdinalIgnoreCase))
-	{
-		throw "Temp/Sweep/Baseline.txt belongs to '$recordedSpec', not '$specRel'"
-	}
-	return $baseline
 }
 
 if ($Close)

@@ -32,19 +32,15 @@ Run in the delegated execution context of
 [`subagent-reporting.md`](../../references/subagent-reporting.md)
 `## Delegated execution context`; inline review by the main session is
 prohibited. Outside [`/coherence-review`](../coherence-review/SKILL.md)
-combined mode, use one separate dispatch per triggered round; when combined
-mode carries this check, the delegated `/coherence-review` reviewer runs it
-in its own context with no separate dispatch. After the manager accepts
-findings and fixes land, only the affected files receive a focused re-review.
+combined mode, use one separate dispatch per printed step-script row; when
+combined mode carries this check, the delegated `/coherence-review` reviewer
+runs it in its own context with no separate dispatch.
 
 ## Inputs
 
 - `Baseline` — the full 40-character session baseline SHA and the absolute
   repository toplevel, plus the committed head when the review runs against one.
 - `Scope` — any untracked paths the review must cover.
-- `First-round findings` — focused re-review only: each accepted first-round
-  finding being re-checked, in `Continuation capsule:` per
-  `../../references/subagent-reporting.md` `## Task brief`.
 - `Stated net size` — the net instruction size change the session's plan
   states; omitted when the session has no plan or the plan states none.
 
@@ -59,9 +55,8 @@ pwsh -NoProfile -NonInteractive -Command 'Import-Module ./.agents/scripts/Sessio
 With `Stated net size`, use the `instruction-size` row from the Change Workflow
 `Run targeted pre-review checks` command (`-Head` for a committed head).
 
-If the baseline is unavailable, the change inventory cannot produce the changed
-regions, or a focused re-review arrives without `First-round findings`, return
-`BLOCKED` naming the missing input.
+If the baseline is unavailable or the change inventory cannot produce the
+changed regions, return `BLOCKED` naming the missing input.
 
 ## Handoff
 
@@ -75,42 +70,34 @@ Baseline: <full SHA>
 Files checked: <count and paths>
 ```
 
-Each `Findings` row is one line on this form:
+Each `Findings` row is one line on this form, with a stable `PD###` ID, graded
+by [`subagent-handoff.md`](../../references/subagent-handoff.md) `## Severity`:
 
 ```text
-file:line — class: duplication | misplacement | size | instruction-change — evidence: owning location, measurement, or replacing text or mechanism — fix direction
+PD### Critical|High|Medium|Low file:line — class: duplication | misplacement | size | instruction-change — evidence: owning location, measurement, or replacing text or mechanism — fix direction
 ```
 
 Example:
 
 ```text
-.agents/skills/code-quality-metrics/SKILL.md:120 — class: duplication — evidence: references/history-contract.md:14-38 states the same JSONL field list — replace with a link to that reference
+PD001 Medium .agents/skills/code-quality-metrics/SKILL.md:120 — class: duplication — evidence: references/history-contract.md:14-38 states the same JSONL field list — replace with a link to that reference
 ```
 
 `Changed files` and `Build required` are `none` because this findings-only
 review never edits a file.
 
-A focused re-review returns this same handoff, carrying one `Findings` row per
-re-checked finding, whose leading `file:line` is that finding's first-round
-location, whose `class:` stays that finding's first-round class, whose
-`evidence:` cites what the re-check read, and whose trailing slot states the
-re-checked verdict — `resolved`, or the remaining problem — in place of the fix
-direction.
-
 Whatever gates on this handoff for changed instruction prose, the block must
 carry four things, none of which may be dropped or reworded: the
 `Skill: progressive-disclosure-review` marker line, the `Files checked:` line, a
-`Status:` line, and a `Baseline:` line whose SHA is either the reviewed diff's
-baseline or another resolvable commit at which the session's own bytes in the
-instruction docs that diff changes are identical to their bytes at that
-baseline, which is what makes those docs' reviewed bytes the bytes this review
-read. A `BLOCKED` handoff, and one whose `Baseline:` is absent, unresolvable, or
-a commit at which those bytes differ, are gated exactly like a missing handoff;
-what a `NEEDS_ACTION` handoff needs to score is the consuming gate's rule.
-Re-run this review only when those bytes differ at the two baselines.
+`Status:` line, and a `Baseline:` line. A `BLOCKED` handoff is gated exactly
+like a missing handoff; whether a handoff still covers the landing candidate is
+the review-round check's decision
+([`landing-acceptance-table.md`](../finalize-changes/references/landing-acceptance-table.md)
+step 3), and what a `NEEDS_ACTION` handoff needs to score is the consuming
+gate's rule.
 
 The manager decides each finding on whether the failure is concrete and
-meaningful under the standard defaults; this review adds no extra rounds.
+meaningful under the standard defaults.
 
 When an inbound workflow requirement has a worker run this skill inside that
 worker's own task, rather than as a separate dispatch, as evidence for that

@@ -108,7 +108,7 @@ void RenderLightingGlobal(int64_t iCommandBuffer)
 	rGlobalLayout.fCombineHuePreserve = gCombineHuePreserve.mfCurrent;
 
 	// LightCombine.comp and DebugTexture.frag share the CPU-computed Uchimura segment constants S0/S1/CP.
-	// The wrapper bounds keep P - S1 at least 0.004f across the slider domain.
+	// The bounds documented at gCombineLinearStart keep P - S1 at or above its stated minimum across the slider domain.
 	float fCombineLinearOutputSpan = (fCombineMaxBrightness - fCombineLinearStart) * fCombineLinearLength;
 	float fCombineShoulderStart = fCombineLinearStart + fCombineLinearOutputSpan;
 	rGlobalLayout.fCombineShoulderInputStart = fCombineLinearStart + fCombineLinearOutputSpan / fCombineContrast;

@@ -83,9 +83,11 @@ when that window must be observed or clicked.
   array of valid integer indices into the production cell navigation data,
   repeats allowed; `points` is an array of finite float XY pairs in centered
   cell-local meters and may be empty for contour discovery. Malformed requests
-  return ordinary command errors. Graph indices carry no ship-type or
-  flight-plane mapping. Only navigation requests build the production navigation
-  graphs. They append
+  return ordinary command errors. The probe accepts raw graph indices with no
+  ship-type mapping; see
+  [Terrain and Navigation](../../../../Engine/Source/Frame/AGENTS.md#terrain-and-navigation)
+  for graph indexing and contour-bake inputs. Only navigation requests build the
+  production navigation graphs. They append
   `"navigation":{"graphs":[{"index":g0,"vertices":[[x,y],...],"polygonOffsets":[offset,...],"reachableEdges":[bool,...]},...],"samples":[{"xy":[x0,y0],"elevation":float,"blocked":[true,false]},...]}`
   to the existing result. Graphs and samples preserve request order, and each
   sample's `blocked` array follows the requested graph order. Offsets are

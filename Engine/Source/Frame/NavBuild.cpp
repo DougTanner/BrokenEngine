@@ -17,11 +17,10 @@ struct ContourEdge
 	uint64_t uiKeyB = 0;
 };
 
-// Encode (orientation, row, col) as a unique 64-bit cell-edge identifier. Horizontal edges have
-// orient=0 with row ∈ [0, iHeight] / col ∈ [0, iWidth-1]; vertical edges have orient=1 with
-// row ∈ [0, iHeight-1] / col ∈ [0, iWidth]. The 32+16+16 packing leaves comfortable headroom for
-// the heightmap sizes the engine builds (kiElevationDivisor = 4 caps heightmap dims at a few
-// thousand pixels).
+// Encode (orientation, row, column) as a unique 64-bit cell-edge identifier. Horizontal edges use
+// orientation 0, rows [0, iHeight - 1], and columns [0, iWidth - 2]; vertical edges use orientation 1,
+// rows [0, iHeight - 2], and columns [0, iWidth - 1]. The 32+16+16 packing keeps keys unique only
+// while iRow and iColumn each fit in 16 bits.
 static constexpr uint64_t EncodeEdgeKey(uint32_t uiOrientation, int64_t iRow, int64_t iColumn)
 {
 	return (static_cast<uint64_t>(uiOrientation) << 32) | (static_cast<uint64_t>(static_cast<uint32_t>(iRow)) << 16) | static_cast<uint64_t>(static_cast<uint32_t>(iColumn));

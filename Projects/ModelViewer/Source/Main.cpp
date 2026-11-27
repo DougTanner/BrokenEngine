@@ -176,7 +176,6 @@ int RunModelViewer(HINSTANCE hinstance)
 	auto pMultithreading = std::make_unique<common::Multithreading>(std::max(1i64, common::HardwareCoreCount() - 2));
 	auto pProfileManager = std::make_unique<engine::ProfileManager>();
 	auto pTerrain = std::make_unique<engine::IslandTerrain>();
-	auto pFlightPlanes = std::make_unique<engine::FlightPlanes>();
 	auto pResidency = std::make_unique<engine::IslandTerrainResidency>();
 	try
 	{

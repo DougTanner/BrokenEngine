@@ -112,14 +112,10 @@ collision, terrain sampling, navigation, and generic collections.
   reads the hitbox.
 - Large terrain/nav allocations are lazy. Do not make frame constructors
   allocate proportional to world or mesh size.
-- `FlightPlanes` borrows the game's immutable, static-lifetime flight-plane
-  table on both builds through a const span. Heights are absolute and
-  independent of terrain. Its lowest plane is the base height every simulation
-  and render consumer reads, and `NearestPlaneIndex` is the one rule for which
-  plane a height is nearest (an exact midpoint takes the lower plane).
-  `OccupiedPlanes` is the one rule for which planes a height occupies.
-  Construction asserts that the table holds 1 to `kiMaxFlightPlanes` planes with
-  positive, strictly ascending heights.
+- Each project's PCH-included `Frame/Frame.h` defines
+  `game::kfBaseHeightMeters`, the absolute, terrain-independent base height
+  available to both builds, read by simulation on both builds and by rendering
+  on the client; `Engine.h` validates that it is positive via `static_assert`.
 
 ## Simulation and Visual State
 

@@ -234,10 +234,9 @@ cross-file tracing.
 
 ### Completeness and duplication
 
-Flag incomplete integration and reachable edge failures. Flag substantial new
-near-copies or repeated multi-condition logic only after independent source
-inspection proves an existing helper fits. Deliberate client/server and
-collection mirrors remain parallel.
+Flag incomplete integration and reachable edge failures. Report a near-copy or
+repeated multi-condition logic as a hard flag only when it violates the
+conventions reference's "Reuse before adding" bullet.
 
 Exclude micro-simplifications, style preferences, naming, header placement
 other than the required `Common/ExternalHeaders.h` rule above, formatting, and

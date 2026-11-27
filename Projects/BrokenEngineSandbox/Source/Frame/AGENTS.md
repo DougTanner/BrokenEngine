@@ -65,16 +65,15 @@ order or participation changes.
   The [shared ship policy](Collections/Ships/AGENTS.md#ship-invariants) owns the
   death transition. Build-local reads also reject a flying missile — neither
   falling nor dying — whose height is non-finite or whose velocity Z is nonzero;
-  finite off-plane heights are valid during its return to the lowest plane
+  any finite height is valid during its return to the base height
   (`Collections/Missiles/AGENTS.md` `## Invariants`). They also reject any row
   of a `GameServerPostRenderCollections` collection with `kTransfer` set.
 - Navigation and elevation are deterministic derived data excluded from both the
   CRC and persisted frame payload. The game derives the clearance tiers and each
   tier's `engine::NavigationGraphSpec` entry (`TerrainUtils.h`) and hands them
-  to engine startup, the only way engine navigation gets them.
-  `FlightPlaneTable.h` supplies the game's heights under the engine's
-  flight-plane contract (`../../../../Engine/Source/Frame/AGENTS.md`
-  `## Architecture`).
+  to engine startup, the only way engine navigation gets them. `Frame.h` defines
+  `kfBaseHeightMeters` under the engine's base-height contract
+  (`../../../../Engine/Source/Frame/AGENTS.md` `## Architecture`).
 - Status changes are consumed here: `kUpdateShip`, `kUpdateFleet`,
   `kUpdateSquadronOrders`, and `kDestroyShip` in Update, after every ship
   Update; spawn and transfer status changes in the post-tick batch, outside the

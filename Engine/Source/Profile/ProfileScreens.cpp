@@ -1,98 +1,20 @@
 #include "Pch.h"
 
+#if defined(BT_CLIENT)
+
 #include "File/PackChunks.h"
 #include "Graphics/CameraBase.h"
-#if defined(BT_CLIENT)
 #include "Ui/GraphicsSettingsWrappersBase.h"
-#endif
 #include "ProfileManager.h"
 
 #include "Profile/ProfileRows.h"
 #include "Game.h"
 
-#if defined(BT_CLIENT)
 #include <Psapi.h>
-#endif
 
 namespace engine
 {
 
-// The caller owns the workbuffer frame's Push/Pop.
-void FormatCpuTimersText(common::Workbuffer& rWorkbuffer, bool bReevaluate)
-{
-	// Submit-worker threads write timer fields under mCpuTimerMutex, so formatting takes the same lock. Callers must release the mutex before formatting; SmoothCpuTimers releases it before this call.
-	std::lock_guard lock(gpProfileManager->mCpuTimerMutex);
-
-	int64_t iCpuTimerCount = gpProfileManager->miCpuTimerCount;
-
-	rWorkbuffer.Append("\n\n");
-
-	for (int64_t i = 0; i < iCpuTimerCount; ++i)
-	{
-		CpuTimer& rCpuTimer = gpProfileManager->GetCpuTimer(i);
-
-		std::chrono::microseconds elapsedMicroseconds(rCpuTimer.smoothedMicroseconds.mSmoothedValue);
-		if (bReevaluate)
-		{
-			rCpuTimer.flags.Set(ProfileRowFlags::kVisible, elapsedMicroseconds != std::chrono::microseconds::zero());
-		}
-
-		if (!(rCpuTimer.flags & ProfileRowFlags::kVisible))
-		{
-			continue;
-		}
-
-		rWorkbuffer.Append(gpProfileManager->GetCpuTimerName(i));
-		rWorkbuffer.Append(": ");
-		rWorkbuffer.Append(elapsedMicroseconds.count());
-		rWorkbuffer.Append(" us");
-		if (rCpuTimer.iThreads > 1)
-		{
-			rWorkbuffer.Append(" (");
-			rWorkbuffer.Append(rCpuTimer.iThreads);
-			rWorkbuffer.Append(")");
-		}
-		if (rCpuTimer.smoothedAllocations.mSmoothedValue > 0)
-		{
-			rWorkbuffer.Append(" [");
-			rWorkbuffer.Append(rCpuTimer.smoothedAllocations.mSmoothedValue);
-			rWorkbuffer.Append("]");
-		}
-		rWorkbuffer.Append("\n");
-
-		if (i == kCpuTimerAcquireToGlobal)
-		{
-			rWorkbuffer.Append("\n");
-		}
-	}
-}
-
-// The caller owns the workbuffer frame's Push/Pop.
-void FormatCpuCountersText(common::Workbuffer& rWorkbuffer, bool bReevaluate)
-{
-	int64_t iCpuCounterCount = gpProfileManager->miCpuCounterCount;
-
-	for (int64_t i = 0; i < iCpuCounterCount; ++i)
-	{
-		CpuCounter& rCpuCounter = gpProfileManager->GetCpuCounter(i);
-		if (bReevaluate)
-		{
-			rCpuCounter.flags.Set(ProfileRowFlags::kVisible, rCpuCounter.iCount != 0);
-		}
-
-		if (!(rCpuCounter.flags & ProfileRowFlags::kVisible))
-		{
-			continue;
-		}
-
-		rWorkbuffer.Append(gpProfileManager->GetCpuCounterName(i));
-		rWorkbuffer.Append(": ");
-		rWorkbuffer.Append(rCpuCounter.iCount);
-		rWorkbuffer.Append("\n");
-	}
-}
-
-#if defined(BT_CLIENT)
 static void AppendProcessMemoryStatistics(common::Workbuffer& rWorkbuffer, bool bReevaluate)
 {
 	static int64_t siPrivateCommitBytes = 0;
@@ -289,9 +211,6 @@ static void FormatGpuMemoryStatistics(common::Workbuffer& rWorkbuffer, bool bRee
 
 	gpImGuiManager->UpdateTextArea(kTextProfileMemory, rWorkbuffer.View());
 }
-#endif // BT_CLIENT
-
-#if defined(BT_CLIENT)
 
 void FormatFramesPerSecondHeader(common::Workbuffer& rWorkbuffer, std::chrono::microseconds elapsedCpuTime)
 {
@@ -388,6 +307,6 @@ void FormatGpuScreen(common::Workbuffer& rWorkbuffer, bool bReevaluate)
 	FormatGpuMemoryStatistics(rWorkbuffer, bReevaluate);
 }
 
-#endif // BT_CLIENT
-
 } // namespace engine
+
+#endif // BT_CLIENT

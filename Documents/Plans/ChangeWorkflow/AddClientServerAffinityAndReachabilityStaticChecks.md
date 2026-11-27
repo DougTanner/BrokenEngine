@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v2 {"createdUtc":"2026-11-25T18:56:18.957Z","dependsOn":["Documents/Plans/Engine/FixEngineClientServerAffinityMismatches.md"]} -->
+<!-- broken-engine-plan/v2 {"createdUtc":"2026-11-25T18:56:18.957Z","dependsOn":[]} -->
 # Add Client/Server Affinity and Header-Reachability Checks to Static Checks
 
 ## Context

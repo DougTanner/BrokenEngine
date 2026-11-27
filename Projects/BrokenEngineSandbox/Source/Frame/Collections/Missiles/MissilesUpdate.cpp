@@ -59,7 +59,7 @@ void MissilesInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict r
 
 			if (!(flags & kFalling))
 			{
-				vecPosition = XMVectorSetZ(vecPosition, StepHeightTowards(XMVectorGetZ(vecPosition), engine::gpFlightPlanes->Lowest().fHeightMeters, kfBattleshipClimbRate * deltaTime.count()));
+				vecPosition = XMVectorSetZ(vecPosition, StepHeightTowards(XMVectorGetZ(vecPosition), kfBaseHeightMeters, kfBattleshipClimbRate * deltaTime.count()));
 
 				// PostRender::Update already applies the rotation delay percentage.
 				vecDirection = common::RotateDirectionAboutZ(vecDirection, deltaTime.count() * rPreviousPostRender.pfDeltaRotations[i]);

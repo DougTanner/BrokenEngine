@@ -136,7 +136,7 @@ void CellStaticData::BuildNavigationDataIfUnbuilt() const
 	// visibility-edge vectors in proportion to the cell's islands, and sizes the fixed-dimension elevation grid
 	// when the cell has islands
 	ScopedSuppressAllocationTracking suppress;
-	BuildCellNavigationData(navigationData, islands);
+	navigationData = BuildCellNavigationData(islands);
 	if (!islands.empty())
 	{
 		gpIslandTerrain->BuildElevationGrid(islands, elevationGrid);

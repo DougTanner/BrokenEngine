@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v2 {"createdUtc":"2026-11-25T18:34:50.433Z","dependsOn":["Documents/Plans/Engine/FftMediumWaves.md","Documents/Plans/Engine/WaterWaveIsolationControls.md"]} -->
+<!-- broken-engine-plan/v2 {"createdUtc":"2026-11-25T18:34:50.433Z","dependsOn":["Documents/Plans/Engine/FftMediumWaves.md"]} -->
 # Rewrite Low-Directional Water Waves Using Modern Spectral Asymmetric Gerstner
 
 ## Context
@@ -22,6 +22,25 @@ band), executed in an **isolated, user-feedback-driven** testing worktree
 (low-directional waves everywhere, FFT medium waves and normal-map textures
 off), iterating with the user until sign-off.
 
+`WaterWaveIsolationControls` and earlier water-wave series commits live on
+branch `water-waves`, while the primary checkout stays on `main` so other
+agents are not disrupted. Because `/next-plan` claims this Plan from `main`,
+the session worktree starts at `main`. Keep the session branch at `main`
+through `/next-plan` step 6's claim refresh — inspecting `water-waves` code via
+Git during step-4/5 preparation and review so `Invoke-NextPlanClaim.ps1` does
+not block with `claim.session-diverged` — and move the session worktree onto
+`water-waves` only **after** step 6's claim refresh completes (merging `main`
+into `water-waves` first if `main` holds prerequisite or overlapping updates),
+then implement, build, and verify on `water-waves`, leaving `main`'s code
+untouched. At landing (`/finalize-changes`), land the implementation and Plan
+completion onto `water-waves` under the global landing lock — either by
+switching primary to `water-waves` for preparation and landing together (then
+switching primary back to `main`), or via a user-authorized locked update of
+`refs/heads/water-waves` while primary stays on `main` — then release the Plan
+claim and sync only the Plan deletion and child `dependsOn` edge removals onto
+`main` (with no water-wave code on `main`) so `/next-plan` on `main` picks up
+the next Plan in the series cleanly.
+
 ### Engine Scale and Integration Constraints
 
 - Water mesh LOD 0 is `895 x 511` quads across all gameplay framings
@@ -34,8 +53,8 @@ off), iterating with the user until sign-off.
   and camera-framing amplitude fade-out (`Fade Start` to `Fade End`) keep
   waves smooth as the camera zooms out.
 - `WaterDisplacement.comp` combines low waves with the FFT medium waves under
-  the shared render-target and slope-addition contract established by
-  `FftMediumWaves.md`: it writes `displacementImage = vec4(Dx_total, Dy_total,
+  the shared render-target and slope-addition contract from the FFT medium-wave
+  rewrite: it writes `displacementImage = vec4(Dx_total, Dy_total,
   Dz_total, fMediumWeight)` (packing `fMediumWeight`, computed from undisplaced
   terrain elevation and honoring `gWaterIgnoreCoastMask`, into `w`) and
   `normalImage = vec4(n_low, J_total)`, where `xyz` always stores the unblended
@@ -156,8 +175,8 @@ off), iterating with the user until sign-off.
      the smooth coast transition for both `fLowWeight` and `fMediumScale`) is a
      deliberate spatially-varying envelope approximation that is exact wherever
      the spatial weights are constant (open ocean and isolation mode).
-   - Preserve the shared `normalImage` + slope-addition contract established by
-     `FftMediumWaves.md`: write `displacementImage = vec4(Dx_total, Dy_total,
+   - Preserve the shared `normalImage` + slope-addition contract from the FFT
+     medium-wave rewrite: write `displacementImage = vec4(Dx_total, Dy_total,
      Dz_total, fMediumWeight)` (packing `fMediumWeight`, computed from
      undisplaced terrain elevation and honoring `gWaterIgnoreCoastMask`, into
      `w` for `Water.vert` to forward as `fInMediumWeight`) and
@@ -197,7 +216,8 @@ off), iterating with the user until sign-off.
      skew needs replacement).
    - Finally, turn isolation off and verify the **combined ocean** (modern
      Gerstner low-directional swells + multi-cascade FFT medium waves + foam)
-     across zoom levels and coastlines with the user before landing.
+     across zoom levels and coastlines with the user before landing onto
+     `water-waves` (leaving `main`'s code untouched).
 
 ## Critical files
 
@@ -226,6 +246,8 @@ off), iterating with the user until sign-off.
   FFT Plan).
 - Adding new skybox assets.
 - Simulation determinism/CRC, network protocol, or save/replay formats.
+- Landing or merging changes onto `main` (leave `main` untouched until explicit
+  user confirmation after the full four-plan water-wave series completes).
 - Unit tests.
 
 ## Risk triggers and invariants
@@ -272,4 +294,15 @@ fields change).
    and show zero cell-boundary jitter.
 4. All new Low-Directional sliders respond live.
 5. User explicitly signs off on isolated low-directional waves AND on the
-   combined ocean (low-directional + FFT medium + foam) before landing.
+   combined ocean (low-directional + FFT medium + foam) before landing onto
+   `water-waves`.
+6. The session branch stays at `main` through `/next-plan` step 6's claim
+   refresh (inspecting `water-waves` via Git during step-4/5 preparation and
+   review), then moves onto `water-waves` for implementation, builds, and
+   verification; at `/finalize-changes`, the implementation and Plan completion
+   land onto `water-waves` under the global landing lock — either by switching
+   primary to `water-waves` for preparation and landing together (then
+   switching primary back to `main`), or via a user-authorized locked update of
+   `refs/heads/water-waves` while primary stays on `main` — then the Plan claim
+   is released and only the Plan deletion and child `dependsOn` edge removals
+   sync onto `main` (with no water-wave code on `main`).

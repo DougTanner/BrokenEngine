@@ -6,7 +6,9 @@ namespace engine
 enum class LaunchOptionFlags : uint8_t
 {
 	kLoopbackOnly = 1 << 0, // bind game/discovery sockets to loopback and disable LAN discovery broadcast
+#if defined(BT_CLIENT)
 	kRenderDoc    = 1 << 1, // force-load renderdoc.dll before instance creation and expose the in-app capture API (client; requires kbRenderDoc)
+#endif
 };
 
 // Parsed once in ProcessMain before any subsystem starts.
@@ -19,7 +21,9 @@ struct LaunchOptions
 	std::string scenePath;
 	std::filesystem::path dataDirectory; // empty = executable-sibling Data; --data-directory supplies an existing absolute directory
 	std::filesystem::path appDataDirectory; // empty = roaming AppData; --app-data-directory supplies an existing absolute directory
+#if defined(BT_CLIENT)
 	VkExtent2D vkWindowedExtent {.width = 0, .height = 0}; // {0,0} = not requested; --windowed WxH forces a windowed client size (overrides fullscreen at the read sites, never mutates gFullscreen)
+#endif
 };
 
 inline LaunchOptions gLaunchOptions {};
@@ -28,6 +32,7 @@ inline LaunchOptions gLaunchOptions {};
 // fatal argument error (e.g. --agent-port out of [1, 65535]) — the caller must abort startup.
 bool ParseLaunchOptions();
 
+#if defined(BT_CLIENT)
 // True for an agent-harness client: a kbAgent build launched with --agent-port. Every physical (human) input
 // chokepoint is suppressed for the process lifetime, leaving the harness's synthetic input as the sole source,
 // except IME result characters, which still reach an active ImGui text field on a focused window.
@@ -37,7 +42,6 @@ inline bool PhysicalInputSuppressed()
 	return kbAgent && gLaunchOptions.iAgentPort != 0;
 }
 
-#if defined(BT_CLIENT)
 // std::nullopt keeps launch behavior; a set value overrides --windowed and the saved fullscreen preference without changing it.
 inline std::optional<bool> gOptionalAgentFullscreenOverride = std::nullopt;
 

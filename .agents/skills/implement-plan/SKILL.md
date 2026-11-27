@@ -38,19 +38,20 @@ Supply the authoritative task-brief fields
 plus these skill-specific fields, in both implementation and audit-only modes:
 
 - mode: `implementation` or `audit-only`;
-- the final approved plan and the exact changes the user approved after it
-  (`none` is valid), plus the assigned items and allowed file scope;
+- final approved plan and execution card (when present), cited per
+  `subagent-reporting.md` `## Task brief`, plus assigned items (section and
+  label/bullet), allowed file scope, and post-plan user changes (`none` is
+  valid);
 - session baseline used for all attribution;
 - pre-existing ownership snapshot naming every already changed or untracked
   path and its owner/outcome (`none` is valid);
-- risk triggers and reviewer focus;
-- execution card when one exists.
+- risk triggers and reviewer focus.
 
 ## Handoff
 
 Return the shared handoff form in
-[`../../references/subagent-handoff.md`](../../references/subagent-handoff.md),
-extended with these fields:
+[`../../references/subagent-handoff.md`](../../references/subagent-handoff.md)
+(`## Handoffs`, including its selector-citation rule), extended with:
 
 - `Self-audit resolved` — one row each: Claim -> Check -> Result, with its fix
   and recheck; or none.
@@ -59,12 +60,11 @@ extended with these fields:
 - `Propagation required` — `/update-affected-code` with the code scope, or
   `N/A — no code changed`.
 - `Reviewer focus areas` — verify X holds when Y, or none.
-- `Runtime acceptance requests` — for the criteria that live in a plan file
-  this handoff already cites, one citation row giving that path plus its `##`
-  selector, then one row per such criterion whose setup, action, observation,
-  or required evidence the plan does not already state, naming the criterion
-  and giving only those parts; for each criterion with no such cited home, one
-  row giving those four parts; or none.
+- `Runtime acceptance requests` — cite the plan/card path plus needed `##`
+  selector per `subagent-handoff.md` `## Handoffs`, then add one row per
+  criterion missing setup, action, observation, or required evidence there
+  (only the missing parts); give all four parts when no cited home exists; or
+  none.
 
 Each shared `Build required` row names its distinct target and that target's
 configuration/platform inline in every case; when the field would push the

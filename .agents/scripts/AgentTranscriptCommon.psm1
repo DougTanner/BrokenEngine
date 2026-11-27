@@ -127,8 +127,9 @@ function Get-AgentAgyBrainRoot([string] $OverrideRoot) {
 		Join-Path $env:ANTIGRAVITY_APP_DATA_DIR 'brain'
 	}
 	else {
-		$userProfile = [Environment]::GetFolderPath([Environment+SpecialFolder]::UserProfile)
-		if ([string]::IsNullOrWhiteSpace($userProfile)) { $userProfile = $env:USERPROFILE }
+		# The inherited profile first: a Codex sandbox reports its own account's special folder.
+		$userProfile = $env:USERPROFILE
+		if ([string]::IsNullOrWhiteSpace($userProfile)) { $userProfile = [Environment]::GetFolderPath([Environment+SpecialFolder]::UserProfile) }
 		Join-Path $userProfile '.gemini\antigravity-cli\brain'
 	}
 	$canonical = ConvertTo-AgentLexicalCanonicalPath $candidate

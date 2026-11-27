@@ -48,7 +48,7 @@ void Camera::ApplyPose(bool bMainMenu)
 	RestoreFraming(mfMenuFraming);
 	// The menu renders the origin cell; rebasing now keeps the next update from shifting the stored position.
 	mBasisCoordinate = engine::kOriginCoordinate;
-	mVecPosition = XMVectorSet(mf2MenuPosition.x, mf2MenuPosition.y, engine::gpFlightPlanes->Lowest().fHeightMeters, 1.0f);
+	mVecPosition = XMVectorSet(mf2MenuPosition.x, mf2MenuPosition.y, kfBaseHeightMeters, 1.0f);
 }
 
 void Camera::ResetMenuPose()

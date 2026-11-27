@@ -65,16 +65,18 @@ When intended trigger intent cannot be resolved from the supplied intent and
 skill sources, return `NEEDS_ACTION` and name the decision needed in shared
 `Residuals` rather than inventing it.
 
-Each `Findings` row is one line on this form:
+Each `Findings` row is one line on this form, graded by
+[`../../references/subagent-handoff.md`](../../references/subagent-handoff.md)
+`## Severity`:
 
 ```text
-VS### Critical|Recommended path:line — finding — correction
+VS### Critical|High|Medium|Low path:line — finding — correction
 ```
 
-Use `PASS` only when every mechanical run succeeds and no Critical finding
-remains. Use `NEEDS_ACTION` for target content or semantic Critical findings.
-Use `BLOCKED` for setup, invocation, read, or internal-validator failures. A
-Critical finding blocks a passing result; a Recommended finding is advisory.
+Use `PASS` only when every mechanical run succeeds and no Critical or High
+finding remains. Use `NEEDS_ACTION` for target content or semantic Critical or
+High findings. Use `BLOCKED` for setup, invocation, read, or internal-validator
+failures. A Medium or Low finding is advisory.
 
 When an inbound workflow requirement has a worker run validate mode inside that
 worker's own task, rather than as a separate dispatch, as evidence for that

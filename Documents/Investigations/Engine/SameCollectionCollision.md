@@ -21,7 +21,6 @@ by Pushers.
   (`:504-505`).
 - The broadphase is an 8x8 grid in XY over the cell (`Collision.h:8-9`,
   `Collision.cpp:10-13`), while the narrowphase tests are 3D (`:258`, `:578`).
-  Flight planes therefore remove no broadphase work but cause no false hits.
 - Determinism comes from a global sort on (time, layer A, object A, layer B,
   object B) (`:386-389`). The order is total only while each unordered pair
   appears once.
@@ -36,9 +35,9 @@ by Pushers.
 
 - A pusher is a radial field per entity, `(1 - d²/r²)^power * intensity`,
   measured in 3D and summed
-  (`Engine/Source/Frame/Collections/Pushers/PushersUpdate.cpp:175-195`), on one
-  50x50 XY zone grid per flight-plane layer (`:8-17`). Pushers ignore alignment
-  and collection and filter only by flags (`:163-173`).
+  (`Engine/Source/Frame/Collections/Pushers/PushersUpdate.cpp`), on a single
+  `kiPusherZones`-per-axis XY zone grid. Pushers ignore alignment and collection
+  and filter only by flags.
 - The response is a velocity impulse capped by `ApplyClampedPush`
   (`Pushers.h:27-32`) at half the maximum speed
   (`Projects/BrokenEngineSandbox/Source/Frame/Collections/Fighters/Fighters.h:58`,

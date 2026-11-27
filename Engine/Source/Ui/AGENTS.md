@@ -80,10 +80,11 @@ is engine-owned here; keybind persistence lives in `../Input/AGENTS.md`.
 
 ## Settings Persistence
 
-- `SoundSettings.bin` is version 3 and persists the three volume controls plus
-  the checked-by-default `Mute in background` setting, which save and load
-  preserve and reset restores to its checked default. Version 2 is intentionally
-  rejected and settings fall back to defaults.
+- `SoundSettings.bin`, versioned by `SoundSettings::kiVersion`, persists the
+  three volume controls plus `gMuteInBackground` (`Mute in background`), which
+  save and load preserve and reset restores to its default. When
+  `ReadAndValidateVersionHeader` rejects the file, settings fall back to
+  defaults.
 - Background mute is client presentation state and remains outside
   Frame/PostRender CRC and network state.
 - `GraphicsSettings.cpp` persists the engine-owned player-facing quality levels
@@ -109,12 +110,14 @@ is engine-owned here; keybind persistence lives in `../Input/AGENTS.md`.
   The Tweaks layout is gated instead as `Screens/TweaksScreen/AGENTS.md`
   `## Registration and Layout Contracts` states.
 - `GameSettings.cpp` persists the selected language, UI font scale, opaque-UI
-  toggle, UI opacity, and UI theme in `GameSettings.bin` version 2. The language
-  is stored as a fixed-width `int32_t` so the `Language` enum's underlying type
-  never decides the file layout; an index outside the enum rejects the file.
+  toggle, UI opacity, and UI theme in `GameSettings.bin`, versioned by
+  `GameSettings::kiVersion`. The language is stored as a fixed-width `int32_t`
+  so the `Language` enum's underlying type never decides the file layout; an
+  index outside the enum rejects the file.
 - `TweaksSettings.cpp` persists the Tweaks visibility flag and the Tweaks
-  section state in `TweaksSettings.bin` version 15, versioned POD written
-  through the engine versioned-file helpers, in `kbDebugInput` builds only.
+  section state in `TweaksSettings.bin`, POD versioned by
+  `TweaksSettings::kiVersion` and written through the engine versioned-file
+  helpers, in `kbDebugInput` builds only.
 
 ## Shared Types
 

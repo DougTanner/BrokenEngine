@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v2 {"createdUtc":"2026-11-25T18:34:47.535Z","dependsOn":["Documents/Plans/Engine/WaterWaveIsolationControls.md"]} -->
+<!-- broken-engine-plan/v2 {"createdUtc":"2026-11-25T18:34:47.535Z","dependsOn":[]} -->
 # Rewrite Medium Water Waves Using Multi-Cascade GPU FFT
 
 ## Context
@@ -20,6 +20,25 @@ Execution is **isolated and user-feedback driven**: implement in the testing
 worktree with isolation enabled (medium waves everywhere, low waves and
 normal-map textures off), ask the user to test with sliders across zoom levels,
 refine, and repeat until the user approves.
+
+`WaterWaveIsolationControls` and earlier water-wave series commits live on
+branch `water-waves`, while the primary checkout stays on `main` so other
+agents are not disrupted. Because `/next-plan` claims this Plan from `main`,
+the session worktree starts at `main`. Keep the session branch at `main`
+through `/next-plan` step 6's claim refresh — inspecting `water-waves` code via
+Git during step-4/5 preparation and review so `Invoke-NextPlanClaim.ps1` does
+not block with `claim.session-diverged` — and move the session worktree onto
+`water-waves` only **after** step 6's claim refresh completes (merging `main`
+into `water-waves` first if `main` holds prerequisite or overlapping updates),
+then implement, build, and verify on `water-waves`, leaving `main`'s code
+untouched. At landing (`/finalize-changes`), land the implementation and Plan
+completion onto `water-waves` under the global landing lock — either by
+switching primary to `water-waves` for preparation and landing together (then
+switching primary back to `main`), or via a user-authorized locked update of
+`refs/heads/water-waves` while primary stays on `main` — then release the Plan
+claim and sync only the Plan deletion and child `dependsOn` edge removals onto
+`main` (with no water-wave code on `main`) so `/next-plan` on `main` picks up
+the next Plan in the series cleanly.
 
 ### Engine Scale and Camera Constraints
 
@@ -348,7 +367,8 @@ refine, and repeat until the user approves.
      zoom levels (`framing = 100` through `600`), iterate on spectrum,
      asymmetry math, cascade sizes, and defaults until the user approves, then
      verify full combined mode (isolation off, foam working, zoom fade-out
-     smooth) before landing.
+     smooth) before landing onto `water-waves` (leaving `main`'s code
+     untouched).
 
 ## Critical files
 
@@ -423,6 +443,8 @@ refine, and repeat until the user approves.
   displacement-active gate, forwarding `displacementImage.w` as
   `fInMediumWeight`, and passing `normalImage.xyz` as unblended low-wave-only
   `f3InNormal` change).
+- Landing or merging changes onto `main` (leave `main` untouched until explicit
+  user confirmation after the full four-plan water-wave series completes).
 - Unit tests.
 
 ## Risk triggers and invariants
@@ -497,3 +519,13 @@ builds compile cleanly.
 6. User explicitly signs off on visual quality after interactive slider
    testing, and combined mode (isolation toggles off, foam active) renders
    cleanly.
+7. The session branch stays at `main` through `/next-plan` step 6's claim
+   refresh (inspecting `water-waves` via Git during step-4/5 preparation and
+   review), then moves onto `water-waves` for implementation, builds, and
+   verification; at `/finalize-changes`, the implementation and Plan completion
+   land onto `water-waves` under the global landing lock — either by switching
+   primary to `water-waves` for preparation and landing together (then
+   switching primary back to `main`), or via a user-authorized locked update of
+   `refs/heads/water-waves` while primary stays on `main` — then the Plan claim
+   is released and only the Plan deletion and child `dependsOn` edge removals
+   sync onto `main` (with no water-wave code on `main`).

@@ -73,7 +73,8 @@
 
 #include "Frame/IslandTerrain.h"
 #include "Frame/TerrainCollisionUtils.h"
-#include "Frame/FlightPlanes.h"
+
+static_assert(game::kfBaseHeightMeters > 0.0f);
 
 #if defined(BT_CLIENT)
 #include "Frame/IslandTerrainResidency.h"

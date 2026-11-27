@@ -17,6 +17,9 @@
 # `Documents/Investigations/ChangeWorkflow/WorkflowIncidents.md` when it changes (and exists on the
 # head side), requiring `## Entries` with its fixed 5-column table header, 5-cell separator and data
 # rows (literal `|` splitting), and unique normalized `(Owner, Symptom, Session branch)` rows.
+# `comment-values` fails on a `//` comment in an added line of a changed `cpp`, `dual-language-header`, or
+# `glsl` entry that copies a `k`-prefixed constant's value (`CommentValuePattern`), splitting each line
+# with AgentScriptCommon's C++ token pattern so a `//` inside a literal is not a comment.
 # `validate-skill` composes an existing script (the bundled skill validator). The
 # run reports results only — it never decides whether a failing check blocks a slice, never edits a
 # file, and writes nothing to disk (GIT_OPTIONAL_LOCKS=0 keeps Git from refreshing the index), so it is
@@ -29,7 +32,7 @@
 # an unexpected error exits 1 with status `error`. `-Head <commit>` selects the changed
 # files from a committed head instead of the working tree, and `-IncludeUntracked` adds the untracked
 # files when checking the working tree. `markdown-links`, `file-hygiene`, `line-length`,
-# `instruction-size`, `model-names`, and `workflow-incidents` read content from that commit; `validate-skill` validates the working tree's copy of each selected package.
+# `instruction-size`, `model-names`, `workflow-incidents`, and `comment-values` read content from that commit; `validate-skill` validates the working tree's copy of each selected package.
 # Every Git read of a Projects/Coretide/ entry runs in the session Coretide clone, against the inventory's
 # `coretide` baseline and head.
 [CmdletBinding()]
@@ -65,9 +68,12 @@ $script:SchemePattern = '^[A-Za-z][A-Za-z0-9+.-]*:'
 # A model slug or family name, bounded as `git grep -w` bounds a word: no adjacent letter, digit, or
 # underscore, so a hyphen-joined name still matches.
 $script:ModelNamePattern = [regex]::new('(?<![A-Za-z0-9_])(?:gpt-[0-9][A-Za-z0-9]*(?:[.-][A-Za-z0-9]+)*|claude-[A-Za-z]+-[0-9][A-Za-z0-9]*(?:[.-][A-Za-z0-9]+)*|opus|sonnet|haiku|astra|sol|luna|fable)(?![A-Za-z0-9_])', [Text.RegularExpressions.RegexOptions]::IgnoreCase)
+$script:CppTokenPattern = Get-AgentCppTokenPattern
+# A `k`-prefixed constant name followed by `=` or `==` and a number: a comment copying the constant's value.
+$script:CommentValuePattern = [regex]::new('\bk[a-z]*[A-Z]\w*\s*==?\s*-?[0-9]')
 
 $result = [ordered]@{
-	schemaVersion = 'broken-engine-static-checks/v7'
+	schemaVersion = 'broken-engine-static-checks/v8'
 	status = 'error'
 	code = 'internal.error'
 	message = 'Static checks did not run.'
@@ -437,6 +443,30 @@ function Get-AddedLine([string[]] $DiffArguments, [string[]] $Paths, [string] $R
 	return , $added
 }
 
+function Get-AddedLineRoute([object] $Inventory, [Collections.Generic.List[string]] $Paths) {
+	# Splits Paths into the untracked ones and the engine and Projects/Coretide/ diff pathspecs, a rename's
+	# old side included. -M pairs a rename only when the pathspec holds both of its paths.
+	$entries = @{}
+	foreach ($entry in $Inventory.entries) { if ($entry.status -cne 'D') { $entries[$entry.path] = $entry } }
+	# Untracked paths exist only against the working tree; a commit-valued head has none.
+	$untracked = @(if ([string]::IsNullOrEmpty($script:HeadSha)) { $script:UntrackedPaths })
+	$route = [pscustomobject] @{
+		Untracked = [Collections.Generic.List[string]]::new()
+		Pathspec = [Collections.Generic.List[string]]::new()
+		CoretidePathspec = [Collections.Generic.List[string]]::new()
+	}
+	foreach ($path in $Paths) {
+		if ($untracked -ccontains $path) { $route.Untracked.Add($path); continue }
+		$sidePaths = @($path)
+		if ($null -ne $entries[$path].oldPath) { $sidePaths += $entries[$path].oldPath }
+		foreach ($sidePath in $sidePaths) {
+			if (Test-CoretidePath $sidePath) { $route.CoretidePathspec.Add($sidePath.Substring($script:CoretidePrefix.Length)) }
+			else { $route.Pathspec.Add($sidePath) }
+		}
+	}
+	return $route
+}
+
 function Add-AddedGlslIndentFailure([string[]] $DiffArguments, [string[]] $Paths, [Collections.Generic.List[object]] $Failures, [string] $Root = $script:Root, [string] $Prefix = '') {
 	foreach ($added in (Get-AddedLine $DiffArguments $Paths $Root)) {
 		if (Test-SpaceIndentedLine $added.Text) { $Failures.Add([ordered]@{ path = $Prefix + $added.Path; line = $added.Line; problem = 'indent with spaces' }) }
@@ -467,23 +497,11 @@ function Invoke-FileHygieneCheck([object] $Inventory) {
 	$entries = @{}
 	foreach ($entry in $Inventory.entries) { if ($entry.status -cne 'D') { $entries[$entry.path] = $entry } }
 
-	# GLSL indentation on added lines. -M pairs a rename only when the pathspec holds both of its paths.
-	$glslPaths = Get-ChangedPath $Inventory { param($entry) $entry.class -cin @('glsl', 'dual-language-header') }
-	$untrackedGlsl = [Collections.Generic.HashSet[string]]::new([string[]] @())
-	$pathspec = [Collections.Generic.List[string]]::new()
-	$coretidePathspec = [Collections.Generic.List[string]]::new()
-	foreach ($path in $glslPaths) {
-		if ($untracked -ccontains $path) { [void] $untrackedGlsl.Add($path); continue }
-		$sidePaths = @($path)
-		if ($null -ne $entries[$path].oldPath) { $sidePaths += $entries[$path].oldPath }
-		foreach ($sidePath in $sidePaths) {
-			if (Test-CoretidePath $sidePath) { $coretidePathspec.Add($sidePath.Substring($script:CoretidePrefix.Length)) }
-			else { $pathspec.Add($sidePath) }
-		}
-	}
+	# GLSL indentation on added lines.
+	$glslRoute = Get-AddedLineRoute $Inventory (Get-ChangedPath $Inventory { param($entry) $entry.class -cin @('glsl', 'dual-language-header') })
 	# An empty pathspec would diff every path.
-	if ($pathspec.Count -gt 0) { Add-AddedGlslIndentFailure $diffArguments ([string[]] $pathspec) $failures }
-	if ($coretidePathspec.Count -gt 0) { Add-AddedGlslIndentFailure $coretideDiffArguments ([string[]] $coretidePathspec) $failures $script:Coretide.Root $script:CoretidePrefix }
+	if ($glslRoute.Pathspec.Count -gt 0) { Add-AddedGlslIndentFailure $diffArguments ([string[]] $glslRoute.Pathspec) $failures }
+	if ($glslRoute.CoretidePathspec.Count -gt 0) { Add-AddedGlslIndentFailure $coretideDiffArguments ([string[]] $glslRoute.CoretidePathspec) $failures $script:Coretide.Root $script:CoretidePrefix }
 
 	# File-level byte checks: gitlinks and symlinks carry no file bytes, and binary is Git's own decision.
 	$bytePaths = Get-ChangedPath $Inventory { param($entry) $entry.class -cne 'binary' -and $entry.current.mode -cin @('100644', '100755') }
@@ -509,7 +527,7 @@ function Invoke-FileHygieneCheck([object] $Inventory) {
 		# A file whose baseline side also lacked a final newline keeps that state.
 		$baselineFinal = $null -eq $baseline -or ($baseline.Length -gt 0 -and $baseline[$baseline.Length - 1] -eq 0x0A)
 		if ($head.Length -gt 0 -and $head[$head.Length - 1] -ne 0x0A -and $baselineFinal) { $failures.Add([ordered]@{ path = $path; line = $null; problem = 'no newline at end of file' }) }
-		if ($null -eq $text -or -not $untrackedGlsl.Contains($path)) { continue }
+		if ($null -eq $text -or -not $glslRoute.Untracked.Contains($path)) { continue }
 		$number = 0
 		foreach ($line in ($text -split "`n")) {
 			$number++
@@ -567,27 +585,21 @@ function Invoke-InstructionSizeCheck([object] $Inventory) {
 function Invoke-ModelNameCheck([object] $Inventory) {
 	$paths = Get-ChangedPath $Inventory { param($entry) Test-InstructionProsePath $entry.path }
 	if ($paths.Count -eq 0) { return New-CheckRow 'model-names' $false 'skipped' $null }
-	# Untracked paths exist only against the working tree, and every line of one is added.
-	$untracked = @(if ([string]::IsNullOrEmpty($script:HeadSha)) { $script:UntrackedPaths })
+	# Test-InstructionProsePath holds no Projects/Coretide/ path, so the Coretide pathspec stays empty.
+	$route = Get-AddedLineRoute $Inventory $paths
 	$added = [Collections.Generic.List[object]]::new()
-	$pathspec = [Collections.Generic.List[string]]::new()
-	foreach ($entry in $Inventory.entries) {
-		if ($entry.status -ceq 'D' -or -not $paths.Contains($entry.path)) { continue }
-		if ($untracked -ccontains $entry.path) {
-			$number = 0
-			foreach ($line in ((Get-HeadText $entry.path) -split "`r`n|`n|`r")) {
-				$number++
-				$added.Add([pscustomobject] @{ Path = $entry.path; Line = $number; Text = $line })
-			}
-			continue
+	# Every line of an untracked path is added.
+	foreach ($path in $route.Untracked) {
+		$number = 0
+		foreach ($line in ((Get-HeadText $path) -split "`r`n|`n|`r")) {
+			$number++
+			$added.Add([pscustomobject] @{ Path = $path; Line = $number; Text = $line })
 		}
-		$pathspec.Add($entry.path)
-		if ($null -ne $entry.oldPath) { $pathspec.Add($entry.oldPath) }
 	}
 	$diffArguments = @($Inventory.baselineSha)
 	if (-not [string]::IsNullOrEmpty($script:HeadSha)) { $diffArguments += $script:HeadSha }
 	# An empty pathspec would diff every path.
-	if ($pathspec.Count -gt 0) { $added.AddRange((Get-AddedLine $diffArguments ([string[]] $pathspec))) }
+	if ($route.Pathspec.Count -gt 0) { $added.AddRange((Get-AddedLine $diffArguments ([string[]] $route.Pathspec))) }
 	$failures = [Collections.Generic.List[object]]::new()
 	foreach ($line in $added) {
 		# A role definition's model setting names a model by design.
@@ -596,6 +608,42 @@ function Invoke-ModelNameCheck([object] $Inventory) {
 	}
 	$status = if ($failures.Count -gt 0) { 'fail' } else { 'pass' }
 	return New-CheckRow 'model-names' $true $status ([ordered]@{ failures = [object[]] $failures.ToArray() })
+}
+
+function Invoke-CommentValueCheck([object] $Inventory) {
+	$paths = Get-ChangedPath $Inventory { param($entry) $entry.class -cin @('cpp', 'dual-language-header', 'glsl') }
+	if ($paths.Count -eq 0) { return New-CheckRow 'comment-values' $false 'skipped' $null }
+	$route = Get-AddedLineRoute $Inventory $paths
+	$added = [Collections.Generic.List[object]]::new()
+	# Every line of an untracked path is added.
+	foreach ($path in $route.Untracked) {
+		$number = 0
+		foreach ($line in ((Get-HeadText $path) -split "`r`n|`n|`r")) {
+			$number++
+			$added.Add([pscustomobject] @{ Path = $path; Line = $number; Text = $line })
+		}
+	}
+	$diffArguments = @($Inventory.baselineSha)
+	if (-not [string]::IsNullOrEmpty($script:HeadSha)) { $diffArguments += $script:HeadSha }
+	# An empty pathspec would diff every path.
+	if ($route.Pathspec.Count -gt 0) { $added.AddRange((Get-AddedLine $diffArguments ([string[]] $route.Pathspec))) }
+	if ($route.CoretidePathspec.Count -gt 0) {
+		$coretideDiffArguments = @($script:Coretide.BaselineSha)
+		if (-not [string]::IsNullOrEmpty($script:Coretide.HeadSha)) { $coretideDiffArguments += $script:Coretide.HeadSha }
+		foreach ($line in (Get-AddedLine $coretideDiffArguments ([string[]] $route.CoretidePathspec) $script:Coretide.Root)) {
+			$added.Add([pscustomobject] @{ Path = $script:CoretidePrefix + $line.Path; Line = $line.Line; Text = $line.Text })
+		}
+	}
+	$failures = [Collections.Generic.List[object]]::new()
+	foreach ($line in $added) {
+		# The token pattern keeps a `//` inside a literal out of the comment group.
+		foreach ($token in [regex]::Matches($line.Text, $script:CppTokenPattern)) {
+			if (-not $token.Groups['comment'].Success -or -not $token.Value.StartsWith('//')) { continue }
+			foreach ($match in $script:CommentValuePattern.Matches($token.Value)) { $failures.Add([ordered]@{ path = $line.Path; line = $line.Line; term = $match.Value }) }
+		}
+	}
+	$status = if ($failures.Count -gt 0) { 'fail' } else { 'pass' }
+	return New-CheckRow 'comment-values' $true $status ([ordered]@{ failures = [object[]] $failures.ToArray() })
 }
 
 function Split-WorkflowIncidentsRow([string] $Line) {
@@ -713,7 +761,7 @@ try {
 		}
 	}
 
-	# All seven rows are always present, triggered or not.
+	# All eight rows are always present, triggered or not.
 	$checks = @(
 		(Invoke-ValidateSkillCheck $inventory)
 		(Invoke-MarkdownLinkCheck $inventory)
@@ -722,6 +770,7 @@ try {
 		(Invoke-InstructionSizeCheck $inventory)
 		(Invoke-ModelNameCheck $inventory)
 		(Invoke-WorkflowIncidentsCheck $inventory)
+		(Invoke-CommentValueCheck $inventory)
 	)
 	$result.checks = [object[]] $checks
 	$triggeredStatuses = @($checks | Where-Object { $_.triggered } | ForEach-Object { $_.status })

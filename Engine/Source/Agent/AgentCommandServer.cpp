@@ -18,6 +18,7 @@ constexpr std::chrono::milliseconds kListenerRetryInterval = 50ms;
 constexpr std::chrono::seconds kResponseFlushTimeout = 3s;
 
 AgentCommandServer::AgentCommandServer(int64_t iPort)
+: common::Singleton<AgentCommandServer>(gpAgentCommandServer, nullptr)
 {
 	// WSAStartup is guaranteed by NetworkManager (enet_initialize), constructed before this.
 
@@ -96,6 +97,7 @@ AgentCommandServer::AgentCommandServer(int64_t iPort)
 	mpAudioStreamingHarnessRig = std::make_unique<AudioStreamingHarnessRig>();
 	AudioStreamingHarnessRig::Attach(*mpAudioStreamingHarnessRig);
 #endif
+	Register(this);
 }
 
 AgentCommandServer::~AgentCommandServer()

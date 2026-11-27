@@ -5,10 +5,12 @@ report template live in [`../SKILL.md`](../SKILL.md).
 
 ## Steps
 
-1. Read the changed regions in full-function context, their applicable
-   `AGENTS.md`, and the producers, consumers, callers, and mirrored paths needed
-   to trace the declared contracts. Diff-only inspection is insufficient. Done
-   when every declared contract has been read in its own source.
+1. Obtain the changed entries and regions per [`../SKILL.md`](../SKILL.md)
+   `## Inputs`, then read those regions in full-function context, their
+   applicable `AGENTS.md`, and the producers, consumers, callers, and mirrored
+   paths needed to trace the declared contracts. Diff-only inspection is
+   insufficient. Done when every declared contract has been read in its own
+   source.
 2. Search changed signatures, semantics, enum values, layouts, ownership,
    guards, frame phases, and serialization identities across every affected
    site. Done when every affected site is identified.
@@ -72,8 +74,8 @@ Full text in [`checks.md`](checks.md); apply only the checks the changed paths
 reach.
 
 - General logic and ownership — every changed region.
-- Conventions reference — every changed PCH-backed region (`Tools/` C++ for the
-  AgentTools bullet only).
+- Conventions reference — every changed PCH-backed region, and `Tools/` C++ for
+  each bullet that names the AgentTools.
 - Type and domain modeling — changed parameters, discriminators, or value types.
 - Changed comments — a comment the change edited.
 - Trust boundaries and failure channels — externally controlled data, network,

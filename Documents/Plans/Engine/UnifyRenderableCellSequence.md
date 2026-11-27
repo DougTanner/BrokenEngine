@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v2 {"createdUtc":"2026-11-25T20:50:30.067Z","dependsOn":["Documents/Plans/Engine/ReplaceFlightPlanesWithBaseHeight.md","Documents/Plans/Engine/SkipEmptyLightingSpread.md"]} -->
+<!-- broken-engine-plan/v2 {"createdUtc":"2026-11-25T20:50:30.067Z","dependsOn":["Documents/Plans/Engine/SkipEmptyLightingSpread.md"]} -->
 # Unify Renderable-Cell Sequence Across BeginRender and Draw
 
 ## Context

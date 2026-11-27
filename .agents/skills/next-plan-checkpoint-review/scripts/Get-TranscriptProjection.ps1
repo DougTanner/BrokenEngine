@@ -1011,14 +1011,21 @@ function Write-ToolCallProjection([int] $LineNumber, [string] $ToolName, [string
 		}
 		if ([string]::IsNullOrEmpty($State.WorktreeRoot)) {
 			foreach ($fieldLine in $fieldLines) {
-				if ($fieldLine -match '^\s*Baseline:(?<pre>.*?[\s,(|;])(?:worktree|(?:absolute\s+)?repo(?:sitory)?\s+toplevel):\s*(?<val>.+)$') {
+				if ($fieldLine -match '^\s*Baseline:(?<pre>.*?[\s,(|;])(?:worktree|(?:absolute\s+)?repo(?:sitory)?\s+toplevel)(?<sep>[:=])\s*(?<val>.+)$') {
 					$pre = $Matches['pre']
+					$sep = $Matches['sep']
 					$val = $Matches['val'].Trim()
 					if ($val -match '^(["''`])([^\r\n]+?)\1(?=\s*(?:[,|;).\s]|$))') {
 						$rawRoot = $Matches[2]
 					}
 					else {
-						$parts = $val -split '[,|;]\s*[A-Za-z][A-Za-z0-9 _-]*:(?![\\/])', 2
+						$fieldSplitPattern = if ($sep -ceq '=') {
+							'[,|;]\s*[A-Za-z][A-Za-z0-9 _-]*(?::(?![\\/])|=)'
+						}
+						else {
+							'[,|;]\s*[A-Za-z][A-Za-z0-9 _-]*:(?![\\/])'
+						}
+						$parts = $val -split $fieldSplitPattern, 2
 						$rawRoot = $parts[0].Trim()
 						$openParens = ($pre -replace '[^(]', '').Length - ($pre -replace '[^)]', '').Length
 						if ($openParens -gt 0) {

@@ -200,12 +200,26 @@ static DiscGridSquare GridCellSquare(int64_t iGridX, int64_t iGridY)
 // visited, so they never block.
 static DiscGridRange OverlappedGridCells(double fMinimumX, double fMinimumY, double fMaximumX, double fMaximumY)
 {
+	static constexpr double kfMaximumGridIndex = static_cast<double>(kiElevationGridDimension - 1);
+	double fFirstX = std::floor((fMinimumX - kfCellOriginX) / kfGridPitchX);
+	double fLastX = std::floor((fMaximumX - kfCellOriginX) / kfGridPitchX);
+	double fFirstY = std::floor((fMinimumY - kfCellOriginY) / kfGridPitchY);
+	double fLastY = std::floor((fMaximumY - kfCellOriginY) / kfGridPitchY);
+	fFirstX = (fFirstX < 0.0) ? 0.0 : fFirstX;
+	fLastX = (fLastX > kfMaximumGridIndex) ? kfMaximumGridIndex : fLastX;
+	fFirstY = (fFirstY < 0.0) ? 0.0 : fFirstY;
+	fLastY = (fLastY > kfMaximumGridIndex) ? kfMaximumGridIndex : fLastY;
+	if (!(fFirstX <= fLastX && fFirstY <= fLastY))
+	{
+		return {};
+	}
+
 	return
 	{
-		.iFirstX = std::max(static_cast<int64_t>(std::floor((fMinimumX - kfCellOriginX) / kfGridPitchX)), 0i64),
-		.iLastX = std::min(static_cast<int64_t>(std::floor((fMaximumX - kfCellOriginX) / kfGridPitchX)), kiElevationGridDimension - 1),
-		.iFirstY = std::max(static_cast<int64_t>(std::floor((fMinimumY - kfCellOriginY) / kfGridPitchY)), 0i64),
-		.iLastY = std::min(static_cast<int64_t>(std::floor((fMaximumY - kfCellOriginY) / kfGridPitchY)), kiElevationGridDimension - 1),
+		.iFirstX = static_cast<int64_t>(fFirstX),
+		.iLastX = static_cast<int64_t>(fLastX),
+		.iFirstY = static_cast<int64_t>(fFirstY),
+		.iLastY = static_cast<int64_t>(fLastY),
 	};
 }
 

@@ -1,9 +1,10 @@
 #include "AudioManager.h"
+
+#if defined(BT_CLIENT)
+
 #if defined(BT_DEBUG)
 #include "Agent/Commands/AudioStreamingHarnessRig.h"
 #endif
-
-#if defined(BT_CLIENT)
 
 #include "File/FileManager.h"
 #include "StaticVoices.h"

@@ -19,6 +19,14 @@ top of the file. A session reviewing the log removes each row it handles.
 
 ## Entries
 
+- 2026-11-26 agy/b4fa1a59-32a9-406a-bc97-2a13634c6bdc —
+  Projects/ModelViewer/Source/ModelViewerApplication.cpp — 17,307/10,000
+  bt-token-v1 — island selection and flight-body updates form a cohesive
+  responsibility.
+- 2026-11-26 agy/b4fa1a59-32a9-406a-bc97-2a13634c6bdc —
+  Engine/Source/Graphics/Render/GlobalUniforms.cpp — 10,101/10,000 bt-token-v1
+  — shadow uniform publication forms a cohesive block under
+  PopulateShadowParameters.
 - 2026-11-25 agy/67048fc4-9412-489e-bec4-ad39620046af — Size observation:
   Engine/Source/Graphics/Render/GlobalUniforms.cpp:242 — 10,119/10,000
   bt-token-v1 — its five consecutive shadow-population functions form a

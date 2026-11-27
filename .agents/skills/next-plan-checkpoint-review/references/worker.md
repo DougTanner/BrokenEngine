@@ -7,11 +7,12 @@ are the isolation lens.
 
 ## Steps
 
-1. Resolve, project, and measure this run's transcript first. On Claude, resolve
-   `(Get-ChildItem "$env:USERPROFILE/.claude/projects/*/$env:CLAUDE_CODE_SESSION_ID.jsonl").FullName`.
-   On `agy`, import `./.agents/scripts/AgentTranscriptCommon.psm1`, call
-   `Resolve-AgentAgyParentSession -SessionId $env:ANTIGRAVITY_CONVERSATION_ID`,
-   require `Status` `'available'` (else `BLOCKED` naming `Reason`), and take
+1. Resolve, project, and measure this run's transcript first, from the brief's
+   source client and session ID (`<id>`). For `claude`, resolve
+   `(Get-ChildItem "$env:USERPROFILE/.claude/projects/*/<id>.jsonl").FullName`.
+   For `agy`, import `./.agents/scripts/AgentTranscriptCommon.psm1`, call
+   `Resolve-AgentAgyParentSession -SessionId '<id>'`, require `Status`
+   `'available'` (else `BLOCKED` naming `Reason`), and take
    `RootTranscriptPath`. If resolved and readable, run
    `pwsh -NoProfile -File .agents/skills/next-plan-checkpoint-review/scripts/Get-TranscriptProjection.ps1 -TranscriptPath '<resolved path>' -IncludeContextEnvelope`
    once from the worktree root, capturing stdout in a PowerShell variable and

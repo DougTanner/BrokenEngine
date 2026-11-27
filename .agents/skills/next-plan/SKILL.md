@@ -91,9 +91,7 @@ The `argument-hint` value selects the Plan:
      approval-refused row of `### Post-checkpoint outcomes`, with the claim
      held.
 
-   When that handoff classifies a tier that differs from the brief's assumed
-   tier, main rewrites the execution card's `Roles` field to the classified
-   tier before Plan review. After that handoff, before Plan review, run
+   After that handoff, before Plan review, run
    [plan-alternatives/SKILL.md](../plan-alternatives/SKILL.md) when its trigger
    fires and present per `### User presentation`; step 5 runs on the user's
    pick, after redrafting any non-drafted pick.
@@ -201,7 +199,7 @@ The `argument-hint` value selects the Plan:
 | implementation accepted and verified | held | run `Complete-NextPlan.ps1`, then the landing gate |
 | changes requested at the `/finalize-changes` landing confirmation | held | follow [claim-exceptions.md](references/claim-exceptions.md) `## Changes requested at landing` |
 | user explicitly authorizes rejection | held | run `Complete-NextPlan.ps1 -Reject`, then the landing gate |
-| `Complete-NextPlan.ps1` refuses with `completion.plan-cited` | held | run step 4's difference preparation per [`../prepare-change/SKILL.md`](../prepare-change/SKILL.md) `## Inputs` (`mode: claimed-plan`), step 5, and step 8, skipping the checkpoint for every later outcome of the run; step 4's citing-line rule puts each rewrite on the card and into `Slices` as scope that rule already approves, which needs no presentation of the difference, and step 7 presents only a user decision that preparation returns; skip steps 6 and 9; then run step 10 again with the same arguments |
+| `Complete-NextPlan.ps1` refuses with `completion.plan-cited` | held | run step 4's difference preparation per [`../prepare-change/SKILL.md`](../prepare-change/SKILL.md) `## Inputs` (`mode: claimed-plan`), step 5, and step 8, skipping the checkpoint for every later outcome of the run; step 4's citing-line rule puts each rewrite on the card and into `Slices` as scope that rule already approves, which needs no presentation, and step 7 presents per `### Implementation approval`; skip steps 6 and 9; then run step 10 again with the same arguments |
 | claim wrapper returns `claim.plan-mismatch` | held, identified only by `conflict.heldPlan` | run the checkpoint once, retain the held claim and all work, report requested and held Plans, and stop; never complete, reject, or defer implicitly |
 | approval refused, or a blocker other than `completion.plan-cited` whose authoritative result explicitly reports a held claim, with no separate defer instruction | held | run the checkpoint once, retain the claim and all work, report and stop; never complete, reject, or defer implicitly, and any checkpoint work created stays with the retained session |
 | blocker before an authoritative claim disposition is available | unknown | follow the supplied `nextAction`, run the checkpoint once, report the error and unknown claim state, and stop, retaining all work with the session; `claim: null` alone never proves claim absence, so add no recovery probe and do not query claim status or mutate a claim |
@@ -213,16 +211,15 @@ The `argument-hint` value selects the Plan:
 ### Implementation approval
 
 Preparation and claim do not require approval. Before implementation that no
-earlier user choice approved (below), present only the execution card's
-`### What does this plan do?` and `### Why this is good for the codebase`
-sections, plus a `### Plan review changes` section listing each change the Plan
-review step made to the approach being approved, or `none`, plus a
+earlier user choice approved (below), present only `Approval summary` from the
+latest card-emitting `planner` handoff (without reading `## Execution card`),
+plus a `### Plan review changes` section listing each change the Plan review
+step made to the approach being approved, or `none`, plus a
 `### User decisions needed` section when any decision is unresolved, listing
 each one with its options, trade-offs, and a recommendation; the alternatives
 the `/plan-alternatives` presentation already showed are not presented again,
-and the rest of the resolved Plan and card stays in the snapshot for the reviews
-and is not presented. Deliver that presentation per the `### User Interaction`
-rules in
+and the full Plan and card stay in the snapshot for the reviews and are not
+presented. Deliver that presentation per the `### User Interaction` rules in
 [`.agents/references/change-workflow.md`](../../references/change-workflow.md) —
 on Codex as exactly one complete `<proposed_plan>` block, then ending the turn
 without an approval question; on Claude Code and every other host as rendered
@@ -231,21 +228,27 @@ which the user's next message is the decision. An approval accepts the
 recommendation for every decision it leaves unanswered, except a recommendation
 to reject the Plan, which still needs an explicit answer. A different approach
 the user chooses at approval returns the run to preparation and Plan review.
-Every user choice in the run — the `/plan-alternatives` pick, an
-`/external-grill-plan` answer, a choice at approval, or a change request at the
-`/finalize-changes` landing confirmation — approves implementation unless it
-rejects the Plan, refuses approval, or defers it from step 4's size entry. The
-run then goes to implementation unless an existing or new question for the user
-is still unanswered; main then presents only those questions, in the
-`### User decisions needed` form and delivered as above. Whether a reply
-answered a decision follows
+Every user choice — the `/plan-alternatives` pick, an `/external-grill-plan`
+answer, a choice at approval, or a change request at the `/finalize-changes`
+landing confirmation — approves implementation unless it rejects the Plan,
+refuses approval, or defers it from step 4's size entry. A choice approves only
+if every non-`none` entry on the current `### Plan review changes` list was
+shown to the user before the choice was given, so a choice given before an
+entry existed, such as the step 4 `/plan-alternatives` pick, does not approve
+that entry. Otherwise main presents the entries the user has not seen, and the
+user's next choice decides. Separately, even when every entry was shown, main
+presents every question for the user that is still unanswered before
+implementation. Main presents entries in the `### Plan review changes` form and
+questions in the `### User decisions needed` form, together and delivered as
+above. Whether a reply answered a decision follows
 [`authority-order.md`](../../references/authority-order.md). When the approved
 presentation differs from the execution card, main dispatches, before step 8,
 one fresh preparation `planner` whose continuation capsule
 ([`../../references/subagent-handoff.md`](../../references/subagent-handoff.md)
 `## Continuation capsule`) carries the snapshot step 8 cites as the approved
 plan with its `##` selectors, and the user's approval answers; that worker
-updates the card's affected fields to the approved scope, and the dispatch
+updates the card's affected fields to the approved scope and refreshes
+`Pre-edit checks`, `Harness checks`, and `Approval summary`; the dispatch
 always names `Slices` in its `Return:`, whether or not the update changes the
 snapshot's scope, so step 8 dispatches from that handoff's `Slices`. Main does
 not read or edit the card or the snapshot for this update. A yes to step 4's

@@ -75,6 +75,15 @@ These are the C++ conventions every implementer and reviewer of C++ applies.
   plus a game hook or policy wrapper, as engine session runtimes and their game
   wrappers do (`Engine/Source/AGENTS.md` `## Frame Ownership`). Applies to new
   files, types, and public functions only.
+- Reuse before adding, in PCH-backed code and the AgentTools: before adding a
+  function, type, helper, or substantial logic block, search the repository for
+  the proposed identifier, the terms describing its behavior, the closest
+  sibling implementation, and its direct callers or consumers, and read the
+  plausible matches. Reuse an existing helper that fits, or adapt one that fits
+  after a small visibility or parameter change (such as exposing a file-local
+  `static` or adding a parameter); leave no near-copy or repeated
+  multi-condition logic, except a deliberate client/server or collection mirror,
+  which stays parallel.
 - Game-instantiated objects: reach `Game` and every other object the game
   instantiates behind an engine `*Base` class through its `gp*` global
   (`game::gpGame`, `engine::gpCamera`). Never store a reference or pointer to

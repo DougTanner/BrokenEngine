@@ -34,12 +34,13 @@ struct MainLayout
 	int32_t iWaterMediumCount INIT;
 	int32_t iWaterActiveQuadX INIT;
 	int32_t iWaterActiveQuadY INIT;
-	// Framing amplitude-fade scales applied to visual displacement/normals in WaterDisplacement.comp while
-	// pf4*WavesTwo.y stays un-faded for foam Jacobian compression.
+	// Framing amplitude-fade scales for visual displacement/normals in WaterDisplacement.comp; zeroed when a band has
+	// no visual contribution (Low quality, full framing fade, zero slope, or full Nyquist attenuation) so Water.vert
+	// gates its displacement fetches on them. pf4*WavesTwo.y carries mesh-quad Nyquist-filtered visual amplitudes;
+	// pf4*WavesOne.z caches raw base amplitudes on the CPU; pf4*WavesOne.w carries the CPU-precomputed foam
+	// compression coefficient (steepness * wavenumber * raw amplitude) for WaterDisplacement.comp.
 	float fWaterLowAmplitudeScale INIT;
 	float fWaterMediumAmplitudeScale INIT;
-	float fWaterFoamHighZoomBlend INIT; // 1 - mean low-band Nyquist alias weight; hands off Jacobian foam to procedural high-zoom whitecaps in WaterFoam.comp
-	vec2 f2WaterFoamHighZoomScroll INIT; // Double-precision modulo-2 spawn-noise UV scroll along the low-band wave direction
 
 	// Lighting — water normal map atlas (3 weighted samples)
 	float fLightingSampledNormalsOneSize INIT;

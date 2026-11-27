@@ -448,15 +448,15 @@ float XM_CALLCONV CellElevationSampler::Sample(FXMVECTOR vecLocalPosition) const
 	XMFLOAT4A f4Position {};
 	XMStoreFloat4A(&f4Position, vecLocalPosition);
 
-	float fGridX = f4Position.x - kfCellOriginX;
-	float fGridY = f4Position.y - kfCellOriginY;
-	int64_t iGridX = static_cast<int64_t>(std::floor(fGridX / kfGridPitchX));
-	int64_t iGridY = static_cast<int64_t>(std::floor(fGridY / kfGridPitchY));
-	if (iGridX < 0 || iGridX >= kiElevationGridDimension || iGridY < 0 || iGridY >= kiElevationGridDimension)
+	float fGridX = (f4Position.x - kfCellOriginX) / kfGridPitchX;
+	float fGridY = (f4Position.y - kfCellOriginY) / kfGridPitchY;
+	if (!(fGridX >= 0.0f && fGridX < static_cast<float>(kiElevationGridDimension) && fGridY >= 0.0f && fGridY < static_cast<float>(kiElevationGridDimension)))
 	{
 		return fSeaFloor;
 	}
 
+	int64_t iGridX = static_cast<int64_t>(fGridX);
+	int64_t iGridY = static_cast<int64_t>(fGridY);
 	return pGrid->at(static_cast<size_t>(iGridY * kiElevationGridDimension + iGridX));
 }
 

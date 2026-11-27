@@ -23,7 +23,7 @@ void UnbindKey(engine::VirtualKey key);
 std::span<const GameKeyAction> VisibleGameKeyActions();
 engine::KeybindRowInfo DescribeKeybind(GameKeyAction eAction);
 
-// Versioned binary persistence (GameKeybinds.bin, kiVersion = 1).
+// Binary persistence uses kpcGameKeybindsPath and GameKeybindsFile::kiVersion.
 bool LoadGameKeybinds();
 void SaveGameKeybinds();
 void ResetGameKeybinds();

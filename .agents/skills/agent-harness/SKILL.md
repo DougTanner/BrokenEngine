@@ -2,10 +2,11 @@
 name: agent-harness
 description: >-
   Drive the Broken Engine client/server for automated verification. Use for
-  runtime-observable acceptance criteria, replay determinism, or whenever the
-  user or a plan's Verification section asks to launch, drive, query, or
-  screenshot the game or to screenshot the ModelViewer, or requests GPU frame
-  capture or RenderDoc capture analysis.
+  non-visual runtime-observable acceptance criteria, replay determinism,
+  non-visual harness checks in a plan's Verification section, user requests to
+  launch, drive, query, or screenshot the game or ModelViewer, or GPU frame or
+  RenderDoc capture analysis (visual/rendering verification uses
+  visual-verification.md).
 allowed-tools: [PowerShell]
 ---
 
@@ -19,9 +20,11 @@ viewer.
 
 ## When to use
 
-- A runtime-observable acceptance criterion or a replay determinism check.
-- The user or a plan's Verification section asks to launch, drive, query, or
-  screenshot the game, or to screenshot the ModelViewer.
+- A non-visual runtime-observable acceptance criterion or a replay determinism
+  check (visual/rendering verification uses
+  [`visual-verification.md`](../../references/visual-verification.md)).
+- The user asks to launch, drive, query, or screenshot the game or ModelViewer,
+  or a plan's Verification section requests a non-visual harness check.
 - A request for GPU frame capture or RenderDoc capture analysis.
 - Any user request to launch the game for their own play or testing: always,
   with no further prompting, run the
@@ -89,7 +92,7 @@ recovery (`## When to use`) take no step sequence.
 Evaluate each criterion as `PASS`, `FAIL`, or `BLOCKED` from exact
 command/query/scene/UI/screenshot/log evidence, and treat a setup limitation as
 a blocked check. Give each observed criterion failure and process-check failure
-a stable `HARNESS-F-###` ID and report it exactly once as a `Required` row in
+a stable `HARNESS-F-###` ID and report it exactly once as a `Critical` row in
 the shared `Findings` field. Process-check findings can come from launch, a
 poll, a transport-failure check, or release entry; record the role, report path,
 exception headline, exit code, and retained evidence path in that finding. Do
@@ -168,7 +171,7 @@ Criterion results: <passed>/<total> passed
 Each `Findings` row is one line on this form:
 
 ```text
-HARNESS-F-### Required report-path:selector — observed criterion or process-check failure — evidence
+HARNESS-F-### Critical report-path:selector — observed criterion or process-check failure — evidence
 ```
 
 `Changed files` and `Build required` are `none` because this role runs the

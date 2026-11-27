@@ -24,19 +24,11 @@ cleanup, and Verify the acceptance table steps in that one dispatch.
 
 - Combined mode: the Review and resolve correctness combined pass, whenever
   `.agents/scripts/Get-ChangeWorkflowSteps.ps1` lists `/coherence-review` in
-  combined mode — except when a Tier-1 change already passed combined mode and
-  later adds or edits a follow-up Plan (even if the script still prints combined
-  mode): run coherence mode with `PathPrefix` on the added or edited Plan `.md`
-  and changed sibling support-folder paths (or prefixes), recheck invalidated
-  carried items (non-landing `/verify-acceptance`,
-  `/progressive-disclosure-review`, `/external-skill-creator` validate mode),
-  and run separately triggered checks (final `Invoke-StaticChecks.ps1` and, at
-  landing, `Executable Plan check`).
+  combined mode; that row carries only the checks the round owes.
 - Coherence mode: every other change with a changed non-C++, non-GLSL artifact
-  (Tier 2+, Tier 1 outside combined mode, or the Tier-1 late-Plan exception
-  above). These keep their separate Apply the triggered cleanup and Verify the
-  acceptance table dispatches unchanged, and the scope, minimality, and
-  simplicity checks run only at Tier 2+.
+  (Tier 2+, or Tier 1 outside combined mode). These keep their separate Apply
+  the triggered cleanup and Verify the acceptance table dispatches unchanged,
+  and the scope, minimality, and simplicity checks run only at Tier 2+.
 - GLSL shaders and dual-language headers route to `/glsl-review`, not
   `/coherence-review`.
 - The Verify and land step's landing acceptance table is never folded into
@@ -49,23 +41,15 @@ cleanup, and Verify the acceptance table steps in that one dispatch.
   [`scope-authorization.md`](../../references/scope-authorization.md)
   "Authorization source:" defines it.
 - `Baseline` — full baseline Git SHA, repo toplevel, and committed head if any.
-- `Scope` — first-round: untracked paths and, optionally in coherence mode after
-  an earlier pass on prior non-C++ files, `PathPrefix` (comma-separated paths or
-  directory prefixes for newly added or edited non-C++ files; see `## When to
-  use` for late-Plan sibling scope). Re-review: affected files, regions,
-  `First-round findings`
-  (`../../references/subagent-reporting.md` `## Task brief`), and for Coretide
-  paths `coretide` revisions from the inventory supplying those regions.
-- The tier and the mode; in combined mode, which Apply the triggered cleanup
-  checks the change triggers and whether the Verify the acceptance table step
-  applies.
-- In combined mode, every input each triggered cleanup skill's `## Inputs`
-  requires, such as a focused re-review's `First-round findings`, and, when the
-  Verify the acceptance table step applies, every input `/verify-acceptance`
-  `## Inputs` requires.
+- `Scope` — untracked paths.
+- The tier and the mode; in combined mode, the carried checks the printed row's
+  `also carries:` list names, none when the row has no such list.
+- In combined mode, every input each carried check's `## Inputs` requires
+  (`/verify-acceptance` among them when the list names it), each check reading
+  its first-pass scope.
 
-First-round region inventory (`-Head` for a committed head;
-`-UntrackedPath`/`-IncludeUntracked` and `-PathPrefix` from `Scope`):
+Region inventory (`-Head` for a committed head;
+`-UntrackedPath`/`-IncludeUntracked` from `Scope`):
 
 ```powershell
 pwsh -NoProfile -NonInteractive -Command 'Import-Module ./.agents/scripts/SessionChangeInventory.psm1; Get-SessionChangeInventory -RepositoryRoot (Get-Location).Path -Baseline <baseline SHA> -Regions -CoherenceOnly|Select-Object status,coretide,counts,entries,regions|ConvertTo-Json -Depth 5'

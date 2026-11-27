@@ -19,7 +19,12 @@ A worker reads the diff of a changed-file inventory entry under
 `Projects/Coretide/` (origin: `.agents/scripts/Get-SessionChangeInventory.ps1`
 header) with
 `git -C Projects/Coretide diff <coretide.baselineSha> [<coretide.headSha>]`,
-taking both values from the same inventory result.
+taking both values from the same inventory result. A review row's `Head` is the
+snapshot that review reads: pass it as the inventory `-Head`, use it as the
+committed head of every diff, and read file text with `git show <Head>:<path>`
+(a Coretide path at that inventory's `coretide.headSha`); a script that reads
+files from disk reads the working tree, which matches the snapshot while the
+round is open.
 
 ## Task brief
 
@@ -95,16 +100,18 @@ allowlist and cap in
 worker-only references; all other cited files stay section-bounded per
 `AGENTS.md` `## Directives` Bounded reading. Each skill's `## Inputs` owns
 command form and producer (e.g.,
-`.agents/skills/repo-code-review/SKILL.md` `## Inputs`,
 `.agents/skills/adversarial-review/SKILL.md` `## Inputs`).
 
-Use `none` for empty fields; add only skill-required fields. Cite paths; get
-nested `AGENTS.md` chains from
-`.agents/skills/update-claude-docs/scripts/Get-AffectedAgentsDocs.ps1`,
-omitting `Temp/` and reparse points before citing (including hookless Codex
-runs). Never paste root instructions, skill bodies, full Plans, manager
-transcript, unrelated handoffs, or raw XML/logs (for a deleted completed Plan,
-give its approved text or Git-history path).
+Use `none` for empty fields; add only skill-required fields. Cite paths; for a
+plan snapshot or execution card, cite its worktree-relative path plus only
+needed `##` selectors (e.g., `## Execution card` alone), never repeating planned
+mechanism or check/fixture text; keep assigned items (section/label), scope,
+post-plan deltas, and required fields inline. Get `AGENTS.md` chains via
+`.agents/skills/update-claude-docs/scripts/Get-AffectedAgentsDocs.ps1 <path>
+[<path> ...]` (positional paths, per `AGENTS.md` `## Directives` Bundled
+scripts; omit `Temp/` and reparse points, including hookless Codex runs). Never
+paste root docs, skill bodies, full Plans, transcripts, unrelated handoffs, or
+raw XML/logs (deleted Plan: approved text or Git-history path).
 
 Workers verify supplied hints against the tree, stay within ownership, and
 expand only for a concrete dependency, decision, or failure. They never route
@@ -120,8 +127,8 @@ What main does with each field:
 | Field | What main does with it |
 | --- | --- |
 | `Status` | Routes the work: PASS advances; NEEDS_ACTION decides each finding, sending accepted fixes to changed artifacts to `/resolve-findings` and accepted plan findings back into the plan; BLOCKED resolves or asks the user. |
-| `Findings` | Decided one at a time. |
-| `Changed files` | Bounds what is re-reviewed. |
+| `Findings` | Decided one at a time; rejections follow [change-workflow.md `### Delegation roles`](change-workflow.md#delegation-roles). Disputed or unquoted repository source checks go to a `locator` brief per [change-workflow.md `### Resolving Ambiguity`](change-workflow.md#resolving-ambiguity) instead of main reading the cited source, including at an `Evidence` selector. |
+| `Changed files` | Marks a file-changing dispatch, which [change-workflow.md `#### Step 6 — Review and resolve correctness`](change-workflow.md#step-6--review-and-resolve-correctness) routes. |
 | `Decisive checks` | Feed the acceptance table. |
 | `Build required` | Goes to a `builder`. |
 | `Evidence` | Passed on to later workers as path plus selector; main reads it only when a decision needs it or when it must act on moved material, such as dispatching or presenting its rows, and then only at the cited selector, not the file whole. |

@@ -23,7 +23,7 @@ void Camera::Update()
 	mMatModelView = XMMatrixLookAtRH(mVecModelEyePosition, mVecModelCenter, XMVectorSet(up.x, up.y, up.z, 0.0f));
 	mMatModelPerspective = XMMatrixPerspectiveFovRH(XM_PIDIV4, engine::gpSwapchainManager->mfAspectRatio, std::max(0.001f * mfRadius, fDistance - 1.5f * mfRadius), fDistance + 2.0f * mfRadius);
 
-	mVecPosition = XMVectorSetZ(mVecPosition, engine::gpFlightPlanes->Lowest().fHeightMeters);
+	mVecPosition = XMVectorSetZ(mVecPosition, kfBaseHeightMeters);
 	mfCameraFraming = kfCameraFramingDefault;
 	mfShadowTexelFraming = mfCameraFraming;
 	mfLightingTexelFraming = mfCameraFraming;

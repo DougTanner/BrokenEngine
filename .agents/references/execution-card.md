@@ -12,7 +12,8 @@ Execution card:
 ### What does this plan do?
 <2-4 plain sentences>
 ### Why this is good for the codebase
-<2-4 plain sentences: what prompted it, who uses the result, and how>
+<2-4 plain sentences: what prompted it, who uses the result, and how; when a
+later Plan depends on it, that it is a prerequisite for that Plan>
 - Goal: <result>
 - Out of scope: <boundary>
 - Tier trigger: <trigger or none>
@@ -61,6 +62,8 @@ Execution card:
   `Projects/<Project>/Documents/AgentHarness.md` routes, and when none does,
   the check is instead the code reading the Change Workflow Run targeted
   pre-review checks step in `.agents/references/change-workflow.md` prescribes
-  for a path nothing reaches today>
+  for a path nothing reaches today; visual/rendering criteria use
+  `.agents/references/visual-verification.md` without an `/agent-harness`
+  command or pre-edit red harness run>
 - Roles: <required and conditional assignments>
 ```

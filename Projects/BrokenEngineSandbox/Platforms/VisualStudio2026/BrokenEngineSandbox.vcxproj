@@ -135,7 +135,6 @@
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\AreaDamage.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\Collision.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\Alignments.h" />
-    <ClInclude Include="..\..\..\..\Engine\Source\Frame\FlightPlanes.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\FrameBase.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\FrameRegistry.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\CellStaticData.h" />
@@ -254,7 +253,6 @@
     <ClInclude Include="..\..\Source\Frame\Collections\Ships\ShipStatusChanges.h" />
     <ClInclude Include="..\..\Source\Frame\Collections\Ships\ShipTypes.h" />
     <ClInclude Include="..\..\Source\Frame\Collections\Wrecks\Wrecks.h" />
-    <ClInclude Include="..\..\Source\Frame\FlightPlaneTable.h" />
     <ClInclude Include="..\..\Source\Frame\Frame.h" />
     <ClInclude Include="..\..\Source\Frame\FrameInput.h" />
     <ClInclude Include="..\..\Source\Frame\TerrainUtils.h" />
@@ -370,7 +368,6 @@
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\AreaDamage.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\Collision.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\Alignments.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Frame\FlightPlanes.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\FrameBase.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\CellStaticData.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\IslandChainPlacement.cpp" />
@@ -542,13 +539,13 @@
     <ClCompile Include="..\..\..\..\Engine\Source\Agent\Commands\ClientDesyncProbe.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Agent\Commands\DescribeScene.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Network\Client\ClientCrashReport.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Graphics\FlightPlaneProjection.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\UiScreens.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\RenderInterpolation.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Profile\GpuStallTimeline.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Input\Keybinds.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\KeybindsScreen.cpp" />
     <ClCompile Include="..\..\Source\Input\GameKeybinds.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Graphics\BaseHeightProjection.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\AreaLight.frag" />

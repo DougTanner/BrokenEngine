@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v2 {"createdUtc":"2026-11-25T18:56:08.653Z","dependsOn":["Documents/Plans/Engine/FixEngineClientServerAffinityMismatches.md"]} -->
+<!-- broken-engine-plan/v2 {"createdUtc":"2026-11-25T18:56:08.653Z","dependsOn":[]} -->
 # Gate Client-Only Third-Party Headers and Include Paths Out of Server
 
 ## Context

@@ -5,17 +5,15 @@ inputs, modes, and the handoff form live in [`../SKILL.md`](../SKILL.md).
 
 ## Steps
 
-1. Fix mode and components from the brief; on focused re-review, read its
-   files, regions, and `First-round findings`, skipping step 2. Done when scope
-   is settled.
-2. Use the first-round inventory in [`../SKILL.md`](../SKILL.md) `## Inputs`.
+1. Fix mode and components from the brief. Done when scope is settled.
+2. Use the region inventory in [`../SKILL.md`](../SKILL.md) `## Inputs`.
    For bridge input see [`codex-bridge.md`](../../../references/codex-bridge.md)
    step 2. Require `status` `pass` or return `BLOCKED` without rebuilding the
    diff.
 
 3. Read each region's old lines from baseline (`oldPath` on renames) and new
    lines from committed head or worktree; read `Projects/Coretide/` entries
-   using `coretide` from step 2 or `Scope` per
+   using `coretide` from step 2 per
    [`subagent-reporting.md`](../../../references/subagent-reporting.md). Done
    when every region is read.
 4. Review those changed bytes against the rules they touch: a statement that
@@ -52,7 +50,5 @@ inputs, modes, and the handoff form live in [`../SKILL.md`](../SKILL.md).
   unaffected by the combined mode.
 - Edit no tracked file; in combined mode, write only the `Temp/` file
   [`../SKILL.md`](../SKILL.md) `## Handoff` requires. Every problem is a
-  finding for the manager to decide.
-- The Review and resolve correctness step's fix-round rule is unchanged: main
-  decides once, accepted fixes go to a separate `implementer`, and only affected
-  regions are re-reviewed.
+  finding for the manager to decide under
+  [change-workflow.md `#### Step 6 — Review and resolve correctness`](../../../references/change-workflow.md#step-6--review-and-resolve-correctness).

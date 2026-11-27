@@ -51,11 +51,12 @@ void main()
 		return;
 	}
 
-	// Low quality leaves both counts at zero and issues no compute work, so keep the surface flat without reading
-	// stale displacement textures. Otherwise, the active LOD's quad count maps each vertex to its matching texel.
+	// Low quality zeros both visual amplitude scales. Full framing fade, zero slope, or full Nyquist attenuation zeros
+	// the affected band's scale. With both scales zero, the surface stays flat and skips displacement fetches. The
+	// active LOD's quad counts map each vertex to its matching texel.
 	vec3 f3Displacement = vec3(0.0f);
 	vec3 f3WaveNormal = vec3(0.0f, 0.0f, 1.0f);
-	if (mainLayout.iWaterLowCount > 0 || mainLayout.iWaterMediumCount > 0)
+	if (mainLayout.fWaterLowAmplitudeScale > 0.0f || mainLayout.fWaterMediumAmplitudeScale > 0.0f)
 	{
 		ivec2 i2Grid = ivec2(round(f2InTexcoord * vec2(mainLayout.iWaterActiveQuadX, mainLayout.iWaterActiveQuadY)));
 		f3Displacement = texelFetch(displacementTextureSampler, i2Grid, 0).xyz;

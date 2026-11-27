@@ -42,9 +42,11 @@ pwsh -NoProfile -NonInteractive -Command 'Import-Module ./.agents/scripts/Sessio
 
 ## Handoff
 
-Order findings by severity, give each one a stable `GLSL###` ID, and omit empty
-optional extension rows. Correctness, performance, and scope-authorization
-failures all go in the shared `Findings` field.
+Grade each finding by
+[`../../references/subagent-handoff.md`](../../references/subagent-handoff.md)
+`## Severity`, order findings by severity, give each one a stable `GLSL###` ID,
+and omit empty optional extension rows. Correctness, performance, and
+scope-authorization failures all go in the shared `Findings` field.
 
 Return the shared handoff form in
 [`../../references/subagent-handoff.md`](../../references/subagent-handoff.md),
@@ -64,7 +66,7 @@ when absent. A refactor observation row takes the `/repo-code-review`
 Each `Findings` row is one line on this form:
 
 ```text
-GLSL### Critical|Required path:line — claim — evidence and smallest correction
+GLSL### Critical|High|Medium|Low path:line — claim — evidence and smallest correction
 ```
 
 `Changed files` and `Build required` are `none` because this findings-only

@@ -1,7 +1,7 @@
 ---
 name: planner
 description: Preparing changes and producing plans and designs — change preparation, implementation plans, and interface/API design proposals.
-model: fable
+model: opus
 effort: high
 disallowedTools: Agent
 ---

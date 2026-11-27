@@ -8,10 +8,12 @@ obligation; this reference owns dispatch, join, and follow-ups.
 
 ## Dispatch
 
-On Claude and `agy`, main dispatches one fresh `reviewer` subagent for
-`/next-plan-checkpoint-review` with the claimed Plan path or `no claim` as its
-only run-specific input, and that reviewer resolves and measures its own run
-evidence per that package's
+On Claude and `agy`, main dispatches one fresh `reviewer` for
+`/next-plan-checkpoint-review` through the Codex bridge (the Codex-bridge rule
+in [change-workflow.md](../../../references/change-workflow.md)
+`### Delegation roles`) with the run-specific inputs that package's
+[`## Inputs`](../../next-plan-checkpoint-review/SKILL.md#inputs) names. That
+reviewer resolves and measures its own run evidence per that package's
 [`references/worker.md`](../../next-plan-checkpoint-review/references/worker.md).
 A Codex main dispatches nothing.
 

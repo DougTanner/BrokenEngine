@@ -195,6 +195,10 @@ void RenderWaterSection(TweaksScreen& rScreen)
 			rScreen.WrapperSlider("Water Foam Spawn Noise Amount", gWaterFoamSpawnNoiseAmount, iSection);
 			rScreen.WrapperSlider("Water Foam Spawn Noise Tile Size", gWaterFoamSpawnNoiseTileSize, iSection);
 			rScreen.WrapperSlider("Water Foam Spawn Noise Patch Blend", gWaterFoamSpawnNoisePatchBlend, iSection);
+
+			rScreen.WrapperSeparatorText("Camera Fade");
+			rScreen.WrapperSlider("Water Foam Generation Fade Start", gWaterFoamGenerationFadeStart, iSection);
+			rScreen.WrapperSlider("Water Foam Generation Fade End", gWaterFoamGenerationFadeEnd, iSection);
 			ImGui::EndTabItem();
 		}
 		if (rScreen.BeginSubtab("Break Repetition", iSection, 6))

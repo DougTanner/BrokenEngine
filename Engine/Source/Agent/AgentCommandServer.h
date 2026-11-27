@@ -15,7 +15,7 @@ class AudioStreamingHarnessRig;
 // Envelope: request {"id"?, "cmd", "params"?} -> success {"id","ok":true,"result"} / failure {"id","ok":false,"error"}.
 // An unknown top-level request key (anything but id/cmd/params) is rejected before dispatch as a failure envelope,
 // then a present non-object "params" is rejected the same way with "params must be an object".
-class AgentCommandServer
+class AgentCommandServer : public common::Singleton<AgentCommandServer>
 {
 public:
 
@@ -24,9 +24,6 @@ public:
 	// Duplicate listeners can share the port, so the harness must quit and wait for the exact PID before relaunching.
 	explicit AgentCommandServer(int64_t iPort);
 	~AgentCommandServer();
-
-	AgentCommandServer(const AgentCommandServer&) = delete;
-	AgentCommandServer& operator=(const AgentCommandServer&) = delete;
 
 	// Main-thread, once per frame: if a request is pending, execute it (unlocked) and publish the response.
 	void Drain();

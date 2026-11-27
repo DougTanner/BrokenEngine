@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Frame/Collections/Ships/ShipHitboxes.h"
-#include "Frame/FlightPlaneTable.h"
 
 namespace engine
 {
@@ -77,15 +76,14 @@ constexpr int64_t ShipTypeClearanceTier(ShipType eType)
 inline constexpr std::array<engine::NavigationGraphSpec, kiNavigationClearanceTierCount> kNavigationGraphSpecs = []
 {
 	std::array<engine::NavigationGraphSpec, kiNavigationClearanceTierCount> navigationGraphSpecs {};
-	float fHeightMeters = kFlightPlanes.at(0).fHeightMeters;
 	for (int64_t iTier = 0; iTier < kiNavigationClearanceTierCount; ++iTier)
 	{
 		float fTierBlend = static_cast<float>(iTier) / static_cast<float>(kiNavigationClearanceTierCount - 1);
 		navigationGraphSpecs.at(static_cast<size_t>(iTier)) = engine::NavigationGraphSpec
 		{
-			.fThresholdElevation = fHeightMeters - ClearanceTierRadius(iTier) - kfPushMargin,
+			.fThresholdElevation = kfBaseHeightMeters - ClearanceTierRadius(iTier) - kfPushMargin,
 			.fClearanceMeters = NavigationClearanceMeters(iTier),
-			.fDebugDrawZ = fHeightMeters,
+			.fDebugDrawZ = kfBaseHeightMeters,
 			.f4DebugColor = {1.0f - fTierBlend, 1.0f, fTierBlend, 1.0f},
 		};
 	}

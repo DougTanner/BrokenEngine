@@ -32,7 +32,7 @@ layout (location = 3) out vec4 f4OutRedSpread;
 layout (location = 4) out vec4 f4OutGreenSpread;
 layout (location = 5) out vec4 f4OutBlueSpread;
 
-// Unthresholded Reinhard compression preserves hue in each EWNS component. Zero strength leaves RGB unchanged, and zero RGB stays zero.
+// Reinhard compression preserves hue in each EWNS component. Zero strength leaves RGB unchanged, and zero RGB stays zero.
 void CompressHuePreserving(inout vec4 f4Red, inout vec4 f4Green, inout vec4 f4Blue, float fCompress)
 {
 	vec4 f4Avg = max((f4Red + f4Green + f4Blue) * (1.0f / 3.0f), vec4(0.0f));

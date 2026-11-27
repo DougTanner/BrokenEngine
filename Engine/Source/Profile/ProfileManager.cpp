@@ -145,6 +145,7 @@ bool ProfileManager::TickVisibilityCadence()
 	return bReevaluate;
 }
 
+#if defined(BT_CLIENT)
 void ProfileManager::ToggleProfileText()
 {
 	if constexpr (kbProfiling)
@@ -154,14 +155,13 @@ void ProfileManager::ToggleProfileText()
 		// Re-evaluate visibility immediately on the switched-to screen instead of showing stale flags.
 		mLastVisibilityEvaluationTime = {};
 
-#if defined(BT_CLIENT)
 		for (int64_t i = kTextGraphics; i < kTextAreasCount; ++i)
 		{
 			gpImGuiManager->UpdateTextArea(static_cast<TextAreas>(i), "");
 		}
-#endif
 	}
 }
+#endif // BT_CLIENT
 
 void ProfileManager::CpuStart(int64_t iCpuTimer, int64_t iThreads)
 {
@@ -1075,5 +1075,80 @@ ScopedSlowOperation::~ScopedSlowOperation()
 	}
 }
 #endif // BT_CLIENT
+
+// The caller owns the workbuffer frame's Push/Pop.
+void FormatCpuTimersText(common::Workbuffer& rWorkbuffer, bool bReevaluate)
+{
+	// Submit-worker threads write timer fields under mCpuTimerMutex, so formatting takes the same lock. Callers must release the mutex before formatting; SmoothCpuTimers releases it before this call.
+	std::lock_guard lock(gpProfileManager->mCpuTimerMutex);
+
+	int64_t iCpuTimerCount = gpProfileManager->miCpuTimerCount;
+
+	rWorkbuffer.Append("\n\n");
+
+	for (int64_t i = 0; i < iCpuTimerCount; ++i)
+	{
+		CpuTimer& rCpuTimer = gpProfileManager->GetCpuTimer(i);
+
+		std::chrono::microseconds elapsedMicroseconds(rCpuTimer.smoothedMicroseconds.mSmoothedValue);
+		if (bReevaluate)
+		{
+			rCpuTimer.flags.Set(ProfileRowFlags::kVisible, elapsedMicroseconds != std::chrono::microseconds::zero());
+		}
+
+		if (!(rCpuTimer.flags & ProfileRowFlags::kVisible))
+		{
+			continue;
+		}
+
+		rWorkbuffer.Append(gpProfileManager->GetCpuTimerName(i));
+		rWorkbuffer.Append(": ");
+		rWorkbuffer.Append(elapsedMicroseconds.count());
+		rWorkbuffer.Append(" us");
+		if (rCpuTimer.iThreads > 1)
+		{
+			rWorkbuffer.Append(" (");
+			rWorkbuffer.Append(rCpuTimer.iThreads);
+			rWorkbuffer.Append(")");
+		}
+		if (rCpuTimer.smoothedAllocations.mSmoothedValue > 0)
+		{
+			rWorkbuffer.Append(" [");
+			rWorkbuffer.Append(rCpuTimer.smoothedAllocations.mSmoothedValue);
+			rWorkbuffer.Append("]");
+		}
+		rWorkbuffer.Append("\n");
+
+		if (i == kCpuTimerAcquireToGlobal)
+		{
+			rWorkbuffer.Append("\n");
+		}
+	}
+}
+
+// The caller owns the workbuffer frame's Push/Pop.
+void FormatCpuCountersText(common::Workbuffer& rWorkbuffer, bool bReevaluate)
+{
+	int64_t iCpuCounterCount = gpProfileManager->miCpuCounterCount;
+
+	for (int64_t i = 0; i < iCpuCounterCount; ++i)
+	{
+		CpuCounter& rCpuCounter = gpProfileManager->GetCpuCounter(i);
+		if (bReevaluate)
+		{
+			rCpuCounter.flags.Set(ProfileRowFlags::kVisible, rCpuCounter.iCount != 0);
+		}
+
+		if (!(rCpuCounter.flags & ProfileRowFlags::kVisible))
+		{
+			continue;
+		}
+
+		rWorkbuffer.Append(gpProfileManager->GetCpuCounterName(i));
+		rWorkbuffer.Append(": ");
+		rWorkbuffer.Append(rCpuCounter.iCount);
+		rWorkbuffer.Append("\n");
+	}
+}
 
 } // namespace engine

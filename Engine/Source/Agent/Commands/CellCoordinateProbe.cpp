@@ -113,7 +113,7 @@ void CommandCellCoordinateProbe(const nlohmann::json& rParameters, nlohmann::jso
 #if defined(BT_SERVER)
 	if (rParameters.contains("navigation"))
 	{
-		BuildCellNavigationData(staticData.navigationData, staticData.islands);
+		staticData.navigationData = BuildCellNavigationData(staticData.islands);
 		nlohmann::json& rNavigation = rResult["navigation"];
 		rNavigation["graphs"] = nlohmann::json::array();
 		for (int64_t iGraph : graphs)

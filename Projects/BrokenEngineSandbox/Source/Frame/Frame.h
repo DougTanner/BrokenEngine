@@ -12,6 +12,8 @@
 namespace game
 {
 
+inline constexpr float kfBaseHeightMeters = 10.0f;
+
 // Seconds between a cell's random-spawn wave attempts, and between two Fighter launches of one fleet.
 inline constexpr float kfShipSpawnInterval = 0.5f;
 

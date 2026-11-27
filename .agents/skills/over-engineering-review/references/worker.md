@@ -9,19 +9,20 @@ handoffs — is [`../SKILL.md`](../SKILL.md).
 The finder pass runs steps 1-3; the validator pass runs steps 4-8.
 
 1. Fix the scope with the read-only inventory.
-   - Create `Temp/` if absent, in a call of its own, then run
-     `pwsh -NoProfile -File .agents/scripts/Get-SessionChangeInventory.ps1
-     -RepositoryRoot '<absolute repository toplevel>' -Baseline <full
-     40-character SHA> -Regions -OutputPath
+   - Create `Temp/` if absent in its own call, then run
+     `pwsh -NoProfile -NonInteractive -File
+     .agents/scripts/Get-SessionChangeInventory.ps1 -RepositoryRoot '<absolute
+     repository toplevel>' -Baseline <baseline SHA> -Regions -OutputPath
      Temp/over-engineering-review-inventory.json`.
-   - Add the `-IncludeUntracked` switch when the brief supplies untracked
-     paths.
-   - The run prints one summary line naming its status, code, and message.
-     Read the file only after that line; only `status` `pass` is usable.
-   - Keep the `entries` rows whose `class` is `cpp`, and the `regions` rows on
-     those paths.
-   - Done when the kept regions are fixed, or the unusable run is reported as
-     `BLOCKED`.
+   - Add `-IncludeUntracked` for briefed untracked paths, and
+     `-PathPrefix '<comma-separated paths>'` for a `Scope` of
+     `session-changed C++ in <paths>` (its paths).
+   - Read the output only after the script prints its receipt (usability per
+     `../SKILL.md` `## Handoff`).
+   - Keep `cpp` `entries` and their `regions`; refresh the same inventory with
+     any later-discovered affected session-changed path before returning a
+     candidate in it.
+   - Done when the kept regions are fixed, or `BLOCKED` is reported.
 2. Search the kept regions for every class in `### Candidate classes`, reading
    code outside them only to build a proof. Leave out every protected check.
    Done when every kept region has been searched.

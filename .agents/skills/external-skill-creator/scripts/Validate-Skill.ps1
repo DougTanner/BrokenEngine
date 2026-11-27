@@ -662,7 +662,7 @@ $subagentSkillSections = @('Purpose', 'When to use', 'Inputs', 'Handoff', 'Refer
 $subagentWorkerSections = @('Steps', 'Rules')
 $mainSessionSkillSections = $skeletonSectionOrder
 $handoffStatusWords = @('PASS', 'NEEDS_ACTION', 'BLOCKED')
-$handoffSeverityWords = @('Critical', 'Required', 'Recommended')
+$handoffSeverityWords = @('Critical', 'High', 'Medium', 'Low')
 
 function Split-VocabularyTokens
 {

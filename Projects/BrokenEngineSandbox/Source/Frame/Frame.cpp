@@ -30,13 +30,18 @@ static void AdmitMirrorFleetUuids(const FramePostRender& rPostRender)
 
 // Omnis and Battleships stay at their controller's effective flight height; Fighters may rise above it over terrain.
 // Every ship moves horizontally; height changes step position directly, never through velocity.
-static void ValidateShipHeights(const Frame& rFrame)
+static void ValidateShipKinematics(const Frame& rFrame)
 {
 	ForEachShipType(rFrame, [](ShipType eType, const auto& rShipInterpolate, const auto& rShipPostRender)
 	{
 		for (int64_t i = 0; i < rShipInterpolate.iCount; ++i)
 		{
-			float fHeight = XMVectorGetZ(rShipInterpolate.pVecPositions[i]);
+			XMVECTOR vecPosition = rShipInterpolate.pVecPositions[i];
+			if (!std::isfinite(XMVectorGetX(vecPosition)) || !std::isfinite(XMVectorGetY(vecPosition)))
+			{
+				throw std::ios_base::failure("Frame ship position");
+			}
+			float fHeight = XMVectorGetZ(vecPosition);
 			float fEffectiveHeight = EffectiveShipFlightHeight(eType, rShipPostRender.pController[i]);
 			if (eType == ShipType::kFighter)
 			{
@@ -49,7 +54,12 @@ static void ValidateShipHeights(const Frame& rFrame)
 			{
 				throw std::ios_base::failure("Frame ship height");
 			}
-			if (XMVectorGetZ(rShipPostRender.pVecVelocities[i]) != 0.0f)
+			XMVECTOR vecVelocity = rShipPostRender.pVecVelocities[i];
+			if (!std::isfinite(XMVectorGetX(vecVelocity)) || !std::isfinite(XMVectorGetY(vecVelocity)))
+			{
+				throw std::ios_base::failure("Frame ship velocity");
+			}
+			if (XMVectorGetZ(vecVelocity) != 0.0f)
 			{
 				throw std::ios_base::failure("Frame ship vertical velocity");
 			}
@@ -299,7 +309,7 @@ static void SpawnRandomShipWave(Frame& __restrict rFrame, const engine::CellStat
 
 	// Every id the cell minted earlier is lower, so a row at or above this one was placed by this wave.
 	int64_t iWaveFirstUuid = CounterUuid(rFrame.postRender, rFrame.postRender.uiNextUuid);
-	float fWaveHeight = engine::gpFlightPlanes->Lowest().fHeightMeters;
+	float fWaveHeight = kfBaseHeightMeters;
 	float fWaveRadius = kShipHitboxTypes[std::to_underlying(eWaveType)].fGameplayRadius;
 	float fTerrainClearance = fWaveRadius * 2.0f;
 	float fChevronStagger = fWaveRadius * 2.0f;
@@ -828,7 +838,7 @@ std::istream& operator>>(std::istream& rStream, Frame& rCurrent)
 
 	engine::ValidateBaseCollectionPairs(loadedFrame.interpolate, loadedFrame.postRender);
 	engine::ValidateCollectionPairs(GameInterpolateCollections(loadedFrame.interpolate), GamePostRenderCollections(loadedFrame.postRender));
-	ValidateShipHeights(loadedFrame);
+	ValidateShipKinematics(loadedFrame);
 	ValidatePusherOwners(loadedFrame);
 	ValidateFlyingMissiles(loadedFrame);
 	ValidateNoTransferRows(loadedFrame);

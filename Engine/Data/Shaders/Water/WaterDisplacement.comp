@@ -77,7 +77,9 @@ void main()
 	float fD = 0.0f;
 	float fG = 0.0f;
 	float fE = 0.0f;
-	// Un-faded horizontal compression accumulators so retained foam keeps generating after visual waves fade with zoom.
+	// Foam compression uses CPU-precomputed steepness * wavenumber * raw amplitude from pf4*WavesOne.w;
+	// PopulateWaterFoam applies the independent camera-height fade to the emission rate WaterFoam.comp reads.
+	bool bComputeFoam = globalLayout.iWaterFoamEnabled != 0 && globalLayout.fWaterFoamEmissionRate > 0.0f;
 	float fFoamA = 0.0f;
 	float fFoamB = 0.0f;
 	float fFoamD = 0.0f;
@@ -92,35 +94,54 @@ void main()
 		float fBandD = 0.0f;
 		float fBandG = 0.0f;
 		float fBandE = 0.0f;
+		float fBandFoamA = 0.0f;
+		float fBandFoamB = 0.0f;
+		float fBandFoamD = 0.0f;
 		for (int i = 0; i < mainLayout.iWaterLowCount; ++i)
 		{
 			float fOmega = mainLayout.pf4LowWavesTwo[i].x;
 			float fAmplitude = mainLayout.pf4LowWavesTwo[i].y;
-			vec2 f2Direction = mainLayout.pf4LowWavesOne[i].xy;
+			bool bVisualWave = fLowAmplitudeScale > 0.0f && fAmplitude > 0.0f;
+			if (!bComputeFoam && !bVisualWave)
+			{
+				continue;
+			}
+
+			vec4 f4WaveOne = mainLayout.pf4LowWavesOne[i];
+			vec2 f2Direction = f4WaveOne.xy;
 
 			float fReducedPhiTime = mainLayout.pf4LowWavesTwo[i].w;
 			float fRadians = dot(f2Direction, f2LocalPosition) * fOmega + fReducedPhiTime;
 			float fSin = sin(fRadians);
-			float fCos = cos(fRadians);
 
-			float fWA = fOmega * fAmplitude;
-			float fQWASin = fLowSteepness * fWA * fSin;
-
-			fBandA += fQWASin * f2Direction.x * f2Direction.x;
-			fBandB += fQWASin * f2Direction.x * f2Direction.y;
-			fBandD += fQWASin * f2Direction.y * f2Direction.y;
-
-			if (fLowAmplitudeScale > 0.0f)
+			if (bComputeFoam)
 			{
+				float fFoamQWASin = f4WaveOne.w * fSin;
+				fBandFoamA += fFoamQWASin * f2Direction.x * f2Direction.x;
+				fBandFoamB += fFoamQWASin * f2Direction.x * f2Direction.y;
+				fBandFoamD += fFoamQWASin * f2Direction.y * f2Direction.y;
+			}
+
+			if (bVisualWave)
+			{
+				float fCos = cos(fRadians);
+				float fWA = fOmega * fAmplitude;
+				float fQWASin = fLowSteepness * fWA * fSin;
 				float fWACos = fWA * fCos;
 				f3BandDisplacement += vec3(fLowSteepness * fAmplitude * f2Direction * fCos, fAmplitude * fSin);
+				fBandA += fQWASin * f2Direction.x * f2Direction.x;
+				fBandB += fQWASin * f2Direction.x * f2Direction.y;
+				fBandD += fQWASin * f2Direction.y * f2Direction.y;
 				fBandG += fWACos * f2Direction.x;
 				fBandE += fWACos * f2Direction.y;
 			}
 		}
-		fFoamA += fLowWeight * fBandA;
-		fFoamB += fLowWeight * fBandB;
-		fFoamD += fLowWeight * fBandD;
+		if (bComputeFoam)
+		{
+			fFoamA += fLowWeight * fBandFoamA;
+			fFoamB += fLowWeight * fBandFoamB;
+			fFoamD += fLowWeight * fBandFoamD;
+		}
 		if (fLowAmplitudeScale > 0.0f)
 		{
 			float fLowVisualWeight = fLowWeight * fLowAmplitudeScale;
@@ -143,35 +164,54 @@ void main()
 		float fBandD = 0.0f;
 		float fBandG = 0.0f;
 		float fBandE = 0.0f;
+		float fBandFoamA = 0.0f;
+		float fBandFoamB = 0.0f;
+		float fBandFoamD = 0.0f;
 		for (int i = 0; i < mainLayout.iWaterMediumCount; ++i)
 		{
 			float fOmega = mainLayout.pf4MediumWavesTwo[i].x;
 			float fAmplitude = mainLayout.pf4MediumWavesTwo[i].y;
-			vec2 f2Direction = mainLayout.pf4MediumWavesOne[i].xy;
+			bool bVisualWave = fMediumAmplitudeScale > 0.0f && fAmplitude > 0.0f;
+			if (!bComputeFoam && !bVisualWave)
+			{
+				continue;
+			}
+
+			vec4 f4WaveOne = mainLayout.pf4MediumWavesOne[i];
+			vec2 f2Direction = f4WaveOne.xy;
 
 			float fReducedPhiTime = mainLayout.pf4MediumWavesTwo[i].w;
 			float fRadians = dot(f2Direction, f2LocalPosition) * fOmega + fReducedPhiTime;
 			float fSin = sin(fRadians);
-			float fCos = cos(fRadians);
 
-			float fWA = fOmega * fAmplitude;
-			float fQWASin = fMediumSteepness * fWA * fSin;
-
-			fBandA += fQWASin * f2Direction.x * f2Direction.x;
-			fBandB += fQWASin * f2Direction.x * f2Direction.y;
-			fBandD += fQWASin * f2Direction.y * f2Direction.y;
-
-			if (fMediumAmplitudeScale > 0.0f)
+			if (bComputeFoam)
 			{
+				float fFoamQWASin = f4WaveOne.w * fSin;
+				fBandFoamA += fFoamQWASin * f2Direction.x * f2Direction.x;
+				fBandFoamB += fFoamQWASin * f2Direction.x * f2Direction.y;
+				fBandFoamD += fFoamQWASin * f2Direction.y * f2Direction.y;
+			}
+
+			if (bVisualWave)
+			{
+				float fCos = cos(fRadians);
+				float fWA = fOmega * fAmplitude;
+				float fQWASin = fMediumSteepness * fWA * fSin;
 				float fWACos = fWA * fCos;
 				f3BandDisplacement += vec3(fMediumSteepness * fAmplitude * f2Direction * fCos, fAmplitude * fSin);
+				fBandA += fQWASin * f2Direction.x * f2Direction.x;
+				fBandB += fQWASin * f2Direction.x * f2Direction.y;
+				fBandD += fQWASin * f2Direction.y * f2Direction.y;
 				fBandG += fWACos * f2Direction.x;
 				fBandE += fWACos * f2Direction.y;
 			}
 		}
-		fFoamA += fMediumWeight * fBandA;
-		fFoamB += fMediumWeight * fBandB;
-		fFoamD += fMediumWeight * fBandD;
+		if (bComputeFoam)
+		{
+			fFoamA += fMediumWeight * fBandFoamA;
+			fFoamB += fMediumWeight * fBandFoamB;
+			fFoamD += fMediumWeight * fBandFoamD;
+		}
 		if (fMediumAmplitudeScale > 0.0f)
 		{
 			float fMediumVisualWeight = fMediumWeight * fMediumAmplitudeScale;

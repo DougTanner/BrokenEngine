@@ -99,13 +99,15 @@ adding the fields below; the other entries are its own commands. For the engine
   apart from a ship's `pGlobalIds` and `pClientGuids` under the
   [shared ship read admission](../../Source/Frame/Collections/Ships/AGENTS.md#ship-invariants):
   a value that duplicates another frame's or ship's identity gives odd behavior
-  but no assert. Positions are also unchecked, apart from a ship's height under
-  that admission, and a flying (neither falling nor dying) missile's height and
-  velocity z, which the save reader requires to be finite and 0 respectively.
-  Positions must stay inside the cell: an out-of-cell omni position transfers to
-  one edge neighbour, so a position more than one neighbour step out asserts in
-  the source cell's `FramePostRenderBase::PrepareTransferRequest` before any
-  transfer ([Frame invariants](../../../../Engine/Source/Frame/AGENTS.md)). A
+  but no assert. `edit_frame` parses each supplied X/Y/Z component as a finite
+  `float`. The save reader checks a ship's position and velocity under that
+  admission and requires a flying (neither falling nor dying) missile's height
+  and velocity z to be finite and 0 respectively; other positions and
+  velocities are unchecked by the save reader. Positions must stay inside the
+  cell: an out-of-cell omni position transfers to one edge neighbour, so a
+  position more than one neighbour step out asserts in the source cell's
+  `FramePostRenderBase::PrepareTransferRequest` before any transfer
+  ([Frame invariants](../../../../Engine/Source/Frame/AGENTS.md)). A
   `pLifecycleFlags` write that sets `LifecycleFlags::kTransfer` (1) is refused
   on every row by the save reader (below), because the Destroy phase removes
   every such row before a tick ends.
@@ -226,8 +228,8 @@ adding the fields below; the other entries are its own commands. For the engine
   integer in `[0,255]`; `float` a finite number; `std::chrono::duration<float>`
   a finite number of seconds; `engine::GridCoord` a `[q,r]` grid coordinate;
   `XMVECTOR` an `[x,y]` pair of finite numbers in the cell's local frame, a
-  position being meters from the cell's center: `vecPosition` takes z at the
-  lowest flight plane and w 1, and every other vector z 0 and w 0;
+  position being meters from the cell's center: `vecPosition` takes z at
+  `kfBaseHeightMeters` and w 1, and every other vector z 0 and w 0;
   `engine::AlignmentIdentifier` `"fleet"` or `"random"`,
   the game's two alignments; a ship's `eController` `"Fleet"` or
   `"RandomSpawn"`; an `eType` `"Fighter"`, `"Omni"`, or `"Battleship"`; a
@@ -256,7 +258,7 @@ adding the fields below; the other entries are its own commands. For the engine
   `vecStoredDirection` to `[1,0]`; `alignment` to `"fleet"`; a ship's
   `fleetWantedCoordinate` to `coord`; and the `UpdateFleet`
   `uiPendingFleetWantedCoordinateTicks` to 32 (`engine::kiTickRate`). A missile
-  returns to plane 0 from any launch height. Ship spawn height follows
+  returns to the base height from any launch height. Ship spawn height follows
   [shared ship policy](../../Source/Frame/Collections/Ships/AGENTS.md#ship-invariants).
   A spawn gets no arrival values: `transferLockTimer` and `arrivalGracePeriod`
   stay 0 unless the entry sets them. `bTransfer` defaults to false, so the

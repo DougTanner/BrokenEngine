@@ -13,12 +13,10 @@ heading turn in `ShipBehaviours` follows the
 
 ## Ship Invariants
 
-- Ships have no ship-to-ship collision or ram damage. Pushers provide horizontal
-  separation within their 3D range between ships sharing an occupied
-  flight-plane layer, including an X position correction for near-coincident XY;
-  blaster collision and missile explosion damage still apply. The
-  [engine pusher contract](../../../../../../Engine/Source/Frame/Collections/Pushers/AGENTS.md#unique-aspects)
-  owns the layer, distance, correction, and shared-snapshot rules.
+- Ships have no ship-to-ship collision or ram damage; blaster collision and
+  missile explosion damage still apply. Pushers provide separation under the
+  [engine pusher contract](../../../../../../Engine/Source/Frame/Collections/Pushers/AGENTS.md#unique-aspects),
+  which owns the distance, correction, and shared-snapshot rules.
 - Apply the pusher's X correction once to the current stored Interpolate
   position after terrain resolution, preserving Y/Z/W and target orders, then
   enforce the live terrain-rise rule below. For ships without that rule, tiny
@@ -54,9 +52,9 @@ heading turn in `ShipBehaviours` follows the
 - Shared startup caches each controller model's minimum origin height from its
   aligned upright geometry, keeping the hull at least 1 meter above water. A
   ship's effective flight height (`EffectiveShipFlightHeight`) is the maximum
-  of that minimum and the lowest flight-plane height; bank and pitch do not
-  affect it. Genuine spawns apply this height once before initializing owned
-  objects; transfers preserve their carried position.
+  of that minimum and `kfBaseHeightMeters`; bank and pitch do not affect it.
+  Genuine spawns apply this height once before initializing owned objects;
+  transfers preserve their carried position.
 - A row's CRC'd `ShipController` selects its script branch and its model.
   Fleet-controlled rows are the owned entities (`Frame::OwnedEntityCount`) and
   run the fleet navigation below, except a fleet Fighter in its flagship's cell
@@ -95,8 +93,9 @@ heading turn in `ShipBehaviours` follows the
   nonzero `pClientGuids` or `pGlobalIds` on a row that is not
   `ShipController::kFleet`, and an AI direction that fails
   `IsShipHeadingValid`; Interpolate `PostRead` rejects a heading that fails
-  `IsShipHeadingValid`. On build-local `Frame` reads (`ValidateShipHeights`,
-  `Frame.cpp`), Omni and Battleship heights must equal their controller's
+  `IsShipHeadingValid`. On build-local `Frame` reads (`ValidateShipKinematics`,
+  `Frame.cpp`), every ship row's horizontal position and velocity must be
+  finite, Omni and Battleship heights must equal their controller's
   `EffectiveShipFlightHeight`, Fighter heights must be finite and at or above
   it (allowing terrain-raised Fighters), and every ship row's velocity Z must
   be zero.
@@ -170,7 +169,7 @@ heading turn in `ShipBehaviours` follows the
   for every shooter (`kiFiringClearanceTier`), so it blocks slightly early near
   terrain. An Omni faces only an enemy in line of sight, its bolt flies flat
   along its hull, and a missile aims along the horizontal offset to its target
-  and flies on the lowest flight plane (`../Missiles/AGENTS.md`).
+  (flight behavior: [Missiles Invariants](../Missiles/AGENTS.md#invariants)).
 - Every Fighter, Omni, and random-spawn Battleship keeps one attack target, the
   enemy row in the previous frame whose registry id its `pRegistryTargets`
   stores, chosen by `FindAttackTarget` (`ShipQueries.h`) or, for a

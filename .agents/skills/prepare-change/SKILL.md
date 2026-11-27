@@ -76,13 +76,32 @@ fields in every mode:
 ```text
 Classification: Tier 1 | Tier 2 | Tier 3 — trigger, with repository-path:line evidence
 Candidate zero: <`Mechanism` through `Pays off when` rows per `.agents/skills/plan-alternatives/SKILL.md` `## Handoff`; `Mechanism` obeys the `/plan-alternatives` brief exclusions in `.agents/references/change-workflow.md` `#### Step 2 — Prepare and explore alternatives` and names neither the plan file nor its `Temp/` snapshot; `none` when no plan was prepared>
+Pre-edit checks: <id-or-position> — <executor> — <build and Local form, or none> — <step-3 | defer-step-4 (<reason>)> [— changed] | none
+Harness checks: no | yes — <required /compile targets, configurations, and game project when relevant>
+Approval summary: <two single-line rows (`What does this plan do: <text>` and `Why this is good for the codebase: <text>`), never `unchanged`; `none` when no plan was prepared>
 ```
+
+`Pre-edit checks` lists each active-stage `before the first edit` check in card
+`Acceptance checks` (excluding checks deferred to later stages, keeping
+`defer-step-4` rows; criterion ID or 1-based card-order position, omitting plan
+path and card heading), or `none`. On a card update after Step 3 pre-edit
+dispatch (write-in, grill round, or approval update — never a Step 2 redraft),
+append `— changed` to any row added, replaced, reordered (including shifted
+positions), or whose steps, expected observation, or `Local` form changed. If
+those rows would overflow `subagent-handoff.md`'s cap, move only them to
+`## Pre-edit checks` under `Evidence` (never pointing main to
+`## Execution card`). `Harness checks` is `yes` with the `/compile` targets,
+configurations, and game project needed by the card's active-stage
+[/agent-harness](../agent-harness/SKILL.md) checks (`## Inputs`) when card
+`Roles` names `runner` and at least one such check remains, else `no`.
+`Approval summary`'s two rows carry the current card's
+`### What does this plan do?` and `### Why this is good for the codebase` text.
 
 ### Ordinary preparation (omitted `mode:`)
 
 ```text
 Prepared plan: <worktree-readable path with verbatim `## In scope` and `## Out of scope`; `none` when no plan was prepared>
-Execution card: <card heading in the prepared plan per `/plan-audit` `## Inputs`; `none` when no plan was prepared>
+Execution card: <`<prepared plan path> ## Execution card` (always head the card `## Execution card`); `none` when no plan was prepared>
 Unresolved decisions: <one row each, decision and options for main, or none>
 ```
 
@@ -130,9 +149,9 @@ next, citing no card and returning no extension field above (overriding them).
 
 ### Execution card
 
-In `mode: claimed-plan`, cite the card
-([`execution-card.md`](../../references/execution-card.md) `## Template`) under
-`Evidence`, never inline; main presents its first two sections per
+In `mode: claimed-plan`, keep the card
+([`execution-card.md`](../../references/execution-card.md) `## Template`) in the
+snapshot cited under `Evidence`, never inline; approval follows
 [`### Implementation approval`](../next-plan/SKILL.md#implementation-approval).
 
 ## References

@@ -1,5 +1,7 @@
 #pragma once
 
+#if defined(BT_CLIENT)
+
 namespace engine
 {
 
@@ -42,7 +44,6 @@ struct RawInput
 	XMFLOAT2 f2DirectionalPad {};
 };
 
-#if defined(BT_CLIENT)
 class RawInputManager : public common::Singleton<RawInputManager>
 {
 public:
@@ -77,6 +78,7 @@ private:
 };
 
 inline RawInputManager* gpRawInputManager = nullptr;
-#endif // BT_CLIENT
 
 } // namespace engine
+
+#endif // BT_CLIENT

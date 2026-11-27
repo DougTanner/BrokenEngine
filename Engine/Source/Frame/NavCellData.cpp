@@ -278,83 +278,75 @@ static void BuildCellVisibilityGraph(NavData& rNavigationData)
 	}
 }
 
-static void BuildPlaneNavigationData(NavData& rNavigationData, const std::vector<IslandPlacement>& rPlacements, int64_t iGraph)
+std::vector<NavData> BuildCellNavigationData(const std::vector<IslandPlacement>& rPlacements)
 {
-	std::chrono::steady_clock::time_point startTimePoint = std::chrono::steady_clock::now();
-
-	rNavigationData.vertices.clear();
-	rNavigationData.polygonOffsets.clear();
-	rNavigationData.visibilityEdgeA.clear();
-	rNavigationData.visibilityEdgeB.clear();
-
-	// Walk per-cell placements; each placement's template contour (UV-space) is rotated and offset by the
-	// placement's cell-local center, so the whole graph lands in centered cell-local meters and no grid
-	// coordinate enters it. Topology offsets are rebased per island.
-	for (const IslandPlacement& rPlacement : rPlacements)
+	std::vector<NavData> navigationData(static_cast<size_t>(gpIslandTerrain->miNavigationGraphCount));
+	for (const auto& [i, rGraphNavigationData] : std::views::enumerate(navigationData))
 	{
-		const IslandTemplate& rTemplate = gpIslandTerrain->mIslands.at(rPlacement.islandCrc);
-		const NavContour& rContour = rTemplate.navContours.at(iGraph);
-		int64_t iVertexCount = std::ssize(rContour.vertices);
-		if (iVertexCount == 0)
+		std::chrono::steady_clock::time_point startTimePoint = std::chrono::steady_clock::now();
+
+		// Walk per-cell placements; each placement's template contour (UV-space) is rotated and offset by the
+		// placement's cell-local center, so the whole graph lands in centered cell-local meters and no grid
+		// coordinate enters it. Topology offsets are rebased per island.
+		for (const IslandPlacement& rPlacement : rPlacements)
 		{
-			continue;
+			const IslandTemplate& rTemplate = gpIslandTerrain->mIslands.at(rPlacement.islandCrc);
+			const NavContour& rContour = rTemplate.navContours.at(i);
+			int64_t iVertexCount = std::ssize(rContour.vertices);
+			if (iVertexCount == 0)
+			{
+				continue;
+			}
+
+			int64_t iVertexBase = std::ssize(rGraphNavigationData.vertices);
+
+			common::SinCos rotation = common::DeterministicSinCos(rPlacement.fRotation);
+			float fCosine = rotation.fCos;
+			float fSine = rotation.fSin;
+			float fFootprintX = rTemplate.fQuadFootprintX;
+			float fFootprintY = rTemplate.fQuadFootprintY;
+
+			// Before rotation, +U maps to +X and +V maps to -Y.
+			for (const XMFLOAT2& rVertex : rContour.vertices)
+			{
+				float fU = rVertex.x;
+				float fV = rVertex.y;
+
+				float fLocalX = (fU - 0.5f) * fFootprintX;
+				float fLocalY = (0.5f - fV) * fFootprintY;
+
+				float fRotatedX = fLocalX * fCosine - fLocalY * fSine;
+				float fRotatedY = fLocalX * fSine + fLocalY * fCosine;
+
+				rGraphNavigationData.vertices.push_back({rPlacement.f2WorldPosition.x + fRotatedX, rPlacement.f2WorldPosition.y + fRotatedY});
+			}
+
+			for (int64_t iOffset : rContour.polygonOffsets)
+			{
+				rGraphNavigationData.polygonOffsets.push_back(static_cast<int32_t>(iVertexBase + iOffset));
+			}
 		}
 
-		int64_t iVertexBase = std::ssize(rNavigationData.vertices);
+		DebugCheckCrossingEdges(rGraphNavigationData);
 
-		common::SinCos rotation = common::DeterministicSinCos(rPlacement.fRotation);
-		float fCosine = rotation.fCos;
-		float fSine = rotation.fSin;
-		float fFootprintX = rTemplate.fQuadFootprintX;
-		float fFootprintY = rTemplate.fQuadFootprintY;
+		// Acceleration first: the visibility pass queries SegmentBlockedByObstacle, which reads the
+		// f2GridMinimum/f2GridMaximum and edge CSR built here. Its edges then need a second adjacency build — only
+		// BuildNavigationAdjacency, not another full BuildNavigationAcceleration, because it rewrites adjacencyOffsets and every
+		// adjacencyNeighbors slot outright.
+		BuildNavigationAcceleration(rGraphNavigationData);
 
-		// Local axes: +U = +world.x, +V = -world.y (V is world-Y inverted).
-		for (const XMFLOAT2& rVertex : rContour.vertices)
+		// Empty cells must retain the cleared derived state produced by BuildNavigationAcceleration,
+		// matching ReadNavigationData on the client.
+		if (!rGraphNavigationData.vertices.empty())
 		{
-			float fU = rVertex.x;
-			float fV = rVertex.y;
-
-			float fLocalX = (fU - 0.5f) * fFootprintX;
-			float fLocalY = (0.5f - fV) * fFootprintY;
-
-			float fRotatedX = fLocalX * fCosine - fLocalY * fSine;
-			float fRotatedY = fLocalX * fSine + fLocalY * fCosine;
-
-			rNavigationData.vertices.push_back({rPlacement.f2WorldPosition.x + fRotatedX, rPlacement.f2WorldPosition.y + fRotatedY});
+			BuildCellVisibilityGraph(rGraphNavigationData);
+			BuildNavigationAdjacency(rGraphNavigationData);
 		}
 
-		for (int64_t iOffset : rContour.polygonOffsets)
-		{
-			rNavigationData.polygonOffsets.push_back(static_cast<int32_t>(iVertexBase + iOffset));
-		}
+		LOG(kNavData, kInfo, "BuildCellNavigationData: graph={} placements={} vertices={} polygons={} visEdges={} elapsedUs={}", i, std::ssize(rPlacements), std::ssize(rGraphNavigationData.vertices), std::ssize(rGraphNavigationData.polygonOffsets), std::ssize(rGraphNavigationData.visibilityEdgeA), std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - startTimePoint).count());
 	}
 
-	DebugCheckCrossingEdges(rNavigationData);
-
-	// Acceleration first: the visibility pass queries SegmentBlockedByObstacle, which reads the
-	// f2GridMinimum/f2GridMaximum and edge CSR built here. Its edges then need a second adjacency build — only
-	// BuildNavigationAdjacency, not another full BuildNavigationAcceleration, because it rewrites adjacencyOffsets and every
-	// adjacencyNeighbors slot outright.
-	BuildNavigationAcceleration(rNavigationData);
-
-	// Empty cells must retain the cleared derived state produced by BuildNavigationAcceleration,
-	// matching ReadNavigationData on the client.
-	if (!rNavigationData.vertices.empty())
-	{
-		BuildCellVisibilityGraph(rNavigationData);
-		BuildNavigationAdjacency(rNavigationData);
-	}
-
-	LOG(kNavData, kInfo, "BuildPlaneNavigationData: graph={} placements={} vertices={} polygons={} visEdges={} elapsedUs={}", iGraph, std::ssize(rPlacements), std::ssize(rNavigationData.vertices), std::ssize(rNavigationData.polygonOffsets), std::ssize(rNavigationData.visibilityEdgeA), std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - startTimePoint).count());
-}
-
-void BuildCellNavigationData(std::vector<NavData>& rNavigationData, const std::vector<IslandPlacement>& rPlacements)
-{
-	rNavigationData.resize(static_cast<size_t>(gpIslandTerrain->miNavigationGraphCount));
-	for (const auto& [i, rGraphNavigationData] : std::views::enumerate(rNavigationData))
-	{
-		BuildPlaneNavigationData(rGraphNavigationData, rPlacements, i);
-	}
+	return navigationData;
 }
 
 #endif // BT_SERVER

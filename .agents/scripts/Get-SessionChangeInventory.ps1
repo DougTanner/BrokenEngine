@@ -1,15 +1,18 @@
 # Deterministic session change inventory CLI wrapper over SessionChangeInventory.psm1:
 # one read-only answer to "what changed between the session baseline and the head side, and
-# what artifact type is each change". The CLI requires one of -OutputPath <path>, -EmitTargets,
-# or -EmitManifest (omitting all three or combining -OutputPath with -EmitTargets or
-# -EmitManifest exits 2 with empty stdout and one stderr line). -OutputPath writes the full
-# untruncated v2 inventory JSON (with exact truncation.outputBytes) to that file and emits one
-# summary line naming its status, code, and message on stdout; the script writes no other file
-# and no repository metadata (GIT_OPTIONAL_LOCKS=0 keeps Git from refreshing the index).
+# what artifact type is each change". The CLI requires either -OutputPath <path> or
+# -EmitManifest (omitting both or combining them exits 2 with empty stdout and one stderr
+# line). -OutputPath writes the full untruncated v2 inventory JSON (with exact
+# truncation.outputBytes) to that file and emits one summary line naming its status, code,
+# and message on stdout; the script writes no other file and no repository metadata
+# (GIT_OPTIONAL_LOCKS=0 keeps Git from refreshing the index).
 # In-process callers import .agents/scripts/SessionChangeInventory.psm1 and call
 # Get-SessionChangeInventory directly with zero disk writes. A session Coretide clone at
 # Projects/Coretide is inventoried by the same pipeline in that repository, from the merge base
-# of its HEAD and upstream, and its rows are merged under that prefix.
+# of its HEAD and upstream, and its rows are merged under that prefix; a -Head whose message
+# carries a Coretide-Snapshot line (a review-round snapshot) sets the Coretide head to that commit
+# instead of the clone's HEAD, and coretide.headSha reports it; its Coretide-Baseline line
+# replaces that merge base.
 [CmdletBinding()]
 param(
 	[Parameter(Mandatory)][string] $RepositoryRoot,
@@ -19,7 +22,6 @@ param(
 	[string[]] $PathPrefix,
 	[switch] $Regions,
 	[switch] $Landing,
-	[switch] $EmitTargets,
 	[switch] $EmitManifest,
 	[string] $OutputPath,
 	[string] $SavePlanPaths
@@ -79,12 +81,12 @@ function Get-CliExitCode([string] $Status) {
 
 try {
 	$hasOutputPath = -not [string]::IsNullOrWhiteSpace($OutputPath)
-	if ($hasOutputPath -and ($EmitTargets -or $EmitManifest)) {
-		Write-InventoryStream $true "blocked inventory.mode-conflict The -OutputPath result file is exclusive with -EmitTargets and -EmitManifest.`n"
+	if ($hasOutputPath -and $EmitManifest) {
+		Write-InventoryStream $true "blocked inventory.mode-conflict The -OutputPath result file is exclusive with -EmitManifest.`n"
 		exit 2
 	}
-	if (-not $hasOutputPath -and -not $EmitTargets -and -not $EmitManifest) {
-		Write-InventoryStream $true "blocked inventory.output-required Supply -OutputPath <path>, -EmitTargets, or -EmitManifest; for in-process callers, import .agents/scripts/SessionChangeInventory.psm1.`n"
+	if (-not $hasOutputPath -and -not $EmitManifest) {
+		Write-InventoryStream $true "blocked inventory.output-required Supply -OutputPath <path> or -EmitManifest; for in-process callers, import .agents/scripts/SessionChangeInventory.psm1.`n"
 		exit 2
 	}
 
@@ -98,12 +100,11 @@ try {
 	if ($IncludeUntracked) { $invokeParams.IncludeUntracked = $true }
 	if ($Regions) { $invokeParams.Regions = $true }
 	if ($Landing) { $invokeParams.Landing = $true }
-	if ($EmitTargets) { $invokeParams.EmitTargets = $true }
 	if ($EmitManifest) { $invokeParams.EmitManifest = $true }
 	if ($PSBoundParameters.ContainsKey('SavePlanPaths')) { $invokeParams.SavePlanPaths = $SavePlanPaths }
 
 	$envelope = $null
-	if ($EmitTargets -or $EmitManifest) { $invokeParams.Envelope = [ref] $envelope }
+	if ($EmitManifest) { $invokeParams.Envelope = [ref] $envelope }
 
 	$doc = Get-SessionChangeInventory @invokeParams
 
@@ -118,25 +119,6 @@ try {
 				exit 2
 			}
 			Write-InventoryBytes $false $bytes
-			exit 0
-		}
-		Write-InventoryStream $true (($doc | ConvertTo-Json -Depth 32 -Compress) + "`n")
-		exit (Get-CliExitCode $doc.status)
-	}
-
-	if ($EmitTargets) {
-		# The targets consumer reads raw stdout: a non-pass run leaves stdout empty and reports
-		# the structured outcome on stderr, and a pass writes the targets bytes and adds a
-		# one-line status receipt on stderr, since a redirected stdout leaves none visible.
-		if ($doc.schemaVersion -ceq 'broken-engine-code-quality-targets/v1') {
-			$bytes = $script:Utf8.GetBytes(($doc | ConvertTo-Json -Depth 32 -Compress) + "`n")
-			if ($bytes.Length -gt $script:MaximumOutputBytes) {
-				$blocked = Set-CliEnvelopeOutcome $envelope 'blocked' 'inventory.manifest-cap-exceeded' "The targets are $($bytes.Length) bytes, above the stdout budget of $($script:MaximumOutputBytes)."
-				Write-InventoryStream $true (($blocked | ConvertTo-Json -Depth 32 -Compress) + "`n")
-				exit 2
-			}
-			Write-InventoryBytes $false $bytes
-			Write-InventoryStream $true "pass ok Emitted $($doc.paths.Count) target path(s).`n"
 			exit 0
 		}
 		Write-InventoryStream $true (($doc | ConvertTo-Json -Depth 32 -Compress) + "`n")

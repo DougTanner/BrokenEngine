@@ -19,9 +19,6 @@
     <Filter Include="Engine\File">
       <UniqueIdentifier>{3fe45fda-e682-4800-9af3-387e4a8937cc}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Engine\Input">
-      <UniqueIdentifier>{9ffa8684-d430-4657-a59d-7e9ca35258fb}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Engine\Network">
       <UniqueIdentifier>{d3e4f5a6-b7c8-9012-def0-345678901bcd}</UniqueIdentifier>
     </Filter>
@@ -321,9 +318,6 @@
     <ClInclude Include="..\..\..\..\Common\StackWalker.h">
       <Filter>Common</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Source\Frame\FlightPlaneTable.h">
-      <Filter>Game\Frame</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Source\Frame\Frame.h">
       <Filter>Game\Frame</Filter>
     </ClInclude>
@@ -368,9 +362,6 @@
     </ClInclude>
     <ClInclude Include="..\..\Source\Frame\Collections\Ships\ShipTypes.h">
       <Filter>Game\Frame\Collections\Ships</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Engine\Source\Input\RawInputManager.h">
-      <Filter>Engine\Input</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Common\Log\LogDifference.h">
       <Filter>Common\Log</Filter>
@@ -528,9 +519,6 @@
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\Alignments.h">
       <Filter>Engine\Frame</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Engine\Source\Frame\FlightPlanes.h">
-      <Filter>Engine\Frame</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\..\Common\ErrorUtils.h">
       <Filter>Common</Filter>
     </ClInclude>
@@ -646,9 +634,6 @@
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Main.cpp">
       <Filter>Engine</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Profile\ProfileScreens.cpp">
-      <Filter>Engine\Profile</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Common\ErrorUtils.cpp">
       <Filter>Common</Filter>
@@ -850,9 +835,6 @@
       <Filter>Engine\Ui</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\Alignments.cpp">
-      <Filter>Engine\Frame</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Frame\FlightPlanes.cpp">
       <Filter>Engine\Frame</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Server\ServerMonitorHost.cpp">

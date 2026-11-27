@@ -141,7 +141,7 @@ struct GlobalLayout
 	float fLightingDepositCompress INIT;
 	// Uchimura tone curve inputs (LightCombine.comp / DebugTexture.frag). fCombineLinearStart and fCombineBlackTightness
 	// resolve CPU-side from normalized wrapper fractions, fCombineLinearLength folds into fCombineShoulderInputStart and
-	// fCombineShoulderOutputStart, and fCombineShoulderExponentCoefficient is -a / (P - S1) (P - S1 >= 0.004f by wrapper bounds).
+	// fCombineShoulderOutputStart, and fCombineShoulderExponentCoefficient is -a / (P - S1) (the gCombineLinearStart wrapper bounds in LightingWrappersBase.h own P - S1's minimum).
 	float fCombineMaxBrightness INIT;
 	float fCombineContrast INIT;
 	float fCombineLinearStart INIT;

@@ -1,11 +1,16 @@
-# Comment-block scanner for /comment-review: it lists every run of consecutive `//` lines in the C++ and
-# shader files a caller names, with the regex kinds each run hits, so a review never has to hand-hunt
-# comment blocks. The scan reports candidates only — it never decides whether a block is a finding, never
-# edits a file, and writes nothing to disk, so it is safe under a read-only sandbox. Stdout carries only
-# the result document.
-[CmdletBinding()]
+# Comment-block scanner for /comment-review: it lists every run of consecutive `//` lines in surviving
+# session-changed C++/shader files (Session mode, with per-block `overlapsRegion`) or in the files and
+# directories a caller names (WholeFile mode, `-Path`), with the regex kinds each run hits, so a review
+# never has to hand-hunt comment blocks. The scan reports candidates only — it never decides whether a
+# block is a finding, never edits a file, and writes nothing to disk, so it is safe under a read-only
+# sandbox. Stdout carries only the result document.
+[CmdletBinding(DefaultParameterSetName = 'Session')]
 param(
-	[Parameter(Mandatory)][string[]] $Path
+	[Parameter(Mandatory, ParameterSetName = 'Session')][string] $RepositoryRoot,
+	[Parameter(Mandatory, ParameterSetName = 'Session')][string] $Baseline,
+	[Parameter(ParameterSetName = 'Session')][switch] $IncludeUntracked,
+	[Parameter(ParameterSetName = 'Session')][string[]] $PathPrefix,
+	[Parameter(Mandatory, ParameterSetName = 'WholeFile')][string[]] $Path
 )
 
 $ErrorActionPreference = 'Stop'
@@ -35,10 +40,13 @@ $script:KindPatterns = @(
 	@{ Kind = 'speculative'; Pattern = '\b(would need|if .* ever|future|hypothetical|TODO)\b' }
 	@{ Kind = 'navigation'; Pattern = 'AGENTS\.md' }
 )
+$script:InventoryModule = Join-Path $PSScriptRoot '..\..\..\scripts\SessionChangeInventory.psm1'
+$script:SessionClasses = @('cpp', 'dual-language-header', 'glsl')
+$script:PathComparer = if ($IsWindows) { [StringComparer]::OrdinalIgnoreCase } else { [StringComparer]::Ordinal }
 $script:Utf8 = [Text.UTF8Encoding]::new($false)
 
 $result = [ordered]@{
-	schemaVersion = 'broken-engine-comment-blocks/v2'
+	schemaVersion = 'broken-engine-comment-blocks/v3'
 	status = 'error'
 	code = 'internal.error'
 	message = 'Comment block scan did not run.'
@@ -64,25 +72,71 @@ function Get-RelativePath([string] $FullPath, [string] $Base) {
 }
 
 function Get-ScannedFile([string[]] $Targets, [string] $Base) {
-	$files = [Collections.Generic.List[string]]::new()
+	$files = [Collections.Generic.List[object]]::new()
+	$seen = [Collections.Generic.HashSet[string]]::new($script:PathComparer)
 	foreach ($target in $Targets) {
 		$full = [IO.Path]::GetFullPath($target, $Base)
 		if (Test-Path -LiteralPath $full -PathType Container) {
 			foreach ($item in (Get-ChildItem -LiteralPath $full -File -Recurse)) {
-				if ($script:ScannedExtensions -contains $item.Extension.ToLowerInvariant()) { $files.Add($item.FullName) }
+				if ($script:ScannedExtensions -contains $item.Extension.ToLowerInvariant()) {
+					$canonical = [IO.Path]::GetFullPath($item.FullName)
+					if ($seen.Add($canonical)) {
+						$files.Add([pscustomobject] @{ FullPath = $canonical; RelativePath = (Get-RelativePath $canonical $Base) })
+					}
+				}
 			}
 			continue
 		}
 		if (-not (Test-Path -LiteralPath $full -PathType Leaf)) {
 			Complete-CommentBlocks 2 'blocked' 'comments.path-invalid' "-Path must name an existing file or directory: '$target'."
 		}
-		if ($script:ScannedExtensions -contains ([IO.Path]::GetExtension($full)).ToLowerInvariant()) { $files.Add($full) }
+		if ($script:ScannedExtensions -contains ([IO.Path]::GetExtension($full)).ToLowerInvariant()) {
+			if ($seen.Add($full)) {
+				$files.Add([pscustomobject] @{ FullPath = $full; RelativePath = (Get-RelativePath $full $Base) })
+			}
+		}
 	}
-	# The comma keeps a one-file result a list instead of unrolling it to a bare string.
+	# The comma keeps a one-file result a list instead of unrolling it to a single file record.
 	return , $files
 }
 
-function Get-CommentBlock([string] $FullPath, [string] $Relative) {
+function Get-SessionFile([object] $Inventory, [string] $RepoRoot) {
+	$files = [Collections.Generic.List[object]]::new()
+	$seen = [Collections.Generic.HashSet[string]]::new($script:PathComparer)
+	foreach ($entry in $Inventory.entries) {
+		if ($entry.status -ceq 'D') { continue }
+		if ($script:SessionClasses -cnotcontains $entry.class) { continue }
+		$full = [IO.Path]::GetFullPath(($entry.path -replace '/', [IO.Path]::DirectorySeparatorChar), $RepoRoot)
+		if (-not $seen.Add($full)) { continue }
+		if (-not (Test-Path -LiteralPath $full -PathType Leaf)) {
+			Complete-CommentBlocks 2 'blocked' 'comments.path-invalid' "Session file does not exist on disk: '$($entry.path)'."
+		}
+		$files.Add([pscustomobject] @{ FullPath = $full; RelativePath = $entry.path })
+	}
+	return , $files
+}
+
+function Get-RegionIndex([object] $Inventory) {
+	$byPath = [Collections.Generic.Dictionary[string, Collections.Generic.List[object]]]::new([StringComparer]::Ordinal)
+	foreach ($region in $Inventory.regions) {
+		if ($null -eq $region.startLine -or $null -eq $region.endLine) { continue }
+		if (-not $byPath.ContainsKey($region.path)) {
+			$byPath[$region.path] = [Collections.Generic.List[object]]::new()
+		}
+		$byPath[$region.path].Add($region)
+	}
+	return , $byPath
+}
+
+function Test-BlockOverlapsRegion([int] $StartLine, [int] $EndLine, [Collections.Generic.List[object]] $Regions) {
+	if ($null -eq $Regions) { return $false }
+	foreach ($region in $Regions) {
+		if ($StartLine -le [int] $region.endLine -and [int] $region.startLine -le $EndLine) { return $true }
+	}
+	return $false
+}
+
+function Get-CommentBlock([string] $FullPath, [string] $Relative, [Collections.Generic.List[object]] $Regions = $null) {
 	$blocks = [Collections.Generic.List[object]]::new()
 	$lines = @([IO.File]::ReadAllText($FullPath, $script:Utf8) -split "`r`n|`n|`r")
 	$start = 0
@@ -107,14 +161,16 @@ function Get-CommentBlock([string] $FullPath, [string] $Relative) {
 			continue
 		}
 		if ($start -eq 0) { continue }
+		$end = $number - 1
 		# Every block is emitted: the length threshold belongs to references/comment-classes.md, not here.
 		$blocks.Add([ordered]@{
 			path = $Relative
 			startLine = $start
-			endLine = $number - 1
+			endLine = $end
 			charCount = $charCount
 			kinds = [string[]] $kinds.ToArray()
 			firstLine = $first
+			overlapsRegion = Test-BlockOverlapsRegion $start $end $Regions
 		})
 		$start = 0
 	}
@@ -122,11 +178,34 @@ function Get-CommentBlock([string] $FullPath, [string] $Relative) {
 }
 
 try {
-	$base = (Get-Location).ProviderPath
-	$scanned = Get-ScannedFile $Path $base
+	$regionsByPath = $null
+	if ($PSCmdlet.ParameterSetName -ceq 'WholeFile') {
+		$base = (Get-Location).ProviderPath
+		$scanned = Get-ScannedFile $Path $base
+	}
+	else {
+		try {
+			Import-Module $script:InventoryModule -Force
+		}
+		catch {
+			Complete-CommentBlocks 2 'blocked' 'comments.inventory-unavailable' $_.Exception.Message
+		}
+		$inventoryParams = @{ RepositoryRoot = $RepositoryRoot; Baseline = $Baseline; Regions = $true }
+		if ($IncludeUntracked) { $inventoryParams.IncludeUntracked = $true }
+		if ($PathPrefix) { $inventoryParams.PathPrefix = $PathPrefix }
+		$inventory = Get-SessionChangeInventory @inventoryParams
+		if ($inventory.status -cne 'pass') {
+			Complete-CommentBlocks 2 'blocked' 'comments.inventory-unavailable' $inventory.message
+		}
+		$repoRoot = [IO.Path]::GetFullPath($RepositoryRoot)
+		$scanned = Get-SessionFile $inventory $repoRoot
+		$regionsByPath = Get-RegionIndex $inventory
+	}
+
 	$found = [Collections.Generic.List[object]]::new()
 	foreach ($file in $scanned) {
-		foreach ($block in (Get-CommentBlock $file (Get-RelativePath $file $base))) { $found.Add($block) }
+		$fileRegions = if ($null -ne $regionsByPath -and $regionsByPath.ContainsKey($file.RelativePath)) { $regionsByPath[$file.RelativePath] } else { $null }
+		foreach ($block in (Get-CommentBlock $file.FullPath $file.RelativePath $fileRegions)) { $found.Add($block) }
 	}
 
 	# Counts always describe the complete scan, never the truncated emission.

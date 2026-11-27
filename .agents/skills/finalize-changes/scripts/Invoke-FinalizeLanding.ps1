@@ -23,6 +23,8 @@ param(
 	# lease instead of minting one; omitted, a matching retained landing claim may be adopted.
 	[string] $OwnerToken,
 	[switch] $ReleasePlanClaim,
+	# The brief's Save-plan paths, comma-separated: a /save-plan landing of exactly those new files owes no review round.
+	[string] $SavePlanPaths,
 	# Total seconds this landing may spend waiting out foreign primary index.lock contention.
 	[ValidateRange(1, 3600)][int] $IndexLockWaitSeconds = 500
 )
@@ -42,8 +44,14 @@ if (-not (Test-Path -LiteralPath $exclusionModule)) {
 }
 Import-Module $exclusionModule -Force
 
+$inventoryModule = Join-Path $PSScriptRoot '..\..\..\scripts\SessionChangeInventory.psm1'
+if (-not (Test-Path -LiteralPath $inventoryModule)) {
+	$inventoryModule = Join-Path $PSScriptRoot '..\..\..\..\.agents\scripts\SessionChangeInventory.psm1'
+}
+Import-Module $inventoryModule -Force
+
 $result = [ordered]@{
-	schemaVersion = 'broken-engine-finalize-landing/v6'
+	schemaVersion = 'broken-engine-finalize-landing/v7'
 	status = 'error'
 	code = 'internal.error'
 	message = 'Landing transaction did not complete.'
@@ -154,7 +162,7 @@ function New-LandingProjection {
 	} 'Invoke-FinalizeLanding'
 	$residuals = New-LandingCollection @($result.residuals) { param($residual); $text = Get-BoundedLandingText ([string]$residual) 512; [ordered]@{ message = $text.Text; messageLength = $text.Length; messageTruncated = $text.Truncated } } 'Invoke-FinalizeLanding'
 	return [ordered]@{
-		schemaVersion = 'broken-engine-finalize-landing/v6'; status = $result.status; code = $code.Text; message = $message.Text; messageLength = $message.Length; messageTruncated = $message.Truncated
+		schemaVersion = 'broken-engine-finalize-landing/v7'; status = $result.status; code = $code.Text; message = $message.Text; messageLength = $message.Length; messageTruncated = $message.Truncated
 		primaryAdvanced = [bool]$result.primaryAdvanced; candidate = [ordered]@{ commit = Get-LandingGitObjectId $result.candidate.commit; tree = Get-LandingGitObjectId $result.candidate.tree; treeVerified = [bool]$result.candidate.treeVerified }
 		landed = [ordered]@{ commit = $(if ($result.status -ceq 'landed') { Get-LandingGitObjectId $result.landed.commit } else { $null }); tree = $(if ($result.status -ceq 'landed') { Get-LandingGitObjectId $result.landed.tree } else { $null }); rebaseAttempts = [int]$result.landed.rebaseAttempts }
 		approvedSource = [ordered]@{ commit = Get-LandingGitObjectId $result.approvedSource.commit; tree = Get-LandingGitObjectId $result.approvedSource.tree; parent = Get-LandingGitObjectId $result.approvedSource.parent; patch = $result.approvedSource.patch; metadata = $result.approvedSource.metadata }
@@ -377,7 +385,7 @@ function Assert-NoHistorySourceChanges([string] $Base, [string] $Tip) {
 	foreach ($line in @($guard -split "`n" | Where-Object { $_ })) {
 		$path = $line.Substring($line.IndexOf("`t") + 1)
 		if ($path -cin @('.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl', '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.svg', '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistoryOverlay.svg')) {
-			Throw-Landing 2 'history.source-changed' 'The approved source patch changes a reserved history output path.'
+			Throw-Landing 2 'history.source-changed' 'The approved source patch changes a reserved history output path.' 'recovery'
 		}
 	}
 	return $guard
@@ -700,11 +708,24 @@ function Find-LandedCommit([string] $PrimaryHead) {
 	return $recoveryMatches[0]
 }
 
+# Refuses, before any primary change, the commit this attempt advances when the session's review rounds do not
+# cover it (Test-ReviewRoundCoverage); a refused rebased commit first puts the branch back on the confirmed one.
+function Assert-LandingReviewRoundCoverage {
+	$coverage = Test-ReviewRoundCoverage -RepositoryRoot $script:CurrentIdentity.Worktree -EngineBase $script:LandingPrimaryTip -EngineCandidate $script:LandingCommit -SavePlanPaths $SavePlanPaths
+	if ($null -eq $coverage) { return }
+	if ($script:LandingCommit -cne $ApprovedSessionCommit) {
+		$restore = Restore-FinalizeBranch $script:CurrentIdentity.Worktree $CurrentBranch $ApprovedSessionCommit
+		if (-not $restore.Restored) { Throw-LandingRestorationUnproven "$($coverage.Message) $($restore.Message)" }
+	}
+	Throw-Landing 2 $coverage.Code $coverage.Message $(if ($coverage.Code.StartsWith('inventory.review-round-')) { 'recovery' } else { 'terminal' })
+}
+
 # Returns $false when primary moved under the held lease, either before the attempt or between the
 # checks and the compare-and-swap.
 function Invoke-LandingAdvanceAttempt {
 	if ((Invoke-FinalizeGit $script:PrimaryIdentity.Worktree @('rev-parse', "refs/heads/$PrimaryBranch")).Trim() -cne $script:LandingPrimaryTip) { return $false }
 	Assert-PrimaryAdvanceState
+	Assert-LandingReviewRoundCoverage
 	Refresh-LandingOwner
 	return (Advance-PrimaryExactCandidate)
 }
@@ -921,7 +942,7 @@ try {
 				Throw-LandingRestorationUnproven $rebase.Message
 			}
 			if ($rebase.Code -cne 'ok') {
-				Throw-Landing 2 $rebase.Code $rebase.Message
+				Throw-Landing 2 $rebase.Code $rebase.Message $(if ($rebase.Code -cin @('rebase.conflicted', 'rebase.patch-not-identical')) { 'recovery' } else { 'terminal' })
 			}
 			$script:LandingPrimaryTip = $newPrimaryTip
 			$script:LandingCommit = $rebase.Commit

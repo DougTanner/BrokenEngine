@@ -605,7 +605,7 @@ void RenderFrameGlobal(int64_t iCommandBuffer, std::chrono::duration<float> curr
 	float fSmokeCurlTimeOffsetScale = gSmokeCurlSpeed.mfCurrent * kfSmokeCurlTimeScale;
 	rGlobalLayout.f2SmokeCurlTimeOffset.x = fSmokeSwirlTimeOffsetX * fSmokeCurlTimeOffsetScale;
 	rGlobalLayout.f2SmokeCurlTimeOffset.y = fSmokeSwirlTimeOffsetY * fSmokeCurlTimeOffsetScale;
-	float fBaseHeight = gpFlightPlanes->Lowest().fHeightMeters;
+	float fBaseHeight = game::kfBaseHeightMeters;
 	rGlobalLayout.fBaseHeight = fBaseHeight;
 	rGlobalLayout.fBaseHeightInverse = 1.0f / std::max(fBaseHeight, 0.001f);
 	rGlobalLayout.fAspectRatioInverse = 1.0f / gpSwapchainManager->mfAspectRatio;

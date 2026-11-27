@@ -117,7 +117,6 @@
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\AreaDamage.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\Collision.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\Alignments.h" />
-    <ClInclude Include="..\..\..\..\Engine\Source\Frame\FlightPlanes.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\FrameBase.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\FrameRegistry.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\CellStaticData.h" />
@@ -163,7 +162,6 @@
     <ClInclude Include="..\..\..\..\Engine\Source\Network\Server\ServerBufferedFrames.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Server\ServerMonitorHost.h" />
     <ClInclude Include="..\..\Source\Profile\ProfileRows.h" />
-    <ClInclude Include="..\..\..\..\Engine\Source\Input\RawInputManager.h" />
     <ClInclude Include="..\..\Source\Frame\Collections\Blasters\Blasters.h" />
     <ClInclude Include="..\..\Source\Frame\Collections\Missiles\Missiles.h" />
     <ClInclude Include="..\..\Source\Frame\Collections\Fighters\Fighters.h" />
@@ -175,7 +173,6 @@
     <ClInclude Include="..\..\Source\Frame\Collections\Ships\ShipQueries.h" />
     <ClInclude Include="..\..\Source\Frame\Collections\Ships\ShipStatusChanges.h" />
     <ClInclude Include="..\..\Source\Frame\Collections\Ships\ShipTypes.h" />
-    <ClInclude Include="..\..\Source\Frame\FlightPlaneTable.h" />
     <ClInclude Include="..\..\Source\Frame\Frame.h" />
     <ClInclude Include="..\..\Source\Frame\FrameInput.h" />
     <ClInclude Include="..\..\Source\Frame\TerrainUtils.h" />
@@ -242,7 +239,6 @@
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\AreaDamage.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\Collision.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\Alignments.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Frame\FlightPlanes.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\FrameBase.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\CellStaticData.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\IslandChainPlacement.cpp" />
@@ -288,7 +284,6 @@
     <ClCompile Include="..\..\..\..\Engine\Source\Network\Server\ServerSessionBase.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Network\Server\ServerBufferedFrames.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Server\ServerMonitorHost.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Profile\ProfileScreens.cpp" />
     <ClCompile Include="..\..\Source\Frame\Collections\Blasters\Blasters.cpp" />
     <ClCompile Include="..\..\Source\Frame\Collections\Blasters\BlastersUpdate.cpp" />
     <ClCompile Include="..\..\Source\Frame\Collections\Missiles\Missiles.cpp" />

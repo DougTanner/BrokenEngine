@@ -6,12 +6,14 @@ these classes enforce; they add no rule it does not state.
 
 | class | rule 64 clause it enforces | what the class adds | severity |
 |---|---|---|---|
-| boilerplate | never restates the signature or a house pattern in template fields, never uses banner separators, never merely explains a language feature or house pattern the declaration already shows | "Uses X to …" counts as a template field | Required |
-| history | never describes the previous implementation, the change that produced the code, or a comparison against replaced code | trigger words: "now", "no longer", "previously", "instead of" | Required |
-| speculative | never describes a hypothetical or future code path, and never argues that the code is correct | a rebuttal of a review is such an argument | Required |
-| navigation | never carries an `AGENTS.md` navigation pointer as its content | — | Required |
-| false | every statement is true of the code as it now stands, including any code elsewhere the comment names | — | Required |
-| dense | says it in the fewest sentences that carry it | a block over 800 characters of comment text, or a fact the block or its function already states elsewhere | Recommended |
+| boilerplate | never restates the signature or a house pattern in template fields, never uses banner separators, never merely explains a language feature or house pattern the declaration already shows | "Uses X to …" counts as a template field | Medium |
+| history | never describes the previous implementation, the change that produced the code, or a comparison against replaced code | trigger words: "now", "no longer", "previously", "instead of" | Medium |
+| speculative | never describes a hypothetical or future code path, and never argues that the code is correct | a rebuttal of a review is such an argument | Medium |
+| navigation | never carries an `AGENTS.md` navigation pointer as its content | — | Medium |
+| false | every statement is true of the code as it now stands, including any code elsewhere the comment names | — | Medium |
+| term | its concept-naming clause | a name no identifier or repository document uses, such as a plan's or a review's own wording | Medium |
+| copied | its value-owner and derived-bound clauses | a number equal to a named constant's value | Medium |
+| dense | says it in the fewest sentences that carry it | a block over 800 characters of comment text, or a fact the block or its function already states elsewhere | Low |
 
 ## Examples
 
@@ -35,6 +37,12 @@ these classes enforce; they add no rule it does not state.
   When the claim is about runtime correctness, the replacement slot is
   `route: /repo-code-review`, because either the comment or the code is wrong
   and only that review decides which.
+- term — `// Refresh the glow pass.`, where "glow pass" is a plan's wording
+  that no identifier or repository document uses for that pass; the
+  replacement uses the code's own name for it.
+- copied — `// Rejects files older than kiVersion = 1.` copies the constant's
+  value, which goes stale when the constant changes; the replacement names
+  `kiVersion` alone.
 - dense — a nine-line block spelling out a thread-safety precondition one
   sentence carries: the constraint is real, so it is shortened, never deleted.
 

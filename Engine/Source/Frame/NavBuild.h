@@ -59,7 +59,7 @@ struct NavData
 
 #if defined(BT_SERVER)
 void BuildNavContour(NavContour& rContour, std::span<const float> heightmapData, int64_t iHeightmapWidth, int64_t iHeightmapHeight, float fWorldThreshold, float fClearanceMeters, float fFootprintXMeters, float fFootprintYMeters);
-void BuildCellNavigationData(std::vector<NavData>& rNavigationData, const std::vector<IslandPlacement>& rPlacements); // one NavData per baked graph
+[[nodiscard]] std::vector<NavData> BuildCellNavigationData(const std::vector<IslandPlacement>& rPlacements); // one NavData per baked graph
 #endif // BT_SERVER
 
 // Client and server must derive identical acceleration structures from identical serialized input.

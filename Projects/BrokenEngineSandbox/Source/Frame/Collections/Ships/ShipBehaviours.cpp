@@ -2,7 +2,6 @@
 
 #include "Frame/Collections/Pushers/Pushers.h"
 #include "Frame/CellStaticData.h"
-#include "Frame/FlightPlanes.h"
 #include "Frame/IslandTerrain.h"
 #include "Frame/NavQuery.h"
 #if defined(BT_CLIENT)
@@ -35,7 +34,7 @@ constexpr float kfTerrainBounceVelocity = 4.0f;
 
 float EffectiveShipFlightHeight(ShipType eType, ShipController eController)
 {
-	return std::max(engine::gpFlightPlanes->Lowest().fHeightMeters, gShipHitboxShapes[std::to_underlying(eType)][std::to_underlying(eController)].fMinimumOriginZ);
+	return std::max(kfBaseHeightMeters, gShipHitboxShapes[std::to_underlying(eType)][std::to_underlying(eController)].fMinimumOriginZ);
 }
 
 const engine::NavData& NavigationTierData(const engine::CellStaticData& rStaticData, int64_t iClearanceTier)
@@ -60,7 +59,7 @@ float StepHeightTowards(float fHeight, float fTargetHeight, float fStep)
 
 XMVECTOR XM_CALLCONV RaiseAboveTerrain(const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition)
 {
-	float fMinimumHeight = engine::gpIslandTerrain->MakeCellElevationSampler(rStaticData).Sample(vecPosition) + engine::gpFlightPlanes->Lowest().fHeightMeters;
+	float fMinimumHeight = engine::gpIslandTerrain->MakeCellElevationSampler(rStaticData).Sample(vecPosition) + kfBaseHeightMeters;
 	if (XMVectorGetZ(vecPosition) >= fMinimumHeight)
 	{
 		return vecPosition;
@@ -249,12 +248,11 @@ XMVECTOR XM_CALLCONV ComputeReturnDestination(const engine::CellStaticData& rSta
 		return vecNearestEnemy;
 	}
 
-	float fBaseHeight = engine::gpFlightPlanes->Lowest().fHeightMeters;
-	XMVECTOR vecIslandCenter = XMVectorSet(centredIslands[0].f2WorldPosition.x, centredIslands[0].f2WorldPosition.y, fBaseHeight, 1.0f);
+	XMVECTOR vecIslandCenter = XMVectorSet(centredIslands[0].f2WorldPosition.x, centredIslands[0].f2WorldPosition.y, kfBaseHeightMeters, 1.0f);
 	float fNearestDistanceSquared = std::numeric_limits<float>::max();
 	for (const engine::IslandPlacement& rPlacement : centredIslands)
 	{
-		XMVECTOR vecCandidate = XMVectorSet(rPlacement.f2WorldPosition.x, rPlacement.f2WorldPosition.y, fBaseHeight, 1.0f);
+		XMVECTOR vecCandidate = XMVectorSet(rPlacement.f2WorldPosition.x, rPlacement.f2WorldPosition.y, kfBaseHeightMeters, 1.0f);
 		float fDistanceSquared = XMVectorGetX(XMVector3LengthSq(XMVectorSubtract(vecCandidate, vecPosition)));
 		if (fDistanceSquared < fNearestDistanceSquared)
 		{

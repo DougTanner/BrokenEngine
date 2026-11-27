@@ -33,16 +33,16 @@ may feed simulation state.
   respective attachments by load op on each world frame with `gLightingEnabled`
   on (including frames that skip a lighting refresh), so no clear pass is
   recorded.
-- World lighting has one layer at the base flight plane height, keeping its
-  combine outputs, history, area latch, and reset flag; one
-  deposit-to-history-copy chain refreshes it on scheduled or forced frames
-  (`gbLightingRefreshFrame`, `Render.h`). A refresh advances its areas and
-  publishes full-texture work; a skipped enabled frame keeps its held areas and
-  publishes zero work (load clears above still run). Published UVs stay finite
-  across reset-pending and disabled frames (`PopulateLightingParameters` in
-  `LightingUniforms.cpp` owns snapped-area fallback and pending-reset handling).
-  Lighting (`../../../Data/Shaders/Lighting/AGENTS.md` `## Pipeline Contracts`)
-  owns the reset and history-copy sequence.
+- World lighting has one layer at the base height, keeping its combine outputs,
+  history, area latch, and reset flag; one deposit-to-history-copy chain
+  refreshes it on scheduled or forced frames (`gbLightingRefreshFrame`,
+  `Render.h`). A refresh advances its areas and publishes full-texture work; a
+  skipped enabled frame keeps its held areas and publishes zero work (load
+  clears above still run). Published UVs stay finite across reset-pending and
+  disabled frames (`PopulateLightingParameters` in `LightingUniforms.cpp` owns
+  snapped-area fallback and pending-reset handling). Lighting
+  (`../../../Data/Shaders/Lighting/AGENTS.md` `## Pipeline Contracts`) owns the
+  reset and history-copy sequence.
 - The terrain shadow elevation, source, blur, temporal, and history-copy chain
   shares one update interval, using the same current/previous area latch as
   lighting (`TemporalAreaLatch`, `Render.h`). A refresh runs on the cadence, on
@@ -141,14 +141,18 @@ may feed simulation state.
   skips CPU history and foam UV preparation; reactivation resets history with
   zero delta instead of advancing across the disabled interval. The Tweaks foam
   checkbox controls presentation only, so retained coverage continues updating
-  while that checkbox hides it. Active foam delta uses `steady_clock` between
-  published updates, including render gaps, and is zero while gameplay is
-  paused, as wind's is, so foam reset or newly exposed while paused stays
-  empty until the resume; simulation time detects rewinds only. First use,
-  recreation, and rewind reset history;
-  ordinary zoom and LOD changes reproject it. Spawn tuning affects new emission
-  without resetting retained coverage. Threshold resolution preserves a positive
-  J range.
+  while that checkbox hides it. `PopulateWaterFoam` (`WaterUniforms.cpp`) owns
+  foam footprint sizing and snapping (`## Area Roles`). Active foam delta uses
+  `steady_clock` between published updates, including render gaps; it is zero on
+  the reset publication (writing empty coverage before subsequent advancing
+  updates accumulate) and, as with wind, while gameplay is paused (keeping reset
+  history and texels without valid reprojected history empty until resume). First
+  use, recreation,
+  explicit reset (`gbWaterFoamReset`), and simulation-time rewinds more than
+  `kWaterFoamRewindThreshold` below the highest elapsed time observed since the
+  last reset clear history; ordinary zoom and LOD changes reproject it. Spawn
+  tuning affects new emission without resetting retained coverage. Threshold
+  resolution preserves a positive J range.
 - Each frame that publishes also copies the values
   `PresentationContinuitySnapshot` (`Render.h`) lists into the
   `gPresentationContinuity` snapshot, which only the agent probe reads
@@ -173,10 +177,13 @@ may feed simulation state.
 
 ## Area Roles
 
-The visible area anchors water and geometry coverage. Shadow uses a
-sunward-expanded, texel-snapped footprint; lighting uses the light-deposit grid
-shared by spread, combine, and temporal passes. Grid snapping and camera-height
-policy belong to Graphics.
+The visible area anchors water and geometry coverage; water foam uses its own
+fixed-margin, world-texel-snapped footprint enclosing the visible area, sized in
+hysteretic power-of-two framing buckets that preserve foam texel spacing within
+a bucket and return to the finest eligible bucket at minimum camera framing.
+Shadow uses a sunward-expanded, texel-snapped footprint; lighting uses the
+light-deposit grid shared by spread, combine, and temporal passes. Grid snapping
+and camera-height policy belong to Graphics.
 
 ## See Also
 

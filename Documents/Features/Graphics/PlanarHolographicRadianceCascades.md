@@ -43,16 +43,16 @@ picked up.
 One client-only developer tunable `gLightingTransport` (`Lighting Transport`:
 Baseline default, HRC, Reference) in the lighting Tweaks; changing it recreates
 the lighting textures, pipelines and command buffers. World lighting now runs
-single-layer planar transport at the base flight plane height (`fBaseHeight`).
-Baseline records exactly today's chain. In HRC and Reference the Main recording
-omits the spread passes and, inside the existing `kGpuTimerLightingSpread`
-bracket on a lighting refresh, prepares a transport medium from the existing
-deposit targets and the elevation texture, runs HRC (or the reference
-ray-march), and writes RGB-separated EWNS fluence into the pass-0 spread-only
-targets (`mpSpreadOnlyTextures[0][0..2]`). LightCombine reads them with a
-published pass count of 1 and total scale of 1, so combine, temporal, history,
-area latch, border sampling and every receiver shader are unchanged and all
-three modes reach the screen through identical code.
+single-layer planar transport at the base height (`fBaseHeight`). Baseline
+records exactly today's chain. In HRC and Reference the Main recording omits
+the spread passes and, inside the existing `kGpuTimerLightingSpread` bracket on
+a lighting refresh, prepares a transport medium from the existing deposit
+targets and the elevation texture, runs HRC (or the reference ray-march), and
+writes RGB-separated EWNS fluence into the pass-0 spread-only targets
+(`mpSpreadOnlyTextures[0][0..2]`). LightCombine reads them with a published
+pass count of 1 and total scale of 1, so combine, temporal, history, area
+latch, border sampling and every receiver shader are unchanged and all three
+modes reach the screen through identical code.
 
 ## Design
 
@@ -223,11 +223,11 @@ What the code allows:
   that; per-source height would need one transport per height band, which is
   the excluded vertical/extra-layer transport.
 - Hulls do carry vertical bounds (`ModelOutline::fMinimumZ`/`fMaximumZ`,
-  `Common/DataFile.h:388-389`), and the base flight-plane height is a
-  GlobalLayout field (`fBaseHeight`, `ShaderGlobalLayout.h`). Point and area
-  deposits project onto `fBaseHeight`, or onto terrain where terrain elevation
-  is higher (`ProjectToBaseHeight`, `FlightPlaneProjection.cpp`), while hex
-  shields project directly to `fBaseHeight` (`HexShield.vert`).
+  `Common/DataFile.h:388-389`), and the base height is a GlobalLayout field
+  (`fBaseHeight`, `ShaderGlobalLayout.h`). Point and area deposits project onto
+  `fBaseHeight`, or onto terrain where terrain elevation is higher
+  (`ProjectToBaseHeight`, `BaseHeightProjection.cpp`), while hex shields
+  project directly to `fBaseHeight` (`HexShield.vert`).
 
 Candidates, none decided:
 

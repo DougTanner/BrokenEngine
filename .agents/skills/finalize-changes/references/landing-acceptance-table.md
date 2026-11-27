@@ -19,13 +19,18 @@ diff, before main asks the confirmation.
    `landing.porcelain`, never through `landing.reviewed`.
 2. Reconcile the diff paths against the declared owned paths, the
    `Projects/Coretide/` diff paths against the Coretide landing set. Each
-   changed region must name its authorizing Plan clause or user instruction.
-   Extra, missing without a recorded no-change decision, or unauthorized bytes
-   block.
-3. Confirm every handoff still applies to this diff. A later change invalidates
-   a handoff only where it changed bytes that handoff's result depends on — for
-   the two typed prose handoffs below, the session's own bytes in the regions
-   they read.
+   changed region must name its authorizing Plan clause or user instruction,
+   and beside it every accepted review finding ID (Plan review,
+   `/external-grill-plan`, or `/resolve-findings`) and every user decision (the
+   `/plan-alternatives` pick, an `/external-grill-plan` decision ID, or an
+   approved user delta) that prompted or chose the change, read from the
+   records the brief carries. A finding ID or decision alone authorizes
+   nothing. Extra, missing without a recorded no-change decision, or
+   unauthorized bytes block.
+3. Confirm every handoff still applies to this diff. The review-round check of
+   the `-Landing` run decides whether review handoffs still apply; a later
+   change invalidates any other handoff only where it changed bytes that
+   handoff's result depends on.
 4. Inventory ignored/non-worktree state from the same run's `landing.porcelain`
    and `landing.submodules` rows, recording exact path, owner/persistence
    contract, evidence, and `unchanged`, `intentionally persisted`, `restored`,
@@ -37,18 +42,26 @@ diff, before main asks the confirmation.
    persisted`.
 
 The run writes only the named result file and emits one summary line on stdout.
-`-Landing` requires a commit-valued `-Head` and excludes the other modes.
-Only `status` `pass` is usable; any other status means the
-reviewed diff is unavailable, which is a `BLOCKED` table, never a diff rebuilt
-inline. Treat `truncated` true as unreviewed state rather than a clean
-inventory. A `-Landing` run still reports the complete top-level `triggers`
-object like any other run, and `planTouched` is the only trigger the `landing`
-object itself adds; no part of the run ever runs or replaces the WorktreeCli
-`plan validate` run required by `## Executable Plan check` below. The `landing`
-object also carries `acceptanceSkeleton`: the rows this landing owes, each
-emitted `BLOCKED` and named by skill, plus the `Executable Plan check` row when
-the reviewed diff touches `Documents/Plans/` or
-`Projects/Coretide/Documents/Plans/`.
+`-Landing` requires a commit-valued `-Head` and excludes the other modes. Only
+`status` `pass` is usable; any other status means the reviewed diff is
+unavailable, which is a `BLOCKED` table, never a diff rebuilt inline. A
+`blocked` status with an `inventory.review-round-*` code is the review-round
+check (`Test-ReviewRoundCoverage` in
+`.agents/scripts/SessionChangeInventory.psm1`) refusing the candidate because a
+round is open or owed; main reruns the step script, whose next round covers it
+(a `/sweep` run: [`/sweep`](../../sweep/SKILL.md) step 11). The code
+`inventory.round-evaluation-failed` is not that refusal: the rounds could not
+be evaluated at the candidate, no further round cures it, and both landing
+scripts report it with the `terminal` `disposition`
+([`scripts.md`](scripts.md#landing-and-recovery)). Treat
+`truncated` true as unreviewed state rather than a clean inventory. A
+`-Landing` run still reports the complete top-level `triggers` object like any
+other run, and `planTouched` is the only trigger the `landing` object itself
+adds; no part of the run ever runs or replaces the WorktreeCli `plan validate`
+run required by `## Executable Plan check` below. The `landing` object also
+carries `acceptanceSkeleton`: the rows this landing owes, each emitted
+`BLOCKED` and named by skill, plus the `Executable Plan check` row when the
+reviewed diff touches `Documents/Plans/` or `Projects/Coretide/Documents/Plans/`.
 
 ## Acceptance table
 
@@ -57,27 +70,14 @@ behavior, required check/review, and residual:
 
 `criterion | decisive check | PASS | FAIL | BLOCKED | UNVERIFIED | evidence`
 
-Exempt paths owing no Review and resolve correctness row:
-
-- `Documents/Plans/**` deleted by `Complete-NextPlan.ps1` (authorized by its
-  completion result; `## Executable Plan check` still applies).
-- Modified (not added, deleted, or renamed)
-  `Documents/Investigations/Engine/RefactorCandidates.md` (Step 9 row additions
-  authorized by that step; other edits by session instruction) and
-  `Documents/Investigations/ChangeWorkflow/WorkflowIncidents.md` (row additions
-  and same-branch updates by its header; deletions by
-  `/create-follow-up-plans`).
+Exempt paths owing no Review and resolve correctness row are the entries
+`Test-ReviewExemptEntry` (`.agents/scripts/SessionChangeInventory.psm1`)
+accepts; a deleted Plan among them still gets `## Executable Plan check`.
 
 On every diff — `/save-plan`-only or mixed (including post-review or
 recovery-added follow-up Plans) — require `Invoke-StaticChecks.ps1` `PASS` and
-run `## Executable Plan check` whenever emitted; mixed diffs also require
-changed-region review handoffs covering every non-exempt path. A first-round
-`/coherence-review` handoff covering every path owing coherence review
-satisfies that row alone; when earlier evidence covers part of that scope, a
-pre-preparation handoff over the `PathPrefix` `Scope` in
-[`../../coherence-review/SKILL.md`](../../coherence-review/SKILL.md) `## Inputs`
-pairs with the still-valid earlier handoff and any carried recheck its
-`## When to use` exception requires.
+run `## Executable Plan check` whenever emitted; mixed diffs also require the
+passing review-round check plus the handoffs of the rounds' reviews.
 
 Every `PASS` cites evidence read or run here, or a mandated handoff whose fields
 prove the row. Narrative alone is `UNVERIFIED`. Duplicate checks name their
@@ -89,11 +89,14 @@ approved user delta may revise/defer a criterion, and a
 deferral names its tracked Plan.
 
 Reconcile each review as:
-`review | delegated/inline | findings | accepted-fixed | refuted | unresolved | evidence`.
-Require zero unresolved accepted findings and fix/recheck evidence. External
-claims name a single checkable proposition, version/configuration, official
-primary source, verdict, dependent finding, and evidence; unresolved or
-undecided refutations are non-passing.
+`review | delegated/inline | findings | accepted-fixed | filed | dropped | refuted | unresolved | evidence`.
+`filed` and `dropped` are the accepted findings a `-CloseRound` result of
+`.agents/scripts/Get-ChangeWorkflowSteps.ps1` says to file or to leave unfixed,
+a `filed` one naming its `/create-follow-up-plans` Plan path in the reviewed
+diff. Require zero unresolved accepted findings and fix/recheck evidence.
+External claims name a single checkable proposition, version/configuration,
+official primary source, verdict, dependent finding, and evidence; unresolved
+or undecided refutations are non-passing.
 
 For builds, require the authoritative `broken-engine-build-result/v1`: intended
 target/selection/arguments, status/exit/failure kind, complete retained log,
@@ -103,7 +106,7 @@ it cites, reporting success. Do not accept schema/result/exit mismatches.
 
 Skill changes require a complete `/external-skill-creator` findings-only
 validate-mode handoff with mechanical self-check, target validator exit/output,
-semantic review, and no unresolved Critical finding.
+semantic review, and no unresolved Critical or High finding.
 
 Instruction-doc changes require a complete `/progressive-disclosure-review`
 handoff with the baseline, the files checked, the findings, and no unresolved
@@ -114,12 +117,11 @@ A missing typed artifact — `/external-skill-creator` validate mode,
 never a `PASS`.
 
 A `NEEDS_ACTION` typed handoff still scores its row when every finding it raised
-is resolved — fixed in the reviewed diff or recorded refuted per the review
-reconciliation above — and a scoped spot-check re-review of exactly those
-regions returned `PASS`. Never dispatch a repeated whole-artifact review for
-that row. For `/external-skill-creator` validate mode the mechanical evidence
-is then that skill's documented validator runs on the reviewed tree, script
-runs rather than a review.
+is fixed in the reviewed diff, filed, dropped, or recorded refuted per the
+review reconciliation above, and the review-round check passed. For
+`/external-skill-creator` validate mode the mechanical evidence is then that
+skill's documented validator runs on the reviewed tree, script runs rather than
+a review.
 
 ## Executable Plan check
 

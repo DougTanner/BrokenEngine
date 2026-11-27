@@ -520,6 +520,14 @@ binding of rule 8 enumeration or rule 38 associative-container iteration
 			break;
 	}
 
+	Omit `default:` on exhaustive `switch` statements over repo-owned enums so
+	MSVC `/we4062` (enabled in `Engine.props` and `DataPacker.vcxproj`) catches
+	missing enumerators at compile time. Handle sentinel enumerators such as
+	`kCount` explicitly; place an out-of-range fallback or
+	`ASSERT(false); std::unreachable();` after the `switch` only when valid
+	cases return or otherwise bypass it. On a `switch` over a repo-owned enum,
+	keep `default:` only when it intentionally handles a subset of the enum.
+
 60. Gate std::memcpy size on the destination, not the source. If sizes differ,
     use std::min(sizeof(source), sizeof(dest)):
 
@@ -616,6 +624,10 @@ correct:
 
 	Good (only what the declaration cannot say):
 	// CreateProcessW writes into rCommandLine, so it cannot be const.
+
+A comment names a concept by its code identifier or the established repository
+term, and names the identifier that owns a value instead of copying the value;
+a bound derived from several values is stated once, at its owner.
 
 What a comment should say, in the fewest sentences that carry it: an invariant,
 a required ordering and the consequence of breaking it, a lifetime or threading

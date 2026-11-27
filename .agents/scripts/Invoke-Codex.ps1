@@ -1,11 +1,11 @@
 <#
 .SYNOPSIS
-	Run one routed review task on Codex headless in a worktree from a non-Codex host and capture its result.
+	Run one routed review task on Codex headless in a read-only sandbox in a worktree from a non-Codex
+	host and capture its result.
 
 	-Skill and optional -Mode select one of the $routes entries, which fixes the $presets model/effort
-	pair and the sandbox mode (read-only or workspace-write). Unrouted skills or modes fail before
-	spawning Codex. -CheckModels checks the presets' models instead of launching; -ListRoutes prints
-	each routed <skill>[:<mode>] and sandbox without launching.
+	pair. Unrouted skills or modes fail before spawning Codex. -CheckModels checks the presets' models
+	instead of launching; -ListRoutes prints each routed <skill>[:<mode>] without launching.
 
 .NOTES
 	Auth/billing: Codex uses ChatGPT sign-in by default -> ChatGPT subscription quota, NOT metered
@@ -31,14 +31,12 @@
 	retried (true when a second attempt ran); reason (null, or the malformed or failed cause).
 
 	Shape check and retry: a Codex exit of 0 whose result does not end in the verdict line every
-	prompt mandates (PASS, CHANGES-REQUIRED: <n>, or BLOCKED: <reason>) is malformed. A read-only
-	detached run then feeds the same unchanged prompt to Codex a second time, publishing the first
-	attempt's bytes to the <out> sibling ending in -attempt1. Only the final attempt's bytes reach
-	<out>. A receipt reports retried, and status malformed when the final attempt still lacks that
-	line; a malformed receipt carries no separator and no result, so drafting notes never reach the
-	caller. -NoRetry makes the run perform exactly one attempt. A workspace-write run always
-	performs exactly one attempt, because a second attempt would start from the first attempt's
-	edits.
+	prompt mandates (PASS, CHANGES-REQUIRED: <n>, or BLOCKED: <reason>) is malformed. The detached
+	run then feeds the same unchanged prompt to Codex a second time, publishing the first attempt's
+	bytes to the <out> sibling ending in -attempt1. Only the final attempt's bytes reach <out>. A
+	receipt reports retried, and status malformed when the final attempt still lacks that line; a
+	malformed receipt carries no separator and no result, so drafting notes never reach the caller.
+	-NoRetry makes the run perform exactly one attempt.
 
 	Exit codes (launch and -Wait calls; -ListRoutes and -CheckModels below): 0 for every wait whatever
 	its status; 126 if an inherited OPENAI_API_KEY is refused, 127 if the codex CLI is not found, 1 for
@@ -49,7 +47,7 @@
 	`detached run ended without publishing a result; exit code unavailable`. How the caller reports a
 	non-zero exit or a failed or malformed status is `.agents/references/codex-bridge.md`, `## Rules`.
 
-	-ListRoutes prints one `<skill>[:<mode>] <sandbox>` line per $routes entry sorted ordinally and
+	-ListRoutes prints one `<skill>[:<mode>]` line per $routes entry sorted ordinally and
 	exits 0 in any environment.
 
 	-CheckModels checks each $presets model against the live Codex model catalog
@@ -90,10 +88,6 @@ param(
 	[ValidateSet('sol', 'astra')]
 	[string] $Agent,                                      # $presets entry resolved from $routes; internal only
 
-	[Parameter(Mandatory, ParameterSetName = 'InternalRun')]
-	[ValidateSet('read-only', 'workspace-write')]
-	[string] $Sandbox,                                    # codex --sandbox resolved from $routes; internal only
-
 	[Parameter(Mandatory, ParameterSetName = 'Wait')]
 	[string] $Wait,                                       # run identifier from a running receipt
 
@@ -106,7 +100,7 @@ param(
 	[switch] $CheckModels,                                # check the $presets models; never launches
 
 	[Parameter(Mandatory, ParameterSetName = 'ListRoutes')]
-	[switch] $ListRoutes,                                 # print routed skill[:mode] keys and sandboxes; never launches
+	[switch] $ListRoutes,                                 # print routed skill[:mode] keys; never launches
 
 	[Parameter(Mandatory, ParameterSetName = 'InternalRun')]
 	[string] $InternalRunId                               # detached-run mode: launched by this script, never by a caller
@@ -127,26 +121,25 @@ $presets = @{
 	astra = @{ Model = 'gpt-6.2-astra'; Effort = 'xhigh' }
 }
 
-# Exact case-sensitive (Skill[:Mode]) -> (Agent, Sandbox) routing table for non-Codex review dispatch.
+# Exact case-sensitive (Skill[:Mode]) -> $presets agent routing table for non-Codex review dispatch.
 $routes = [Collections.Hashtable]::new([StringComparer]::Ordinal)
-# Astra (gpt-6.2-astra, xhigh)
-$routes['repo-code-review'] = @{ Agent = 'astra'; Sandbox = 'read-only' }
-$routes['glsl-review'] = @{ Agent = 'astra'; Sandbox = 'read-only' }
-$routes['adversarial-review'] = @{ Agent = 'astra'; Sandbox = 'read-only' }
-$routes['plan-audit'] = @{ Agent = 'astra'; Sandbox = 'read-only' }
-$routes['plan-simplicity-review'] = @{ Agent = 'astra'; Sandbox = 'read-only' }
-$routes['over-engineering-review:finder'] = @{ Agent = 'astra'; Sandbox = 'workspace-write' }
-$routes['external-architecture-review'] = @{ Agent = 'astra'; Sandbox = 'read-only' }
-# Sol (gpt-6.2-sol, xhigh)
-$routes['code-style-review'] = @{ Agent = 'sol'; Sandbox = 'workspace-write' }
-$routes['comment-review'] = @{ Agent = 'sol'; Sandbox = 'workspace-write' }
-$routes['coherence-review:coherence'] = @{ Agent = 'sol'; Sandbox = 'read-only' }
-$routes['coherence-review:combined'] = @{ Agent = 'sol'; Sandbox = 'workspace-write' }
-$routes['progressive-disclosure-review'] = @{ Agent = 'sol'; Sandbox = 'read-only' }
-$routes['external-skill-creator:validate'] = @{ Agent = 'sol'; Sandbox = 'read-only' }
-$routes['verify-acceptance'] = @{ Agent = 'sol'; Sandbox = 'read-only' }
-$routes['next-plan-review'] = @{ Agent = 'sol'; Sandbox = 'read-only' }
-$routes['next-plan-checkpoint-review'] = @{ Agent = 'sol'; Sandbox = 'read-only' }
+# Astra (gpt-6.2-astra, xhigh): plan reviews
+$routes['plan-audit'] = 'astra'
+$routes['plan-simplicity-review'] = 'astra'
+# Sol (gpt-6.2-sol, xhigh): code and every other review
+$routes['repo-code-review'] = 'sol'
+$routes['glsl-review'] = 'sol'
+$routes['adversarial-review'] = 'sol'
+$routes['external-architecture-review'] = 'sol'
+$routes['external-deep-analysis'] = 'sol'
+$routes['external-refactor-clean'] = 'sol'
+$routes['coherence-review:coherence'] = 'sol'
+$routes['progressive-disclosure-review'] = 'sol'
+$routes['external-skill-creator:validate'] = 'sol'
+$routes['verify-acceptance'] = 'sol'
+$routes['next-plan-review'] = 'sol'
+$routes['next-plan-checkpoint-review'] = 'sol'
+$routes['session-audit'] = 'sol'
 
 if ($PSCmdlet.ParameterSetName -ceq 'ListRoutes')
 {
@@ -154,7 +147,7 @@ if ($PSCmdlet.ParameterSetName -ceq 'ListRoutes')
 	[Array]::Sort($keys, [StringComparer]::Ordinal)
 	foreach ($key in $keys)
 	{
-		Write-Output "$key $($routes[$key].Sandbox)"
+		Write-Output $key
 	}
 	exit 0
 }
@@ -259,7 +252,7 @@ function Invoke-CodexAttempt([string] $StagingPath)
 	Get-Content -LiteralPath $PromptFile -Raw | & $codex.Source `
 		-a never `
 		exec `
-		--sandbox $Sandbox `
+		--sandbox read-only `
 		-C $Worktree `
 		-m $presets[$Agent].Model `
 		-c "model_reasoning_effort=`"$($presets[$Agent].Effort)`"" `
@@ -468,9 +461,7 @@ if ($PSCmdlet.ParameterSetName -ceq 'Launch')
 		exit 1
 	}
 
-	$route = $routes[$routeKey]
-	$Agent = $route.Agent
-	$Sandbox = $route.Sandbox
+	$Agent = $routes[$routeKey]
 }
 
 # Only the modes that start Codex refuse the key; a wait, route listing, or model check runs in any environment.
@@ -518,7 +509,7 @@ if ($PSCmdlet.ParameterSetName -ceq 'Launch')
 	$start.WorkingDirectory = $ExecutionContext.SessionState.Path.CurrentFileSystemLocation.ProviderPath
 	foreach ($argument in @('-NoProfile', '-NonInteractive', '-File', $PSCommandPath,
 		'-InternalRunId', $runId, '-Skill', $Skill, '-Worktree', $absoluteWorktree, '-PromptFile', $detachedPrompt,
-		'-OutFile', $absoluteOutput, '-Agent', $Agent, '-Sandbox', $Sandbox))
+		'-OutFile', $absoluteOutput, '-Agent', $Agent))
 	{
 		$start.ArgumentList.Add($argument)
 	}
@@ -575,8 +566,7 @@ try
 	if ($exitCode -eq 0)
 	{
 		$malformed = -not (Test-CodexVerdictLine ([string](Get-Content -LiteralPath $stagingOutput -Raw -ErrorAction SilentlyContinue)))
-		# A workspace-write retry would start from the first attempt's edits, so only read-only retries.
-		if ($malformed -and (-not $NoRetry) -and ($Sandbox -ceq 'read-only'))
+		if ($malformed -and (-not $NoRetry))
 		{
 			# The first attempt's bytes are the only evidence of what went wrong, so they are kept
 			# beside the result before the second attempt takes over the caller's out-file. An

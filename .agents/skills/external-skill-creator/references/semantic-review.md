@@ -55,7 +55,7 @@ Public contract, inputs, and handoff form: [`../SKILL.md`](../SKILL.md).
    (exit `1`). When an inbound workflow requirement has a worker run the target
    inside that worker's own task, rather than as a separate dispatch, as
    evidence for that task, a missing or incomplete run-as-evidence paragraph in
-   the target's `## Handoff` is a Critical finding citing
+   the target's `## Handoff` is a High finding citing
    [`skill-skeleton.md`](../../../references/skill-skeleton.md)
    `## Section order` item 5. Done when the run-as-evidence check has a verdict
    for the target and every collected reference is classified: model invocation
@@ -71,9 +71,8 @@ Public contract, inputs, and handoff form: [`../SKILL.md`](../SKILL.md).
   Codex companion file merely because the Claude flag is true. A
   platform-neutral or Codex-specific manual-only promise requires Codex policy
   `false`; a Claude-only promise requires the Claude flag. A disabled policy
-  that conflicts with an inbound workflow requirement is Critical for that
-  client.
-- Critical: `description` lacks meaningful trigger contexts. Codex discovery
+  that conflicts with an inbound workflow requirement is High for that client.
+- High: `description` lacks meaningful trigger contexts. Codex discovery
   sees `name` and `description`, not `when_to_use` or the body; package listing
   or loader acceptance does not prove implicit invocation.
 - Treat structural validation as evidence of repository-schema acceptance
@@ -84,19 +83,19 @@ Public contract, inputs, and handoff form: [`../SKILL.md`](../SKILL.md).
   unavailable runtime behavior as unverified when the target makes no claim
   that depends on it. Do not require a runtime check merely because a package
   contains client-specific metadata.
-- Recommended: remove unused Claude pre-approvals and add those needed by
+- Low: remove unused Claude pre-approvals and add those needed by
   prescribed commands. Keep body tool and delegation bounds authoritative; Codex
   dependencies wire external tools and grant no execution authority.
-- Recommended: keep instructions imperative, general, and concise; include an
+- Low: keep instructions imperative, general, and concise; include an
   example for a non-trivial required output format.
-- Recommended: plain wording — apply the one-term-per-concept and plain-words
+- Low: plain wording — apply the one-term-per-concept and plain-words
   rules in root `AGENTS.md` `## Directives`, and name concrete actions instead
   of abstract noun-stacks unless the stack is an established term or code
   identifier. Report a reintroduced synonym for an established term as a
   finding.
-- Recommended: end each workflow step on a checkable done-condition, so the
+- Low: end each workflow step on a checkable done-condition, so the
   agent can tell done from not-done.
-- Do not promote ordinary quality advice to Critical unless discovery or
+- Do not promote ordinary quality advice to High unless discovery or
   invocation is concretely incorrect, or the finding is the step 6
   run-as-evidence check.
 - Progressive disclosure, the root `Instruction changes` directive, and

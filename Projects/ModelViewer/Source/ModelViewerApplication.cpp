@@ -683,12 +683,11 @@ void ModelViewerApplication::GenerateIslands()
 	engine::gpIslandTerrain->BuildElevationGrid(mIslandCell.islands, mIslandCell.elevationGrid);
 	const XMFLOAT2& rf2Island = mIslandCell.islands.at(0).f2WorldPosition;
 	float fBestScore = std::numeric_limits<float>::max();
-	float fLowestHeight = engine::gpFlightPlanes->Lowest().fHeightMeters;
 	for (float fY = -engine::kfCellHalfHeight; fY < engine::kfCellHalfHeight; fY += 8.0f)
 	{
 		for (float fX = -engine::kfCellHalfWidth; fX < engine::kfCellHalfWidth; fX += 8.0f)
 		{
-			XMVECTOR vecCandidate = XMVectorSet(fX, fY, fLowestHeight, 1.0f);
+			XMVECTOR vecCandidate = XMVectorSet(fX, fY, kfBaseHeightMeters, 1.0f);
 			if (!DiscClear(vecCandidate, 0.0f))
 			{
 				continue;

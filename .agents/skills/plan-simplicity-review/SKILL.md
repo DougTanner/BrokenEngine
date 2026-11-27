@@ -67,7 +67,7 @@ exactly as it was, and the edit adds no net text.
 
 For each finding:
 
-> `PSR-F-###` Critical|Required|Recommended `plan-path:line` — class — concrete
+> `PSR-F-###` Critical|High|Medium|Low `plan-path:line` — class — concrete
 > problem — simpler alternative — disposition: simplify | user-judgment —
 > evidence: `<locator>`
 

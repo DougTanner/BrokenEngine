@@ -118,6 +118,7 @@ public:
 
 	Pipeline() = default;
 	Pipeline(const Pipeline&) = delete;
+	Pipeline& operator=(const Pipeline&) = delete;
 	Pipeline(const PipelineInfo& rInfo);
 	~Pipeline();
 

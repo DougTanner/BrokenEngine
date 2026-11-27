@@ -88,7 +88,7 @@ void main()
 	}
 	else
 	{
-		// Eye-line intersection with the base flight plane, the plane this pass deposits into
+		// Eye-line intersection with the base height plane, the plane this pass deposits into
 		// (unclamped, unlike BaseHeightPosition which is a no-op above the plane)
 		vec3 f3ToEye = ToEyeLine(mainLayout, f3OutPosition);
 		float fT = (globalLayout.fBaseHeight - f3OutPosition.z) / f3ToEye.z;

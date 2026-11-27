@@ -20,8 +20,9 @@ inline constexpr NetworkSimulationConfig GetNetworkSimulationConfiguration(Netwo
 		case NetworkSimulationLevel::kEurope:       return {.fPacketLossPercent = 1.5f,  .iPingMinimumMilliseconds = 80, .iPingMaximumMilliseconds = 130};
 		case NetworkSimulationLevel::kSouthAmerica: return {.fPacketLossPercent = 2.0f, .iPingMinimumMilliseconds = 120, .iPingMaximumMilliseconds = 200};
 		case NetworkSimulationLevel::kChina:        return {.fPacketLossPercent = 2.5f, .iPingMinimumMilliseconds = 300, .iPingMaximumMilliseconds = 500};
-		default:                                    return {.fPacketLossPercent = 0.0f,   .iPingMinimumMilliseconds = 0,   .iPingMaximumMilliseconds = 0};
+		case NetworkSimulationLevel::kDisabled:     break;
 	}
+	return {.fPacketLossPercent = 0.0f, .iPingMinimumMilliseconds = 0, .iPingMaximumMilliseconds = 0};
 }
 
 inline constexpr std::string_view GetNetworkSimulationName(NetworkSimulationLevel eLevel)
@@ -33,8 +34,9 @@ inline constexpr std::string_view GetNetworkSimulationName(NetworkSimulationLeve
 		case NetworkSimulationLevel::kEurope:       return "Europe";
 		case NetworkSimulationLevel::kSouthAmerica: return "SouthAmerica";
 		case NetworkSimulationLevel::kChina:        return "China";
-		default:                                    return "Off";
+		case NetworkSimulationLevel::kDisabled:     break;
 	}
+	return "Off";
 }
 
 struct NetworkSimulationBounds
@@ -55,8 +57,9 @@ inline constexpr NetworkSimulationBounds GetNetworkSimulationBounds(NetworkSimul
 		case NetworkSimulationLevel::kEurope:       return {.iCrcMinimum = 32, .iAssumedMaximum = 32, .iFastReplayMaximum = 32, .iStatusReplayMaximum = 30, .iKnockOnReplayMaximum = 36};
 		case NetworkSimulationLevel::kSouthAmerica: return {.iCrcMinimum = 24, .iAssumedMaximum = 50, .iFastReplayMaximum = 50, .iStatusReplayMaximum = 44, .iKnockOnReplayMaximum = 50};
 		case NetworkSimulationLevel::kChina:        return {.iCrcMinimum = 12, .iAssumedMaximum = 90, .iFastReplayMaximum = 600, .iStatusReplayMaximum = 70, .iKnockOnReplayMaximum = 80};
-		default:                                    return {.iCrcMinimum = 62,  .iAssumedMaximum = 2,  .iFastReplayMaximum = 2,  .iStatusReplayMaximum = 2,  .iKnockOnReplayMaximum = 2};
+		case NetworkSimulationLevel::kDisabled:     break;
 	}
+	return {.iCrcMinimum = 62, .iAssumedMaximum = 2, .iFastReplayMaximum = 2, .iStatusReplayMaximum = 2, .iKnockOnReplayMaximum = 2};
 }
 
 struct DelayedPacket

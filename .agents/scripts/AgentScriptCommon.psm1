@@ -545,4 +545,11 @@ function Find-AgentLivePlanCitations([string] $RepositoryRoot, [string] $Plan) {
 	}
 }
 
-Export-ModuleMember -Function Get-AgentCanonicalPath, Invoke-AgentGit, Invoke-AgentProcess, Get-AgentNormalizedText, Measure-AgentTokenCount, Get-AgentMarkdownSearchText, Get-AgentModelFamily, Compare-AgentModelVersion, Get-AgentGameProjects, Get-AgentCoretideRepository, Test-AgentDataInputPath, Get-AgentDataInputChanges, Get-AgentSharedDataStampPath, Get-AgentWorktreeCliRepositoryIdentity, Invoke-AgentBootstrapLock, Get-AgentSharedDataRecordPath, Write-AgentSharedDataRecord, Get-AgentSharedDataRecord, Get-AgentDataListing, Compare-AgentSharedDataRecord, Write-AgentModelViewerResolvedData, Get-AgentHarnessLaunchConfiguration, Get-AgentPlansLayoutViolation, Find-AgentLivePlanCitations
+# The C++ token pattern with named groups comment, literal (delimiter for a raw string), space, and code.
+# Literals remain opaque tokens; comments are trivia. Numbers consume digit separators before the
+# character-literal alternative can mistake an apostrophe for an opening quote.
+function Get-AgentCppTokenPattern() {
+	return '(?<comment>//(?:[^\n]*\\\n)*[^\n]*|/\*[\s\S]*?(?:\*/|\z))|(?<literal>(?:u8|u|U|L)?R"(?<delimiter>[^\s()\\]{0,16})\([\s\S]*?\)\k<delimiter>"|\b[0-9][\w''.]*|"(?:\\[\s\S]|[^"\\])*"|''(?:\\[\s\S]|[^''\\])*'')|(?<space>\s+)|(?<code>.)'
+}
+
+Export-ModuleMember -Function Get-AgentCanonicalPath, Invoke-AgentGit, Invoke-AgentProcess, Get-AgentNormalizedText, Measure-AgentTokenCount, Get-AgentMarkdownSearchText, Get-AgentModelFamily, Compare-AgentModelVersion, Get-AgentGameProjects, Get-AgentCoretideRepository, Test-AgentDataInputPath, Get-AgentDataInputChanges, Get-AgentSharedDataStampPath, Get-AgentWorktreeCliRepositoryIdentity, Invoke-AgentBootstrapLock, Get-AgentSharedDataRecordPath, Write-AgentSharedDataRecord, Get-AgentSharedDataRecord, Get-AgentDataListing, Compare-AgentSharedDataRecord, Write-AgentModelViewerResolvedData, Get-AgentHarnessLaunchConfiguration, Get-AgentPlansLayoutViolation, Find-AgentLivePlanCitations, Get-AgentCppTokenPattern

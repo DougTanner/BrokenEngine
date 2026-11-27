@@ -1,7 +1,6 @@
 #include "ShipNavigationUtils.h"
 
 #include "Frame/CellStaticData.h"
-#include "Frame/FlightPlanes.h"
 #include "Frame/IslandTerrain.h"
 #include "Frame/NavQuery.h"
 
@@ -53,13 +52,13 @@ static int64_t SelectIslandPlacement(std::span<const engine::IslandPlacement> ce
 	return iSelected;
 }
 
-// A point uniform in the fRadius disc around vecCenter in x/y, on the lowest plane: two draws, the angle first.
+// A point uniform in the fRadius disc around vecCenter in x/y, at the base height: two draws, the angle first.
 static XMVECTOR XM_CALLCONV OmniPatrolDiscPoint(FXMVECTOR vecCenter, float fRadius, common::RandomEngine& rRandomEngine)
 {
 	float fAngle = common::Random<XM_2PI>(rRandomEngine);
 	float fDistance = fRadius * std::sqrt(common::Random<1.0f>(rRandomEngine));
 	common::SinCos rotation = common::DeterministicSinCos(fAngle);
-	return XMVectorSetZ(XMVectorAdd(vecCenter, XMVectorSet(rotation.fCos * fDistance, rotation.fSin * fDistance, 0.0f, 0.0f)), engine::gpFlightPlanes->Lowest().fHeightMeters);
+	return XMVectorSetZ(XMVectorAdd(vecCenter, XMVectorSet(rotation.fCos * fDistance, rotation.fSin * fDistance, 0.0f, 0.0f)), kfBaseHeightMeters);
 }
 
 // Patrol Together: a squadron's leader is its lowest-global-ID non-dying, non-healing Omni in the previous frame whose
@@ -251,7 +250,7 @@ void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, c
 	// Cell center: every cell's local frame is centered on the origin.
 	// W=1.0 keeps this a proper position — every downstream (cellCenter - vecPosition) and neighbour offset add stays W-clean,
 	// so normalize fallbacks don't leak W into the AI direction and on into velocity.
-	XMVECTOR vecCellCenter = XMVectorSet(0.0f, 0.0f, engine::gpFlightPlanes->Lowest().fHeightMeters, 1.0f);
+	XMVECTOR vecCellCenter = XMVectorSet(0.0f, 0.0f, kfBaseHeightMeters, 1.0f);
 
 	// Throttle bookkeeping: capture mode before the fleet/flagship/timer blocks can change it; a mode change forces an
 	// immediate pathfind below (see bRecompute).
@@ -354,7 +353,7 @@ void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, c
 					const engine::IslandTemplate& rTemplate = engine::gpIslandTerrain->mIslands.at(rPlacement.islandCrc);
 					float fX = rPlacement.f2WorldPosition.x - 0.5f * rTemplate.fQuadFootprintX + common::Random(rTemplate.fQuadFootprintX, rFrame.postRender.randomEngine);
 					float fY = rPlacement.f2WorldPosition.y - 0.5f * rTemplate.fQuadFootprintY + common::Random(rTemplate.fQuadFootprintY, rFrame.postRender.randomEngine);
-					vecPatrolPoint = XMVectorSet(fX, fY, engine::gpFlightPlanes->Lowest().fHeightMeters, 1.0f);
+					vecPatrolPoint = XMVectorSet(fX, fY, kfBaseHeightMeters, 1.0f);
 				}
 				vecPatrolPoint = engine::NavQuerySnapToNavigable(vecPatrolPoint, rNavData);
 				if (common::IsInsideHex(vecPatrolPoint, engine::kCellDirections, kfOmniPatrolCellInset))
@@ -387,7 +386,7 @@ void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, c
 
 				float fX = fIslandMinimumX + common::Random(rTemplate.fQuadFootprintX, rFrame.postRender.randomEngine);
 				float fY = fIslandMinimumY + common::Random(rTemplate.fQuadFootprintY, rFrame.postRender.randomEngine);
-				rVecIslandDestination = XMVectorSet(fX, fY, engine::gpFlightPlanes->Lowest().fHeightMeters, 1.0f);
+				rVecIslandDestination = XMVectorSet(fX, fY, kfBaseHeightMeters, 1.0f);
 
 				// Snap to navigable area if inside an obstacle
 				rVecIslandDestination = engine::NavQuerySnapToNavigable(rVecIslandDestination, rNavData);

@@ -3,7 +3,6 @@
 #include "Frame/Collections/Pushers/Pushers.h"
 #include "Frame/Collections/Collection.h"
 #include "Frame/Alignments.h"
-#include "Frame/FlightPlanes.h"
 #include "Frame/FrameRegistry.h"
 #include "Frame/GridCoord.h"
 #if defined(BT_CLIENT)

@@ -1079,6 +1079,7 @@ void GameBase::ResetSession()
 	game::gpClientSession->mpRuntime->ClearSubscriptionState();
 	gpCamera->ResetForSession();
 	gbSmokeClear = true;
+	gbWaterFoamReset = true;
 	gpParticleManager->mbReset = true;
 	WindTrailsInterpolate::sPreviousPositions.clear();
 #endif // BT_CLIENT

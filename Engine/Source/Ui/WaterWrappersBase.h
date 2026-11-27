@@ -138,24 +138,27 @@ inline Wrapper gLightingWaterSkyboxThreeBeachReduction(0.0f, 0.0f, 1.0f);
 
 // Foam
 inline Wrapper gWaterFoamEnabled(true); // checkbox, not slider-mapped
-inline Wrapper gWaterFoamEmissionRate(199.004974f, 0.0f, 400.0f);
-inline Wrapper gWaterFoamJStart(0.802203f, 0.01f, 1.0f);
-inline Wrapper gWaterFoamJFull(0.123705f, -1.0f, 0.99f);
-inline Wrapper gWaterFoamHalfLife(1.317040f, 0.1f, 2.0f);
+inline Wrapper gWaterFoamEmissionRate(400.0f, 0.0f, 800.0f);
+inline Wrapper gWaterFoamJStart(0.79f, 0.7f, 0.9f);
+inline Wrapper gWaterFoamJFull(0.1f, -1.0f, 0.99f);
+inline Wrapper gWaterFoamHalfLife(2.0f, 0.1f, 4.0f);
 inline Wrapper gWaterFoamTextureIndex(3i64, TextureIndices(shaders::kiWaterFoamTextureCount));
-inline Wrapper gWaterFoamTextureTileSize(5.104477f, 1.0f, 16.0f);
-inline Wrapper gWaterFoamTextureStrength(1.101990f, 0.0f, 2.0f);
-inline Wrapper gWaterFoamTexturePatchBlend(0.873134f, 0.0f, 1.0f);
-inline Wrapper gWaterFoamEdgeSoftness(0.387948f, 0.005f, 0.5f); // Positive lower bound keeps Water.frag smoothstep edges strictly ordered.
-inline Wrapper gWaterFoamErosionCurve(2.069652f, 0.25f, 3.0f); // Positive lower bound keeps Water.frag pow(fCoverage, ...) defined at zero.
+inline Wrapper gWaterFoamTextureTileSize(7.0f, 1.0f, 16.0f);
+inline Wrapper gWaterFoamTextureStrength(1.0f, 0.0f, 2.0f);
+inline Wrapper gWaterFoamTexturePatchBlend(0.7f, 0.0f, 1.0f);
+inline Wrapper gWaterFoamEdgeSoftness(0.4f, 0.005f, 0.5f); // Positive lower bound keeps Water.frag smoothstep edges strictly ordered.
+inline Wrapper gWaterFoamErosionCurve(0.4f, 0.25f, 3.0f); // Positive lower bound keeps Water.frag pow(fCoverage, ...) defined at zero.
 inline Wrapper gWaterFoamDistanceSoften(1.009950f, 0.0f, 4.0f);
 inline Wrapper gWaterFoamBreakupTextureIndex(0i64, TextureIndices(shaders::kiWaterFoamBreakupTextureCount));
-inline Wrapper gWaterFoamBreakupTileSize(10.177860f, 1.0f, 32.0f);
-inline Wrapper gWaterFoamBreakupAmount(0.584576f, 0.0f, 1.0f);
-inline Wrapper gWaterFoamBreakupPatchBlend(0.712687f, 0.0f, 1.0f);
+inline Wrapper gWaterFoamBreakupTileSize(7.0f, 1.0f, 32.0f);
+inline Wrapper gWaterFoamBreakupAmount(0.6f, 0.0f, 1.0f);
+inline Wrapper gWaterFoamBreakupPatchBlend(0.7f, 0.0f, 1.0f);
 inline Wrapper gWaterFoamSpawnNoiseAmount(0.0f, 0.0f, 1.0f);
 inline Wrapper gWaterFoamSpawnNoiseTileSize(158.130615f, 1.0f, 256.0f);
 inline Wrapper gWaterFoamSpawnNoisePatchBlend(0.706468f, 0.0f, 1.0f);
+// Camera-height fade for foam generation (independent of wave amplitudes): 0.0 at or above End (End takes precedence when Start >= End), 1.0 at or below Start.
+inline Wrapper gWaterFoamGenerationFadeStart(000.0f, 0.0f, 1'200.0f);
+inline Wrapper gWaterFoamGenerationFadeEnd(300.0f, 0.0f, 1'200.0f);
 
 // Break Repetition
 inline Wrapper gPatchWeightThreshold(0.4f, 0.0f, 1.0f); // MakePatchTriangle caps the subtracted threshold below the largest normalized cube, so the excess sum stays positive.

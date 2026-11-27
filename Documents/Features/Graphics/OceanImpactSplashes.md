@@ -18,8 +18,10 @@ Nothing reacts to the sea surface today:
 - `ExplosionsPostRender::Spawn`
   (`Engine/Source/Frame/Collections/Explosions/ExplosionsSpawn.cpp`) adds the
   same lights, puffs, smoke trails, wind radials, and GPU particles over water
-  as over land. Omnis and spaceships fly at the lowest flight plane, so their
-  explosions over water happen at that height.
+  as over land. Each ship's effective flight height
+  (`EffectiveShipFlightHeight`, the maximum of `kfBaseHeightMeters` and its
+  model's minimum origin height) floors the ship's origin, while explosions
+  spawn at their actual height — including lower anchors on descending wrecks.
 - The water surface renders at height 0. Its displacement is GPU-only:
   `Engine/Data/Shaders/Water/WaterDisplacement.comp` bakes Gerstner displacement
   into a texture whose texels match the active LOD's visible-area vertex grid
@@ -52,8 +54,8 @@ Nothing reacts to the sea surface today:
 - **Open choices.**
   - Where the ring lives: a new `ParticleManager` layout, or a separate
     client-side ring list.
-  - The height threshold for "near sea level", which decides whether every unit
-    explosion over water at the lowest flight plane splashes.
+  - The height threshold for "near sea level", tested against each explosion's
+    actual height to decide whether explosions over water splash.
   - The falling-missile splash point: the z = 0 crossing of the traced segment,
     rather than the sea-floor hit position.
 

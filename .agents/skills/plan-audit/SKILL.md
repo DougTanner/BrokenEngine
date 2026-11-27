@@ -54,7 +54,7 @@ through `/external-grill-plan` for Tier 3, or directly with the user for Tier 2.
 
 For each finding:
 
-> `PA-F-###` Critical|Required|Recommended `plan-path:line` — category —
+> `PA-F-###` Critical|High|Medium|Low `plan-path:line` — category —
 > concrete problem — evidence: `repository-path:line` — proposed improvement
 
 Each finding's problem, evidence, and proposed improvement appear exactly once,

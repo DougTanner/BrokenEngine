@@ -1,14 +1,14 @@
 # Smoke Shaders - Sparse Camera-Following Simulation
 
-Smoke is a single client-only 2D density field at the base flight-plane height;
-it follows the camera on a held world rectangle and refreshes on its own
-cadence. Objects deposit into the field, two compute passes advect and diffuse
-it, and world shaders sample it through shared smoke helpers, reusing the
-caller's single lighting-layer sample; Model (`../Model/AGENTS.md`) owns how a
-model fades smoke with height. Smoke has its sun/moon and ambient base lighting
-multiplied by object-shadow R (`../Shadow/AGENTS.md` `## Overview`).
-Point-light and explosion lighting on smoke stays unshadowed. Terrain and water
-read that shadow at the base-height projection, and models at the fragment.
+Smoke is a single client-only 2D density field at the base height; it follows
+the camera on a held world rectangle and refreshes on its own cadence. Objects
+deposit into the field, two compute passes advect and diffuse it, and world
+shaders sample it through shared smoke helpers, reusing the caller's single
+lighting-layer sample; Model (`../Model/AGENTS.md`) owns how a model fades
+smoke with height. Smoke has its sun/moon and ambient base lighting multiplied
+by object-shadow R (`../Shadow/AGENTS.md` `## Overview`). Point-light and
+explosion lighting on smoke stays unshadowed. Terrain and water read that
+shadow at the base-height projection, and models at the fragment.
 
 ## Controls
 

@@ -128,11 +128,20 @@ applies, the original stands and the turn's report carries one line:
 Alternatives: original stands (<axes>)
 ```
 
-Otherwise, before the Plan review step on every route, main presents every
-returned candidate and every main-added option that applies beside the drafted
-approach per `### User Interaction` `Comparing options`, translating researcher
-rows (`Mechanism`, `Adds/Deletes`, `Invariant surfaces`, `Pays off when`) into
-plain outcomes, giving each option, the drafted plan included:
+Otherwise, before the Plan review step on every route, main first explains the
+change per `### User Interaction`: what it does (its goal and the visible
+result) and why it is good for the codebase (the problem it solves, and that it
+is a prerequisite when a later Plan needs it). With an execution card, main
+presents the card's `### What does this plan do?` and
+`### Why this is good for the codebase` sections as `/next-plan`
+`### Implementation approval` does; without one, main writes both from the
+request.
+
+Main then presents every returned candidate and every main-added option that
+applies beside the drafted approach per `### User Interaction`
+`Comparing options`, translating researcher rows (`Mechanism`, `Adds/Deletes`,
+`Invariant surfaces`, `Pays off when`) into plain outcomes, giving each option,
+the drafted plan included:
 
 - Unique advantages: what it offers that the other options do not, each named
   with a short label, such as DRY (reuses an existing mechanism instead of

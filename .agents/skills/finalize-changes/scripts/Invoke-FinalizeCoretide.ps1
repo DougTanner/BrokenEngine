@@ -2,8 +2,9 @@
 # the commits its upstream lacks into one commit on their merge base under the Coretide message file. -Land, under the
 # landing lease the caller already holds, checks the approval receipts, rebases onto a moved upstream only for an
 # identical patch, and fast-forwards the primary Coretide checkout from the clone; a rerun after landing reports none.
-# It never pushes and changes no primary Coretide configuration. Result schema broken-engine-finalize-coretide/v1;
-# exit 0 for pass, none, or landed, 2 for blocked, 1 for error.
+# It never pushes and changes no primary Coretide configuration. Result schema broken-engine-finalize-coretide/v2;
+# exit 0 for pass, none, or landed, 2 for blocked, 1 for error. Its disposition takes the Invoke-FinalizeLanding.ps1
+# values: recovery for a refusal a rebase or review round can cure with the clone branch restored, else terminal.
 [CmdletBinding()]
 param(
 	[Parameter(Mandatory, ParameterSetName = 'Prepare')][switch] $Prepare,
@@ -16,7 +17,9 @@ param(
 	[Parameter(ParameterSetName = 'Land')][string] $ApprovalReviewResultFile,
 	[Parameter(ParameterSetName = 'Land')][string] $ApprovedEngineCommit,
 	[Parameter(ParameterSetName = 'Land')][string] $EngineApprovalReviewResultFile,
-	[Parameter(ParameterSetName = 'Land')][switch] $ReleasePlanClaim
+	[Parameter(ParameterSetName = 'Land')][switch] $ReleasePlanClaim,
+	# The brief's Save-plan paths, comma-separated: a /save-plan landing of exactly those new files owes no review round.
+	[Parameter(ParameterSetName = 'Land')][string] $SavePlanPaths
 )
 
 $ErrorActionPreference = 'Stop'
@@ -29,21 +32,24 @@ if (-not (Test-Path -LiteralPath (Join-Path $scripts 'FinalizeWorkflowCommon.psm
 Import-Module (Join-Path $scripts 'FinalizeWorkflowCommon.psm1') -Force
 Import-Module (Join-Path $scripts 'AgentScriptCommon.psm1') -Force
 Import-Module (Join-Path $scripts 'AgentWorktreeSession.psm1') -Force -DisableNameChecking
+Import-Module (Join-Path $scripts 'SessionChangeInventory.psm1') -Force
 
 $result = [ordered]@{
-	schemaVersion = 'broken-engine-finalize-coretide/v1'
+	schemaVersion = 'broken-engine-finalize-coretide/v2'
 	status = 'error'
 	code = 'internal.error'
 	message = 'Coretide finalization did not run.'
+	disposition = 'terminal'
 	coretideCommit = $null
 	planClaim = [ordered]@{ requested = [bool]$ReleasePlanClaim; released = $false }
 	residuals = [Collections.Generic.List[string]]::new()
 }
 
-function Complete-FinalizeCoretide([int] $ExitCode, [string] $Status, [string] $Code, [string] $Message) {
+function Complete-FinalizeCoretide([int] $ExitCode, [string] $Status, [string] $Code, [string] $Message, [string] $Disposition = 'terminal') {
 	$result.status = $Status
 	$result.code = $Code
 	$result.message = $Message
+	$result.disposition = $Disposition
 	Write-Output ($result | ConvertTo-Json -Depth 32 -Compress)
 	exit $ExitCode
 }
@@ -140,9 +146,25 @@ try {
 	if ($approvedParent -cne $upstream) {
 		$rebase = Invoke-FinalizeVerifiedRebase -Repository $coretide -Branch $branch -Base $approvedParent -Commit $approved -Target $upstream
 		if ($rebase.Code -cne 'ok') {
-			Complete-FinalizeCoretide 2 'blocked' $rebase.Code $rebase.Message
+			Complete-FinalizeCoretide 2 'blocked' $rebase.Code $rebase.Message $(if ($rebase.Code -cin @('rebase.conflicted', 'rebase.patch-not-identical')) { 'recovery' } else { 'terminal' })
 		}
 		$landCommit = $rebase.Commit
+	}
+	# The review rounds must cover the commit about to be fast-forwarded; a refused rebased commit first puts the
+	# clone branch back on the approved one.
+	$coverageParameters = @{ RepositoryRoot = $session.Worktree; CoretideCandidate = $landCommit; SavePlanPaths = $SavePlanPaths }
+	if (-not [string]::IsNullOrWhiteSpace($ApprovedEngineCommit)) {
+		$engineCommit = Resolve-FinalizeCommit $session.Worktree $ApprovedEngineCommit
+		$coverageParameters.EngineBase = Resolve-FinalizeCommit $session.Worktree "$engineCommit^"
+		$coverageParameters.EngineCandidate = $engineCommit
+	}
+	$coverage = Test-ReviewRoundCoverage @coverageParameters
+	if ($null -ne $coverage) {
+		if ($landCommit -cne $approved) {
+			$restore = Restore-FinalizeBranch $coretide $branch $approved
+			if (-not $restore.Restored) { Complete-FinalizeCoretide 2 'blocked' 'rebase.abort-failed' "$($coverage.Message) $($restore.Message)" }
+		}
+		Complete-FinalizeCoretide 2 'blocked' $coverage.Code $coverage.Message $(if ($coverage.Code.StartsWith('inventory.review-round-')) { 'recovery' } else { 'terminal' })
 	}
 	$advance = Invoke-FinalizeNativeText 'git.exe' @('-C', $primaryCoretide, 'pull', '--ff-only', '--no-rebase', $coretide, $landCommit) $primaryCoretide
 	if ($advance.ExitCode -ne 0) {

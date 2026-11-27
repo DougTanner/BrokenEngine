@@ -40,11 +40,12 @@ again. It stays in the original cell, never transfers cells, and never enters
 deterministic game state. Peaks are horizontal destinations only: the body flies
 at the exact, unbounded Height (m) entry, which accepts only finite values and
 is reached at a fixed rate, with no terrain collision, island avoidance or
-descent hold. Flight planes are not a viewer control; the table stays supplied
-for engine files ([Engine integration](#engine-integration)). Model selection
-retains the body, destination, Height (m) entry, pause and mode. Reroll
-rebuilds elevation, then resets the body to its water anchor and the Height (m)
-entry to its default, retaining the mode.
+descent hold. The engine base height (`kfBaseHeightMeters`) is not a viewer
+control; `Source/Frame/Frame.h` supplies it for engine files
+([Engine integration](#engine-integration)). Model selection retains the body,
+destination, Height (m) entry, pause and mode. Reroll rebuilds elevation, then
+resets the body to its water anchor and the Height (m) entry to its default,
+retaining the mode.
 
 Startup shares the Sandbox client's native instance mutex under
 [Engine single-instance policy](../../Engine/Source/AGENTS.md#crash-reporting);

@@ -6,7 +6,6 @@
 
 #include "Agent/Commands/ReplayHarnessRigs.h"
 #include "File/Replay.h"
-#include "Frame/FlightPlanes.h"
 #include "Network/Server/ServerTransferManager.h"
 #include "Network/StatusChangeFields.h"
 
@@ -107,10 +106,10 @@ static void ParseStatusChangeField(const nlohmann::json& rEntry, DATA& rData)
 		{
 			throw std::runtime_error(std::format("'{}' must be an [x,y] array of finite numbers", kName));
 		}
-		// The caller supplies local XY only; positions sit on the lowest flight plane, and the W lane follows the
+		// The caller supplies local XY only; positions sit at the base height, and the W lane follows the
 		// position/direction invariant.
 		static constexpr bool kbIsPosition = kName == "vecPosition";
-		rMember = XMVectorSet(engine::AgentFloatValue(rValue.at(0), kName), engine::AgentFloatValue(rValue.at(1), kName), kbIsPosition ? engine::gpFlightPlanes->Lowest().fHeightMeters : 0.0f, kbIsPosition ? 1.0f : 0.0f);
+		rMember = XMVectorSet(engine::AgentFloatValue(rValue.at(0), kName), engine::AgentFloatValue(rValue.at(1), kName), kbIsPosition ? kfBaseHeightMeters : 0.0f, kbIsPosition ? 1.0f : 0.0f);
 	}
 	else if constexpr (std::is_same_v<Member, engine::AlignmentIdentifier>)
 	{
@@ -219,7 +218,7 @@ template <typename SPAWN_INFO>
 static SPAWN_INFO& ParseSpawnEntry(const nlohmann::json& rEntry, StatusChange& rChange, [[maybe_unused]] engine::GridCoord coordinate)
 {
 	SPAWN_INFO& rData = std::get<SPAWN_INFO>(rChange.data);
-	rData.vecPosition = XMVectorSet(0.0f, 0.0f, engine::gpFlightPlanes->Lowest().fHeightMeters, 1.0f);
+	rData.vecPosition = XMVectorSet(0.0f, 0.0f, kfBaseHeightMeters, 1.0f);
 	if constexpr (requires { rData.vecDirection; })
 	{
 		rData.vecDirection = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);

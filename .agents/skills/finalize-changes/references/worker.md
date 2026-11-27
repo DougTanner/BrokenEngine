@@ -35,8 +35,8 @@ every other lease is foreign.
 
 ## Steps
 
-Ordinary preparation runs steps 1-8; post-confirmation engine
-`rebase.conflicted` or `rebase.patch-not-identical` recovery enters at step 4;
+Ordinary preparation runs steps 1-8; post-confirmation engine-landing recovery
+(`## Recovery`) enters at step 4;
 landing runs steps 9-15 from `SKILL.md` `### Landing confirmation`'s capsule.
 A blocked result that needs recovery returns a handoff: main dispatches a fresh
 preparation worker whose capsule carries that blocked disposition as its
@@ -102,13 +102,12 @@ preparation dispatch recovers `primary.path-overlap` itself under
    - Never withhold the table waiting for a missing one: give each triggered
      handoff that does not exist its own row with the status that reference
      assigns a missing artifact.
-   - A triggered `/progressive-disclosure-review` handoff counts as existing on
-     the terms the landing acceptance table states for that row.
    - Consume every typed receipt verbatim, each `broken-engine-build-result/v1`
      envelope included, never summarized, reading an envelope the brief cites as
      a `Temp/` path plus selector from that file.
-   - A meaningful change to that diff re-runs review of the changed regions
-     only.
+   - After a meaningful change to that diff, return its changed paths for main
+     to route under
+     [change-workflow.md `#### Step 6 — Review and resolve correctness`](../../../references/change-workflow.md#step-6--review-and-resolve-correctness).
    - Reconcile the Coretide landing set against the `Projects/Coretide/` rows
      of `landing.reviewed`, and the engine landing set against the rest. When
      this worker's own `Invoke-FinalizeCoretide.ps1 -Prepare` reports `none`
@@ -142,8 +141,8 @@ preparation dispatch recovers `primary.path-overlap` itself under
    - A blocker returns no launch line and no landing summary, and names the
      candidate parent and live primary whenever either is available.
    - Route `primary.path-overlap` — and `needs-review` when `rebuildProjects`
-     is non-empty or on the initial step-4 check of a post-confirmation engine
-     `rebase.conflicted` / `rebase.patch-not-identical` recovery entry — to
+     is non-empty or on the initial step-4 check of a post-confirmation
+     engine-landing recovery entry — to
      `## Recovery`'s overlap recovery in this same dispatch (`## Recovery` owns
      the clean, conflict, `rebuildProjects` build, and abort/refusal outcomes).
    - Any other `needs-review` result (empty `rebuildProjects` on ordinary
@@ -189,6 +188,10 @@ preparation dispatch recovers `primary.path-overlap` itself under
    the step-6 lines, and a landing summary.
    - The summary carries `## Context`, outcome-focused `## What landed`, and
      `## Landing`.
+   - `## What landed` names once each distinct landed change whose
+     [`landing-acceptance-table.md`](landing-acceptance-table.md) step-2 record
+     carries a finding ID or user decision, stating every behavior it changes
+     and those IDs or decisions, or `none`.
    - `## Landing` states the checked candidate parent and live primary (and,
      after harmless primary movement, that any internal rebase can land only a
      byte-identical patch).
@@ -281,39 +284,40 @@ preparation dispatch recovers `primary.path-overlap` itself under
 
 ## Recovery
 
-- A `blocked` `Invoke-FinalizeCoretide.ps1 -Land` stops before engine landing:
-  on `rebase.conflicted` or `rebase.patch-not-identical` (restoration proven),
-  release the lease (`Invoke-FinalizeLockClaim.ps1 -Release`) and return for
-  recovery to rebase Coretide onto `@{upstream}` and re-run `-Prepare`, then
-  continue through steps 3-6 (fresh step-3 acceptance table, applicable
-  movement checks, and step-6 receipt reuse or refreshed review, or return the
-  meaning-change handoff if code meaning changed). If `-Prepare` returns
-  `coretide.no-changes` after a recovery rebase, stop, release any held landing
-  lease, and report to main without auto-releasing the Plan claim or
-  auto-completing. Any other `-Land` block returns a user blocker, retaining the
-  lease only on `rebase.abort-failed`.
-- Postconfirmation engine `Invoke-FinalizeLanding.ps1` `rebase.conflicted` or
-  `rebase.patch-not-identical`: prior landing arguments, baseline, expected
-  tips, and acceptance table are invalid; confirmation authority, drift routing,
-  and receipt reuse follow `SKILL.md` `### Landing confirmation` and step 6,
-  while prior verification handoffs stay valid where their evidence still
-  applies under the
+- A `blocked` `Invoke-FinalizeCoretide.ps1 -Land` stops before engine landing
+  and reports a `disposition` with the engine landing result's values
+  ([`scripts.md`](scripts.md#landing-and-recovery)). On `recovery`, release the
+  lease (`Invoke-FinalizeLockClaim.ps1 -Release`) and return for recovery to
+  rebase Coretide onto `@{upstream}` and re-run `-Prepare`, then, except after
+  an `inventory.review-round-*` refusal (next bullet), continue through steps
+  3-6 (fresh step-3 acceptance table, applicable movement checks, and step-6
+  receipt reuse or refreshed review, or return the meaning-change handoff if
+  code meaning changed). If `-Prepare` returns `coretide.no-changes` after a
+  recovery rebase, stop, release any held landing lease, and report to main
+  without auto-releasing the Plan claim or auto-completing. Any other
+  disposition returns a user blocker, retaining the lease only on
+  `rebase.abort-failed`.
+- Postconfirmation engine `Invoke-FinalizeLanding.ps1` `recovery` result: prior
+  landing arguments, baseline, expected tips, and acceptance table are invalid;
+  confirmation authority, drift routing, and receipt reuse follow `SKILL.md`
+  `### Landing confirmation` and step 6, while prior verification handoffs stay
+  valid where their evidence still applies under the
   [table rules](landing-acceptance-table.md#reviewed-diff-and-authorization).
-  Gate dispatch on those two typed codes (which prove restoration) and
-  `lock.released: true`, then return for a fresh preparation worker entering at
-  step 4 (`SKILL.md` `## Inputs`). If restoration or release is unproven
-  (`rebase.abort-failed`, `lock.released: false`), retain the blocker and lease
-  and stop. Never change primary before a fresh landing acceptance table and
-  `SKILL.md` `### Landing confirmation` complete, or reuse prior landing
-  arguments.
-- Reconciliation conflict: resolve under the approved invariants, then
-  re-review the affected regions and follow `SKILL.md`
-  `### Landing confirmation`. Resolve hunk by hunk, tracing each side's
-  intent to its originating commit or Plan before choosing, and preserve both
-  intents where they are compatible. Keep the resolution to behavior one side
-  already had; never invent new behavior in a resolution. A conflict on a path
-  that the primary-movement result triggering this reconciliation lists in
-  `changes.exportOutputPaths`
+  When the result's `disposition` is `recovery` and `lock.released` is true,
+  return for a fresh preparation worker entering at step 4 (`SKILL.md`
+  `## Inputs`); otherwise retain the blocker and lease and stop. Never change
+  primary before a fresh landing acceptance table and `SKILL.md`
+  `### Landing confirmation` complete, or reuse prior landing arguments. After
+  an `inventory.review-round-*` refusal from either script, return once the
+  rebased bytes are reproduced (`SKILL.md` `### Landing confirmation`).
+- Reconciliation conflict: resolve under the approved invariants, return the
+  changed paths as step 3 states for a meaningful change, and follow `SKILL.md`
+  `### Landing confirmation`. Resolve hunk by hunk, tracing
+  each side's intent to its originating commit or Plan before choosing, and
+  preserve both intents where they are compatible. Keep the resolution to
+  behavior one side already had; never invent new behavior in a resolution. A
+  conflict on a path that the primary-movement result triggering this
+  reconciliation lists in `changes.exportOutputPaths`
   ([`scripts.md#primary-movement-check`](scripts.md#primary-movement-check))
   resolves to the bytes at that result's `tips.livePrimary`, except that a
   modify/delete conflict where the session deleted the path keeps the session's

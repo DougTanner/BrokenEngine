@@ -3,6 +3,8 @@
 # ancestor subdirectory AGENTS.md files (excluding root AGENTS.md, Temp/, and
 # symlinks/reparse points) on file access, deduplicated via hook markers in the
 # active session transcript with zero OS-temp state.
+# Also strips newly added UTF-8 BOMs from safe in-worktree .ps1/.psm1 files
+# outside Temp/ after paired non-error Antigravity edit_file/write_file calls.
 # Exit codes:
 #   0 - always; stdout is compact hook JSON when emitting unseen entries/stubs,
 #       or empty on no-op or any fail-open error.
@@ -18,7 +20,8 @@ $script:DirectReadCommands = @('get-content', 'gc', 'cat', 'type')
 $script:SkipOutputCommands = @('echo', 'write-output', 'write-host', 'printf')
 $script:MetadataPathCommands = @('get-childitem', 'gci', 'ls', 'dir', 'test-path', 'get-item', 'gi', 'resolve-path')
 $script:MetadataSearchCommands = @('select-string', 'sls', 'rg', 'grep')
-$script:HeadingPatternRegex = [regex]::new('^\^#+(?:\+|\{\d+(?:,\d*)?\})? $')
+$script:HeadingPatternRegex = [regex]::new('^\^(?:#+(?:\+|\{0*[1-9]\d*(?:,\d*)?\})?|##+\{\d+(?:,\d*)?\})(?: |\\s\+?)$')
+$script:PlanFileRelPathRegex = [regex]::new('^(?:Projects/Coretide/)?Documents/Plans/[^/]+/[^/]+\.md$', [Text.RegularExpressions.RegexOptions]::IgnoreCase)
 $script:ApplyPatchHeaderRegex = [regex]::new('(?m)^\*\*\* (?:(?:Update|Add|Delete) File|Move to):\s*(.+?)\s*\r?$')
 $script:AgyFullReadRegex = [regex]::new('(?m)^Showing lines 1-(\d+) of \1\r?$')
 $script:AgyZeroExitRegex = [regex]::new('(?m)^Command exited with code 0\.\r?$')
@@ -46,6 +49,55 @@ function Test-IsAgentsFilePath([string] $ComparablePath) {
 	$slash = $ComparablePath.LastIndexOf('/')
 	$leaf = if ($slash -ge 0) { $ComparablePath.Substring($slash + 1) } else { $ComparablePath }
 	return $leaf.Equals('AGENTS.md', [StringComparison]::OrdinalIgnoreCase)
+}
+
+function Test-IsPlanFilePath([string] $ResolvedComparable, [string] $CwdComparable) {
+	if (-not (Test-UnderDirectory $ResolvedComparable $CwdComparable)) { return $false }
+	if (Test-IsAgentsFilePath $ResolvedComparable) { return $false }
+	return $script:PlanFileRelPathRegex.IsMatch($ResolvedComparable.Substring($CwdComparable.Length + 1))
+}
+
+function Test-AreAllPlanFileTargets([Collections.Generic.List[string]] $RawPaths, [bool] $HasDynamicPath, [string] $CwdComparable) {
+	if ($HasDynamicPath -or $RawPaths.Count -eq 0) { return $false }
+	foreach ($raw in $RawPaths) {
+		if ([string]::IsNullOrWhiteSpace($raw) -or $raw.IndexOfAny([char[]]'*?[]') -ge 0) { return $false }
+		try {
+			$resolved = ConvertTo-ComparablePath $raw $CwdComparable
+			if (-not (Test-IsPlanFilePath $resolved $CwdComparable)) { return $false }
+			$native = $resolved.Replace('/', [IO.Path]::DirectorySeparatorChar)
+			if (-not [IO.File]::Exists($native)) { return $false }
+		}
+		catch {
+			return $false
+		}
+	}
+	return $true
+}
+
+function Test-IsExemptPlanTierRead([string] $ResolvedComparable, [string] $NativePath, [string] $CwdComparable, $CallArgs) {
+	if (-not (Test-IsPlanFilePath $ResolvedComparable $CwdComparable)) { return $false }
+	if ($null -ne (Get-AgentTranscriptField $CallArgs 'ByteOffset')) { return $false }
+	$startLine = 0L
+	$endLine = 0L
+	if (-not (Test-JsonInteger (Get-AgentTranscriptField $CallArgs 'StartLine') ([ref]$startLine))) { return $false }
+	if (-not (Test-JsonInteger (Get-AgentTranscriptField $CallArgs 'EndLine') ([ref]$endLine))) { return $false }
+	if ($startLine -lt 1 -or $endLine -lt $startLine) { return $false }
+
+	try {
+		$safety = Get-AgentPathSafety $NativePath
+		if ($safety.Status -cne 'safe' -or $safety.Item.PSIsContainer) { return $false }
+		$lines = [IO.File]::ReadAllLines($safety.Path)
+		if ($endLine -gt $lines.Length) { return $false }
+		for ($idx = [int]($endLine - 1); $idx -ge 0; $idx--) {
+			if ($lines[$idx] -match '^##\s+') {
+				return (($idx + 1) -le $startLine) -and ($lines[$idx] -match '^##\s+Risk\s+tier\b')
+			}
+		}
+		return $false
+	}
+	catch {
+		return $false
+	}
 }
 
 function Add-MarkersFromText([string] $Text, [Collections.Generic.HashSet[string]] $Seen) {
@@ -168,6 +220,84 @@ function Get-WordPathCandidates($Word) {
 	return (Split-UnquotedCommaWord $Word $startOffset)
 }
 
+function Get-DirectReadLiteralOperands($El) {
+	$expectPath = $false
+	$expectPathIsLiteral = $false
+	$expectEncoding = $false
+	$endOfFlags = $false
+	$operands = [Collections.Generic.List[string]]::new()
+	for ($i = $El.CommandIndex + 1; $i -lt $El.Words.Count; $i++) {
+		$w = $El.Words[$i]
+		if ($w.HasVariable -or $w.HasSubstitution -or $w.IsSplat) { return $null }
+		$val = $w.Value
+		if ($expectEncoding) {
+			$expectEncoding = $false
+			continue
+		}
+		if ($expectPath) {
+			$pieces = Split-UnquotedCommaWord $w 0
+			if ($pieces.Count -eq 0) { return $null }
+			$wildcards = if ($expectPathIsLiteral) { [char[]]'*?' } else { [char[]]'*?[]' }
+			foreach ($p in $pieces) {
+				if ($p.IndexOfAny($wildcards) -ge 0) { return $null }
+				$operands.Add($p)
+			}
+			$expectPath = $w.View.EndsWith(',', [StringComparison]::Ordinal)
+			if (-not $expectPath) { $expectPathIsLiteral = $false }
+			continue
+		}
+		if (-not $endOfFlags -and $val -ceq '--') {
+			$endOfFlags = $true
+			continue
+		}
+		if (-not $endOfFlags -and $val.StartsWith('-') -and $val.Length -gt 1) {
+			if ($val -notmatch '^-([A-Za-z]+)(?::(.*))?$') { return $null }
+			$flag = $Matches[1].ToLowerInvariant()
+			$hasColon = $val.IndexOf(':') -ge 0
+			$inlineVal = if ($hasColon) { $Matches[2] } else { '' }
+			if ($flag -eq 'raw') {
+				if ($hasColon -and @('$true', '$false', 'true', 'false', '1', '0') -notcontains $inlineVal.ToLowerInvariant()) { return $null }
+				continue
+			}
+			elseif (@('literalpath', 'lp', 'pspath', 'path') -contains $flag) {
+				$isLiteral = $flag -ne 'path'
+				if ($hasColon) {
+					$pieces = Split-UnquotedCommaWord $w ($val.IndexOf(':') + 1)
+					if ($pieces.Count -eq 0) { return $null }
+					$wildcards = if ($isLiteral) { [char[]]'*?' } else { [char[]]'*?[]' }
+					foreach ($p in $pieces) {
+						if ($p.IndexOfAny($wildcards) -ge 0) { return $null }
+						$operands.Add($p)
+					}
+					if ($w.View.EndsWith(',', [StringComparison]::Ordinal)) {
+						$expectPath = $true
+						$expectPathIsLiteral = $isLiteral
+					}
+				}
+				else {
+					$expectPath = $true
+					$expectPathIsLiteral = $isLiteral
+				}
+				continue
+			}
+			elseif ($flag -eq 'encoding') {
+				if (-not $hasColon) { $expectEncoding = $true }
+				continue
+			}
+			else {
+				return $null
+			}
+		}
+		$pieces = Split-UnquotedCommaWord $w 0
+		foreach ($p in $pieces) {
+			if ($p.IndexOfAny([char[]]'*?[]') -ge 0) { return $null }
+			$operands.Add($p)
+		}
+	}
+	if ($expectPath -or $expectEncoding -or $operands.Count -eq 0) { return $null }
+	return , $operands
+}
+
 function Get-DirectReadShellPlan([string] $Command, [string] $CwdComparable, [string] $TempComparable, [hashtable] $CandidateCache) {
 	try {
 		$lex = Get-ShellTokenLists $Command $false
@@ -178,66 +308,12 @@ function Get-DirectReadShellPlan([string] $Command, [string] $CwdComparable, [st
 		if ($el.CommandIndex -lt 0 -or $el.PrecededBy -cne '' -or $el.FollowedBy -cne '') { return $null }
 		if ($script:DirectReadCommands -notcontains $el.Name) { return $null }
 
-		$expectPath = $false
-		$expectEncoding = $false
-		$endOfFlags = $false
-		$operands = [Collections.Generic.List[string]]::new()
-		for ($i = $el.CommandIndex + 1; $i -lt $el.Words.Count; $i++) {
-			$w = $el.Words[$i]
-			if ($w.HasVariable -or $w.HasSubstitution -or $w.IsSplat) { return $null }
-			$val = $w.Value
-			if ($expectEncoding) {
-				$expectEncoding = $false
-				continue
-			}
-			if ($expectPath) {
-				$pieces = Split-UnquotedCommaWord $w 0
-				if ($pieces.Count -eq 0) { return $null }
-				foreach ($p in $pieces) { $operands.Add($p) }
-				$expectPath = $w.Raw.EndsWith(',')
-				continue
-			}
-			if (-not $endOfFlags -and $val -ceq '--') {
-				$endOfFlags = $true
-				continue
-			}
-			if (-not $endOfFlags -and $val.StartsWith('-') -and $val.Length -gt 1) {
-				if ($val -notmatch '^-([A-Za-z]+)(?::(.*))?$') { return $null }
-				$flag = $Matches[1].ToLowerInvariant()
-				$hasColon = $val.IndexOf(':') -ge 0
-				$inlineVal = if ($hasColon) { $Matches[2] } else { '' }
-				if ($flag -eq 'raw') {
-					if ($hasColon -and @('$true', '$false', 'true', 'false', '1', '0') -notcontains $inlineVal.ToLowerInvariant()) { return $null }
-					continue
-				}
-				elseif (@('literalpath', 'lp', 'pspath', 'path') -contains $flag) {
-					if ($hasColon) {
-						$pieces = Split-UnquotedCommaWord $w ($val.IndexOf(':') + 1)
-						if ($pieces.Count -eq 0) { return $null }
-						foreach ($p in $pieces) { $operands.Add($p) }
-					}
-					else {
-						$expectPath = $true
-					}
-					continue
-				}
-				elseif ($flag -eq 'encoding') {
-					if (-not $hasColon) { $expectEncoding = $true }
-					continue
-				}
-				else {
-					return $null
-				}
-			}
-			$pieces = Split-UnquotedCommaWord $w 0
-			foreach ($p in $pieces) { $operands.Add($p) }
-		}
-		if ($expectPath -or $expectEncoding -or $operands.Count -eq 0) { return $null }
+		$operands = Get-DirectReadLiteralOperands $el
+		if ($null -eq $operands) { return $null }
 
 		$agentsCandidates = [Collections.Generic.List[object]]::new()
 		$otherTargets = [Collections.Generic.List[object]]::new()
 		foreach ($op in $operands) {
-			if ($op.IndexOfAny([char[]]'*?') -ge 0) { return $null }
 			try {
 				$resolved = ConvertTo-ComparablePath $op $CwdComparable
 				if (-not (Test-UnderDirectory $resolved $CwdComparable)) { continue }
@@ -276,14 +352,17 @@ function Get-LeafName([string] $PathText) {
 	return $PathText
 }
 
-function Test-IsContentReadElement($El) {
-	if ($El.CommandIndex -lt 0) { return $false }
-	if ($script:DirectReadCommands -contains $El.Name) { return $true }
-	if ($script:MetadataSearchCommands -contains $El.Name -and -not (Test-IsMetadataLookupElement $El)) { return $true }
+function Test-IsContentReadElement($Tokens, $Elements, [int] $Index, [string] $CwdComparable, [bool] $HasRedirection, [bool] $IsTopLevel) {
+	$el = $Elements[$Index]
+	if ($el.CommandIndex -lt 0) { return $false }
+	if (($script:DirectReadCommands -contains $el.Name -or $script:MetadataSearchCommands -contains $el.Name) -and
+		-not (Test-IsMetadataLookupElement $Tokens $Elements $Index $CwdComparable $HasRedirection $IsTopLevel)) {
+		return $true
+	}
 	return $false
 }
 
-function Get-PreservedMetadataIndices($Tokens, $Elements, [bool] $PreserveAll) {
+function Get-PreservedMetadataIndices($Tokens, $Elements, [bool] $PreserveAll, [string] $CwdComparable, [bool] $HasRedirection, [bool] $IsTopLevel) {
 	$preserved = [Collections.Generic.HashSet[int]]::new()
 	if ($Elements.Count -eq 0) { return , $preserved }
 	if ($PreserveAll) {
@@ -294,7 +373,7 @@ function Get-PreservedMetadataIndices($Tokens, $Elements, [bool] $PreserveAll) {
 	$isContentRead = [bool[]]::new($Elements.Count)
 	$hasAnyContentRead = $false
 	for ($i = 0; $i -lt $Elements.Count; $i++) {
-		if (Test-IsContentReadElement $Elements[$i]) {
+		if (Test-IsContentReadElement $Tokens $Elements $i $CwdComparable $HasRedirection $IsTopLevel) {
 			$isContentRead[$i] = $true
 			$hasAnyContentRead = $true
 		}
@@ -408,26 +487,140 @@ function Get-PreservedMetadataIndices($Tokens, $Elements, [bool] $PreserveAll) {
 	return , $preserved
 }
 
-function Test-IsMetadataLookupElement($El) {
+function Test-IsHeadingLookupPattern([string] $Pattern, $PathOperands, [bool] $HasDynamicPath, [string] $CwdComparable, [bool] $IsPiped) {
+	if ($script:HeadingPatternRegex.IsMatch($Pattern)) { return $true }
+	if ($IsPiped) { return $false }
+	$pipeIdx = $Pattern.IndexOf('|')
+	if ($pipeIdx -lt 0 -or $Pattern.IndexOf('|', $pipeIdx + 1) -ge 0) { return $false }
+	$left = $Pattern.Substring(0, $pipeIdx)
+	$right = $Pattern.Substring($pipeIdx + 1)
+	$isPlanHeadingAlternation = $false
+	if ($right.Equals('Tier', [StringComparison]::OrdinalIgnoreCase) -or
+		$right.Equals('Risk tier', [StringComparison]::OrdinalIgnoreCase) -or
+		$right.Equals('Expected Tier', [StringComparison]::OrdinalIgnoreCase)) {
+		$isPlanHeadingAlternation = $script:HeadingPatternRegex.IsMatch($left)
+	}
+	elseif ($left.Equals('Tier', [StringComparison]::OrdinalIgnoreCase) -or
+		$left.Equals('Expected Tier', [StringComparison]::OrdinalIgnoreCase)) {
+		$isPlanHeadingAlternation = $script:HeadingPatternRegex.IsMatch($right)
+	}
+	if (-not $isPlanHeadingAlternation) { return $false }
+	return Test-AreAllPlanFileTargets $PathOperands $HasDynamicPath $CwdComparable
+}
+
+function Test-IsAgentScriptWord($Word, [string] $CwdComparable) {
+	if ($Word.HasVariable -or $Word.HasSubstitution -or $Word.IsSplat -or
+		$Word.View.IndexOf('$') -ge 0 -or $Word.View.IndexOf(',') -ge 0 -or
+		$Word.Raw.IndexOfAny([char[]]"`r`n") -ge 0 -or
+		[string]::IsNullOrWhiteSpace($Word.Value)) {
+		return $false
+	}
+	try {
+		$resolved = ConvertTo-ComparablePath $Word.Value $CwdComparable
+	}
+	catch {
+		return $false
+	}
+	return $resolved.EndsWith('.ps1', [StringComparison]::OrdinalIgnoreCase) -and (Test-UnderDirectory $resolved "$CwdComparable/.agents")
+}
+
+function Test-IsMetadataLookupElement($Tokens, $Elements, [int] $Index, [string] $CwdComparable, [bool] $HasRedirection, [bool] $IsTopLevel) {
+	$El = $Elements[$Index]
 	if ($script:MetadataPathCommands -contains $El.Name) { return $true }
 
-	if ((Get-LeafName $El.Name).Equals('get-affectedagentsdocs.ps1', [StringComparison]::OrdinalIgnoreCase)) {
+	if ($script:DirectReadCommands -contains $El.Name) {
+		if ($HasRedirection -or -not $IsTopLevel) { return $false }
+		if ($El.CommandIndex -ne 0) { return $false }
+		if ($Index + 1 -ge $Elements.Count) { return $false }
+		$next = $Elements[$Index + 1]
+		if ($next.CommandIndex -ne 0 -or $next.Words.Count -ne 1 -or @('.count', '.length') -notcontains $next.Name) { return $false }
+		if ($null -eq (Get-DirectReadLiteralOperands $El)) { return $false }
+
+		$startIdx = -1
+		$depth = 0
+		for ($ti = 0; $ti -lt $Tokens.Count; $ti++) {
+			if ([object]::ReferenceEquals($Tokens[$ti], $El.Words[0])) {
+				$startIdx = $ti
+				break
+			}
+			if ($Tokens[$ti] -is [string]) {
+				if ($Tokens[$ti] -ceq '(' -or $Tokens[$ti] -ceq '{') { $depth++ }
+				elseif ($Tokens[$ti] -ceq ')' -or $Tokens[$ti] -ceq '}') { $depth-- }
+			}
+		}
+		if ($startIdx -le 0 -or $depth -ne 1) { return $false }
+		if (-not ($Tokens[$startIdx - 1] -is [string] -and $Tokens[$startIdx - 1] -ceq '(')) { return $false }
+		$endIdx = $startIdx + $El.Words.Count
+		if ($endIdx + 1 -ge $Tokens.Count) { return $false }
+		for ($wi = 1; $wi -lt $El.Words.Count; $wi++) {
+			if (-not [object]::ReferenceEquals($Tokens[$startIdx + $wi], $El.Words[$wi])) { return $false }
+		}
+		if (-not ($Tokens[$endIdx] -is [string] -and $Tokens[$endIdx] -ceq ')')) { return $false }
+		if (-not [object]::ReferenceEquals($Tokens[$endIdx + 1], $next.Words[0])) { return $false }
+		if ($startIdx -gt 1) {
+			$beforeOpen = $Tokens[$startIdx - 2]
+			if ($beforeOpen -isnot [string] -or $beforeOpen -cne ';') { return $false }
+		}
+		if ($endIdx + 2 -lt $Tokens.Count) {
+			$afterMember = $Tokens[$endIdx + 2]
+			if ($afterMember -isnot [string] -or $afterMember -cne ';') { return $false }
+		}
+		return $true
+	}
+
+	$isDirectCommand = (-not [string]::IsNullOrEmpty($El.Name)) -or ($El.CommandIndex -gt 0 -and $El.Words[$El.CommandIndex - 1].Raw -ceq '.')
+	if ($isDirectCommand -and (Test-IsAgentScriptWord $El.Words[$El.CommandIndex] $CwdComparable)) {
 		return $true
 	}
 	if ($El.Name -eq 'pwsh') {
+		$pwshSwitchOptions = @(
+			'-noprofile', '-nop',
+			'-noninteractive', '-noni',
+			'-nologo', '-nol',
+			'-noexit', '-noe',
+			'-noprofileloadtime',
+			'-interactive', '-i',
+			'-login', '-l',
+			'-mta', '-sta'
+		)
+		$pwshValueOptions = @(
+			'-executionpolicy', '-ep', '-ex',
+			'-workingdirectory', '-wd',
+			'-configurationname', '-config',
+			'-configurationfile', '-custompipename',
+			'-settingsfile', '-settings',
+			'-inputformat', '-inp', '-if',
+			'-outputformat', '-o', '-of',
+			'-windowstyle', '-w'
+		)
 		for ($i = $El.CommandIndex + 1; $i -lt ($El.Words.Count - 1); $i++) {
-			$val = $El.Words[$i].Value
-			if ($val.Equals('-Command', [StringComparison]::OrdinalIgnoreCase) -or $val.Equals('-c', [StringComparison]::OrdinalIgnoreCase)) {
+			$w = $El.Words[$i]
+			if ($w.HasVariable -or $w.HasSubstitution -or $w.IsSplat -or
+				$w.View.IndexOf('$') -ge 0 -or $w.View.IndexOf(',') -ge 0 -or
+				$w.Raw.IndexOfAny([char[]]"`r`n") -ge 0) {
 				break
 			}
-			if ($val.Equals('-File', [StringComparison]::OrdinalIgnoreCase)) {
-				$next = $El.Words[$i + 1]
-				if (-not $next.HasVariable -and -not $next.HasSubstitution -and
-					(Get-LeafName $next.Value).Equals('get-affectedagentsdocs.ps1', [StringComparison]::OrdinalIgnoreCase)) {
+			$lower = $w.Value.ToLowerInvariant()
+			if ($lower -eq '-file' -or $lower -eq '-f') {
+				if (Test-IsAgentScriptWord $El.Words[$i + 1] $CwdComparable) {
 					return $true
 				}
 				break
 			}
+			if ($pwshSwitchOptions -contains $lower) {
+				continue
+			}
+			if ($pwshValueOptions -contains $lower) {
+				$optVal = $El.Words[$i + 1]
+				if ($optVal.HasVariable -or $optVal.HasSubstitution -or $optVal.IsSplat -or
+					$optVal.View.IndexOf('$') -ge 0 -or $optVal.View.IndexOf(',') -ge 0 -or
+					$optVal.Raw.IndexOfAny([char[]]"`r`n") -ge 0) {
+					break
+				}
+				$i++
+				continue
+			}
+			break
 		}
 		return $false
 	}
@@ -436,14 +629,14 @@ function Test-IsMetadataLookupElement($El) {
 
 	if ($El.Name -eq 'rg' -or $El.Name -eq 'grep') {
 		if ($El.FollowedBy -ceq '(') { return $false }
+		if ($El.Words[$El.Words.Count - 1].View.EndsWith(',', [StringComparison]::Ordinal)) { return $false }
 		$expectPattern = $false
 		$expectOtherValue = $false
 		$endOfFlags = $false
 		$hasMetadataOutputFlag = $false
 		$explicitPatternCount = 0
 		$patternValue = $null
-		$positionalPattern = $null
-		$positionalPatternDynamic = $false
+		$positionals = [Collections.Generic.List[object]]::new()
 
 		$metadataShortFlags = @('l', 'c')
 		$metadataLongFlags = if ($El.Name -eq 'rg') {
@@ -456,13 +649,13 @@ function Test-IsMetadataLookupElement($El) {
 		$safeShortValueFlags = @('m', 'd')
 		$safeLongBoolFlags = @('--ignore-case', '--line-number', '--with-filename', '--no-filename',
 			'--word-regexp', '--quiet', '--silent', '--no-messages', '--follow')
-		$safeLongValueFlags = @('--max-count', '--color', '--encoding')
+		$safeLongValueFlags = @('--max-count', '--encoding')
 		if ($El.Name -eq 'rg') {
 			$safeShortBoolFlags += @('S', 'u')
 			$safeShortValueFlags += @('g', 't', 'T', 'M', 'j', 'E')
 			$safeLongBoolFlags += @('--no-heading', '--heading', '--smart-case', '--case-sensitive',
 				'--hidden', '--no-ignore', '--unrestricted')
-			$safeLongValueFlags += @('--glob', '--iglob', '--type', '--type-not', '--max-depth',
+			$safeLongValueFlags += @('--color', '--glob', '--iglob', '--type', '--type-not', '--max-depth',
 				'--max-columns', '--threads')
 		}
 		else {
@@ -511,6 +704,9 @@ function Test-IsMetadataLookupElement($El) {
 				if (-not $hasEq -and $safeLongBoolFlags -ccontains $flagName) {
 					continue
 				}
+				if ($El.Name -eq 'grep' -and $flagName -ceq '--color') {
+					continue
+				}
 				if ($safeLongValueFlags -ccontains $flagName) {
 					if (-not $hasEq) { $expectOtherValue = $true }
 					continue
@@ -545,29 +741,45 @@ function Test-IsMetadataLookupElement($El) {
 				}
 				continue
 			}
-			if ($explicitPatternCount -eq 0 -and $null -eq $positionalPattern -and -not $positionalPatternDynamic) {
-				if ($w.HasVariable -or $w.HasSubstitution) { $positionalPatternDynamic = $true }
-				else { $positionalPattern = $val }
-			}
+			$positionals.Add($w)
 		}
 
 		if ($expectPattern -or $expectOtherValue) { return $false }
 		if ($hasMetadataOutputFlag) { return $true }
 		if ($explicitPatternCount -gt 1) { return $false }
-		if ($explicitPatternCount -eq 1) { return $script:HeadingPatternRegex.IsMatch($patternValue) }
-		if ($positionalPatternDynamic -or $null -eq $positionalPattern) { return $false }
-		return $script:HeadingPatternRegex.IsMatch($positionalPattern)
+		$pathOperands = [Collections.Generic.List[string]]::new()
+		$hasDynamicPath = $false
+		$pathStart = 0
+		if ($explicitPatternCount -eq 1) {
+			$activePattern = $patternValue
+		}
+		else {
+			if ($positionals.Count -eq 0 -or $positionals[0].HasVariable -or $positionals[0].HasSubstitution) { return $false }
+			$activePattern = $positionals[0].Value
+			$pathStart = 1
+		}
+		for ($pi = $pathStart; $pi -lt $positionals.Count; $pi++) {
+			$pw = $positionals[$pi]
+			if ($pw.HasVariable -or $pw.HasSubstitution) { $hasDynamicPath = $true }
+			else { $pathOperands.Add($pw.Value) }
+		}
+		return Test-IsHeadingLookupPattern $activePattern $pathOperands $hasDynamicPath $CwdComparable ($El.PrecededBy -ceq '|')
 	}
 
 	# select-string / sls
+	if ($El.FollowedBy -ceq '(' -or $El.FollowedBy -ceq '{') { return $false }
+	if ($El.Words[$El.Words.Count - 1].View.EndsWith(',', [StringComparison]::Ordinal)) { return $false }
 	$expectPattern = $false
+	$expectPathValue = $false
 	$expectOtherValue = $false
 	$endOfFlags = $false
 	$patternCount = 0
 	$patternValue = $null
-	$positionalPattern = $null
-	$positionalPatternDynamic = $false
-	$safeValueFlags = @('path', 'literalpath', 'lp', 'pspath', 'encoding', 'include', 'exclude', 'culture')
+	$pathOperands = [Collections.Generic.List[string]]::new()
+	$hasDynamicPath = $false
+	$positionals = [Collections.Generic.List[object]]::new()
+	$pathFlags = @('path', 'literalpath', 'lp', 'pspath')
+	$safeValueFlags = @('encoding', 'include', 'exclude', 'culture')
 	$safeSwitchFlags = @('casesensitive', 'allmatches', 'list', 'quiet', 'raw', 'noemphasis')
 
 	for ($i = $El.CommandIndex + 1; $i -lt $El.Words.Count; $i++) {
@@ -581,6 +793,17 @@ function Test-IsMetadataLookupElement($El) {
 			$patternCount++
 			$patternValue = $val
 			$expectPattern = $false
+			continue
+		}
+		if ($expectPathValue) {
+			if ($w.HasVariable -or $w.HasSubstitution) {
+				$hasDynamicPath = $true
+			}
+			else {
+				$pieces = Split-UnquotedCommaWord $w 0
+				foreach ($p in $pieces) { $pathOperands.Add($p) }
+			}
+			$expectPathValue = $w.View.EndsWith(',', [StringComparison]::Ordinal) -or $nextStartsWithComma
 			continue
 		}
 		if ($expectOtherValue) {
@@ -608,6 +831,17 @@ function Test-IsMetadataLookupElement($El) {
 				}
 				continue
 			}
+			if ($pathFlags -contains $flag) {
+				if ($hasColon) {
+					$pieces = Split-UnquotedCommaWord $w ($val.IndexOf(':') + 1)
+					foreach ($p in $pieces) { $pathOperands.Add($p) }
+					$expectPathValue = $w.View.EndsWith(',', [StringComparison]::Ordinal) -or $nextStartsWithComma
+				}
+				else {
+					$expectPathValue = $true
+				}
+				continue
+			}
 			if ($safeValueFlags -contains $flag) {
 				if ($hasColon) {
 					$expectOtherValue = $w.View.EndsWith(',', [StringComparison]::Ordinal) -or $nextStartsWithComma
@@ -625,26 +859,45 @@ function Test-IsMetadataLookupElement($El) {
 			}
 			return $false
 		}
-		if ($patternCount -eq 0 -and $null -eq $positionalPattern -and -not $positionalPatternDynamic) {
-			if ($w.HasVariable -or $w.HasSubstitution -or $w.View.IndexOf(',') -ge 0 -or $nextStartsWithComma) {
-				$positionalPatternDynamic = $true
-			}
-			else {
-				$positionalPattern = $val
-			}
-		}
+		$positionals.Add([pscustomobject]@{ Word = $w; NextStartsWithComma = $nextStartsWithComma })
 	}
 
-	if ($expectPattern -or $expectOtherValue -or $patternCount -gt 1) { return $false }
-	if ($patternCount -eq 1) { return $script:HeadingPatternRegex.IsMatch($patternValue) }
-	if ($positionalPatternDynamic -or $null -eq $positionalPattern) { return $false }
-	return $script:HeadingPatternRegex.IsMatch($positionalPattern)
+	if ($expectPattern -or $expectPathValue -or $expectOtherValue -or $patternCount -gt 1) { return $false }
+	$pathStart = 0
+	if ($patternCount -eq 1) {
+		$activePattern = $patternValue
+	}
+	else {
+		if ($positionals.Count -eq 0) { return $false }
+		$p0 = $positionals[0]
+		if ($p0.Word.HasVariable -or $p0.Word.HasSubstitution -or $p0.Word.View.IndexOf(',') -ge 0 -or $p0.NextStartsWithComma) {
+			return $false
+		}
+		$activePattern = $p0.Word.Value
+		$pathStart = 1
+	}
+	for ($pi = $pathStart; $pi -lt $positionals.Count; $pi++) {
+		$pw = $positionals[$pi].Word
+		if ($pi -eq ($positionals.Count - 1) -and $pw.View.EndsWith(',', [StringComparison]::Ordinal)) {
+			return $false
+		}
+		if ($pw.HasVariable -or $pw.HasSubstitution) {
+			$hasDynamicPath = $true
+		}
+		else {
+			$pieces = Split-UnquotedCommaWord $pw 0
+			foreach ($p in $pieces) { $pathOperands.Add($p) }
+		}
+	}
+	return Test-IsHeadingLookupPattern $activePattern $pathOperands $hasDynamicPath $CwdComparable ($El.PrecededBy -ceq '|')
 }
 
 function Get-ShellAccessedTargets([string] $Command, [string] $CwdComparable) {
 	$targets = [Collections.Generic.List[object]]::new()
 	try {
-		$tokenLists = (Get-ShellTokenLists $Command $false).TokenLists
+		$lex = Get-ShellTokenLists $Command $false
+		$tokenLists = $lex.TokenLists
+		$hasRedirection = $lex.HasRedirection
 	}
 	catch {
 		return , $targets
@@ -660,8 +913,9 @@ function Get-ShellAccessedTargets([string] $Command, [string] $CwdComparable) {
 		}
 		$parsedLists.Add([pscustomobject]@{ Index = $t; Tokens = $tokenLists[$t]; Elements = $elements })
 		if (-not $hasContentReaderWithSubstitution -and $tokenLists.Count -gt 1) {
-			foreach ($el in $elements) {
-				if (-not (Test-IsContentReadElement $el)) { continue }
+			for ($ei = 0; $ei -lt $elements.Count; $ei++) {
+				$el = $elements[$ei]
+				if (-not (Test-IsContentReadElement $tokenLists[$t] $elements $ei $CwdComparable $hasRedirection ($t -eq 0))) { continue }
 				for ($w = $el.CommandIndex + 1; $w -lt $el.Words.Count; $w++) {
 					if ($el.Words[$w].HasSubstitution) {
 						$hasContentReaderWithSubstitution = $true
@@ -674,12 +928,13 @@ function Get-ShellAccessedTargets([string] $Command, [string] $CwdComparable) {
 	}
 	foreach ($entry in $parsedLists) {
 		$elements = $entry.Elements
-		$preserved = Get-PreservedMetadataIndices $entry.Tokens $elements ($entry.Index -gt 0 -and $hasContentReaderWithSubstitution)
+		$isTopLevel = ($entry.Index -eq 0)
+		$preserved = Get-PreservedMetadataIndices $entry.Tokens $elements ($entry.Index -gt 0 -and $hasContentReaderWithSubstitution) $CwdComparable $hasRedirection $isTopLevel
 		for ($i = 0; $i -lt $elements.Count; $i++) {
 			$el = $elements[$i]
 			if ($el.CommandIndex -lt 0) { continue }
 			if ($script:SkipOutputCommands -contains $el.Name) { continue }
-			if ((Test-IsMetadataLookupElement $el) -and -not $preserved.Contains($i)) { continue }
+			if ((Test-IsMetadataLookupElement $entry.Tokens $elements $i $CwdComparable $hasRedirection $isTopLevel) -and -not $preserved.Contains($i)) { continue }
 			$isDirectRead = $script:DirectReadCommands -contains $el.Name
 			$cmdWord = $el.Words[$el.CommandIndex]
 			$wordsToScan = [Collections.Generic.List[object]]::new()
@@ -782,6 +1037,114 @@ function Write-Utf8Stdout([string] $Text) {
 	$bytes = $script:Utf8.GetBytes($Text)
 	$stdout.Write($bytes, 0, $bytes.Length)
 	$stdout.Flush()
+}
+
+function Invoke-GitReadOnly([string] $WorkingDirectory, [string[]] $Arguments, [switch] $RawStdout) {
+	$start = [Diagnostics.ProcessStartInfo]::new()
+	$start.FileName = 'git'
+	$start.WorkingDirectory = $WorkingDirectory
+	$start.UseShellExecute = $false
+	$start.CreateNoWindow = $true
+	$start.RedirectStandardOutput = $true
+	$start.RedirectStandardError = $true
+	$start.StandardOutputEncoding = $script:Utf8
+	$start.StandardErrorEncoding = $script:Utf8
+	foreach ($envName in @('GIT_DIR', 'GIT_WORK_TREE', 'GIT_COMMON_DIR', 'GIT_INDEX_FILE', 'GIT_OBJECT_DIRECTORY', 'GIT_ALTERNATE_OBJECT_DIRECTORIES', 'GIT_NAMESPACE')) {
+		[void] $start.Environment.Remove($envName)
+	}
+	$start.Environment['GIT_OPTIONAL_LOCKS'] = '0'
+	[void] $start.ArgumentList.Add('-C')
+	[void] $start.ArgumentList.Add($WorkingDirectory)
+	[void] $start.ArgumentList.Add('--no-pager')
+	foreach ($arg in $Arguments) { [void] $start.ArgumentList.Add($arg) }
+
+	$process = [Diagnostics.Process]::new()
+	$process.StartInfo = $start
+	$memory = $null
+	try {
+		if (-not $process.Start()) { return $null }
+		if ($RawStdout) {
+			$memory = [IO.MemoryStream]::new()
+			$stdoutTask = $process.StandardOutput.BaseStream.CopyToAsync($memory)
+		}
+		else {
+			$stdoutTask = $process.StandardOutput.ReadToEndAsync()
+		}
+		$stderrTask = $process.StandardError.ReadToEndAsync()
+		$process.WaitForExit()
+		$stdout = $stdoutTask.GetAwaiter().GetResult()
+		[void] $stderrTask.GetAwaiter().GetResult()
+		if ($RawStdout) { $stdout = $memory.ToArray() }
+		return [pscustomobject]@{
+			ExitCode = $process.ExitCode
+			Stdout = $stdout
+		}
+	}
+	finally {
+		if ($null -ne $memory) { $memory.Dispose() }
+		$process.Dispose()
+	}
+}
+
+function Remove-AddedPowerShellBom([string] $Resolved, [string] $Native, [string] $TempComparable) {
+	if (-not ($Resolved.EndsWith('.ps1', [StringComparison]::OrdinalIgnoreCase) -or
+		$Resolved.EndsWith('.psm1', [StringComparison]::OrdinalIgnoreCase))) {
+		return
+	}
+	if (Test-UnderDirectory $Resolved $TempComparable) { return }
+
+	$safety = Get-AgentPathSafety $Native
+	if ($safety.Status -cne 'safe' -or $safety.Item.PSIsContainer) { return }
+
+	$bytes = [IO.File]::ReadAllBytes($safety.Path)
+	if ($bytes.Length -lt 3 -or $bytes[0] -ne 0xEF -or $bytes[1] -ne 0xBB -or $bytes[2] -ne 0xBF) { return }
+
+	$parentDir = [IO.Path]::GetDirectoryName($safety.Path)
+	if ([string]::IsNullOrEmpty($parentDir)) { return }
+
+	$lsRun = Invoke-GitReadOnly $parentDir @('ls-tree', '-z', '--full-name', '--name-only', 'HEAD')
+	if ($null -eq $lsRun -or $lsRun.ExitCode -ne 0) { return }
+
+	$targetLeaf = [IO.Path]::GetFileName($safety.Path)
+	$headPath = $null
+	foreach ($entry in ($lsRun.Stdout -split "`0")) {
+		if ([string]::IsNullOrEmpty($entry)) { continue }
+		if ((Get-LeafName $entry).Equals($targetLeaf, [StringComparison]::OrdinalIgnoreCase)) {
+			$headPath = $entry
+			break
+		}
+	}
+
+	if ($null -ne $headPath) {
+		$blobRun = Invoke-GitReadOnly $parentDir @('cat-file', 'blob', "HEAD:$headPath") -RawStdout
+		if ($null -eq $blobRun -or $blobRun.ExitCode -ne 0) { return }
+		$headBytes = [byte[]]$blobRun.Stdout
+		if ($headBytes.Length -ge 3 -and $headBytes[0] -eq 0xEF -and $headBytes[1] -eq 0xBB -and $headBytes[2] -eq 0xBF) { return }
+	}
+
+	$recheck = Get-AgentPathSafety $safety.Path
+	if ($recheck.Status -cne 'safe' -or $recheck.Item.PSIsContainer) { return }
+
+	$stream = [IO.FileStream]::new($safety.Path, [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+	try {
+		$len = $stream.Length
+		if ($len -lt 3 -or $len -gt [int]::MaxValue) { return }
+		$currentBytes = [byte[]]::new([int]$len)
+		$offset = 0
+		while ($offset -lt $currentBytes.Length) {
+			$read = $stream.Read($currentBytes, $offset, $currentBytes.Length - $offset)
+			if ($read -le 0) { break }
+			$offset += $read
+		}
+		if ($offset -ne $currentBytes.Length -or $currentBytes[0] -ne 0xEF -or $currentBytes[1] -ne 0xBB -or $currentBytes[2] -ne 0xBF) { return }
+
+		$stream.Position = 0
+		$stream.Write($currentBytes, 3, $currentBytes.Length - 3)
+		$stream.SetLength($currentBytes.Length - 3)
+	}
+	finally {
+		$stream.Dispose()
+	}
 }
 
 function Invoke-AgyPostInvocation($Hook) {
@@ -913,7 +1276,9 @@ function Invoke-AgyPostInvocation($Hook) {
 						Add-AccessedTarget $resolved $true $cwdComparable $tempComparable $state
 					}
 					elseif ([IO.File]::Exists($native)) {
-						Add-AccessedTarget $resolved $false $cwdComparable $tempComparable $state
+						if (-not (Test-IsExemptPlanTierRead $resolved $native $cwdComparable $call.Args)) {
+							Add-AccessedTarget $resolved $false $cwdComparable $tempComparable $state
+						}
 					}
 				}
 			}
@@ -921,7 +1286,7 @@ function Invoke-AgyPostInvocation($Hook) {
 				continue
 			}
 		}
-		elseif ($call.Name -ceq 'edit_file') {
+		elseif ($call.Name -ceq 'edit_file' -or $call.Name -ceq 'write_file') {
 			$path = Get-AgentTranscriptField $call.Args 'Path'
 			if ($path -isnot [string] -or [string]::IsNullOrWhiteSpace($path)) { continue }
 			try {
@@ -933,26 +1298,11 @@ function Invoke-AgyPostInvocation($Hook) {
 				}
 				elseif ([IO.File]::Exists($native)) {
 					Add-AccessedTarget $resolved $false $cwdComparable $tempComparable $state
+					if ($null -ne $call.Result) {
+						Remove-AddedPowerShellBom $resolved $native $tempComparable
+					}
 				}
-			}
-			catch {
-				continue
-			}
-		}
-		elseif ($call.Name -ceq 'write_file') {
-			$path = Get-AgentTranscriptField $call.Args 'Path'
-			if ($path -isnot [string] -or [string]::IsNullOrWhiteSpace($path)) { continue }
-			try {
-				$resolved = ConvertTo-ComparablePath $path $cwdComparable
-				if (-not (Test-UnderDirectory $resolved $cwdComparable)) { continue }
-				$native = $resolved.Replace('/', [IO.Path]::DirectorySeparatorChar)
-				if ([IO.Directory]::Exists($native)) {
-					Add-AccessedTarget $resolved $true $cwdComparable $tempComparable $state
-				}
-				elseif ([IO.File]::Exists($native)) {
-					Add-AccessedTarget $resolved $false $cwdComparable $tempComparable $state
-				}
-				else {
+				elseif ($call.Name -ceq 'write_file') {
 					$parentDir = Get-ComparableParent $resolved
 					if (-not [string]::IsNullOrEmpty($parentDir) -and [IO.Directory]::Exists($parentDir.Replace('/', [IO.Path]::DirectorySeparatorChar))) {
 						Add-AccessedTarget $resolved $false $cwdComparable $tempComparable $state

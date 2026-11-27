@@ -97,10 +97,8 @@ main-session skill links every needed reference from `SKILL.md`.
 ## Shared vocabulary
 
 Status and severity words are the ones the shared handoff form in
-`subagent-handoff.md` lists. `Critical` and `Required` are defined in
-`.agents/skills/repo-code-review/SKILL.md`, and `Recommended` in
-`.agents/skills/external-skill-creator/SKILL.md` validation mode. Introduce no
-other status or severity term.
+`subagent-handoff.md` lists; the severity words are defined in its
+`## Severity`. Introduce no other status or severity term.
 
 ## Reviewer checklist
 

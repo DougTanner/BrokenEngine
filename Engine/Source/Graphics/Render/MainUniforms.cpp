@@ -18,7 +18,7 @@ static void DebugRenderCellEdges(const std::vector<GridCoord>& rActiveCoordinate
 		return;
 	}
 
-	float fZ = gpFlightPlanes->Lowest().fHeightMeters;
+	float fZ = game::kfBaseHeightMeters;
 	static constexpr XMFLOAT4A kf4EdgeColor = {0.0f, 1.0f, 1.0f, 1.0f};
 
 	for (const GridCoord& rCoordinate : rActiveCoordinates)
@@ -56,7 +56,7 @@ static void DebugRenderIslandBoundaries(const std::vector<GridCoord>& rActiveCoo
 		return;
 	}
 
-	float fZ = gpFlightPlanes->Lowest().fHeightMeters;
+	float fZ = game::kfBaseHeightMeters;
 	static constexpr XMFLOAT4A kf4BoundaryColor = {1.0f, 0.0f, 1.0f, 1.0f};
 
 	for (const GridCoord& rCoordinate : rActiveCoordinates)
@@ -104,7 +104,7 @@ static void DebugRenderIslandValidArea(const std::vector<GridCoord>& rActiveCoor
 	}
 
 	// Drawn at the underwater mask threshold depth (the depth that defines the hull boundary), below
-	// the magenta boundary rectangle / cyan cell edges at the lowest flight plane. Debug lines are an overlay
+	// the magenta boundary rectangle / cyan cell edges at the base height. Debug lines are an overlay
 	// (no depth test), so the underwater Z is never occluded by terrain or water.
 	float fZ = common::kfUnderwaterMaskThresholdMeters;
 	static constexpr XMFLOAT4A kf4ValidAreaColor = {0.0f, 1.0f, 0.0f, 1.0f};

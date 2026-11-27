@@ -129,10 +129,16 @@ commit before landing.
     `/compile` for its `builds=` targets: Client and Server in Debug and
     Release, plus Profile when the line reads `profile=yes`; the others in
     Release. Done when every build passes or the line reads `cpp=no`.
-11. Report the stage per `## Handoff`, land the changed files (including any
-    deferred-fixes record) through `/finalize-changes`, then remove `Temp/Sweep`
-    and `Temp/sweep-stderr.txt` if present by exact literal paths. Done when
-    `/finalize-changes` and that cleanup complete.
+11. Freeze the sweep's review round: run
+    `pwsh -NoProfile -NonInteractive -File .agents/skills/sweep/scripts/Invoke-Sweep.ps1 -Spec '<spec>' -ReviewRound`,
+    and continue after it succeeds. Then report the stage per `## Handoff` and
+    land the changed files (including any deferred-fixes record) through
+    `/finalize-changes`. A `/sweep` run has no further round, so when landing
+    refuses the sweep's candidate with an `inventory.review-round-*` code,
+    report it to the user as a blocker: the sweep's changes cannot land from
+    that candidate. Once it lands, remove `Temp/Sweep` and
+    `Temp/sweep-stderr.txt` if present by exact literal paths. Done when the
+    round is frozen and `/finalize-changes` and that cleanup complete.
 
 ## Handoff
 

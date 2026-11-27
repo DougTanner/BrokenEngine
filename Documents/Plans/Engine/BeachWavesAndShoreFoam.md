@@ -1,9 +1,9 @@
-<!-- broken-engine-plan/v2 {"createdUtc":"2026-11-25T20:59:38.853Z","dependsOn":["Documents/Plans/Engine/AllocateOnlyActiveLightingSpreadPasses.md","Documents/Plans/Engine/FftMediumWaves.md","Documents/Plans/Engine/MergeRenderTargetTexturesLighting.md","Documents/Plans/Engine/ModernGerstnerLowDirectionalWaves.md","Documents/Plans/Engine/PrepareLightingSpreadTaps.md","Documents/Plans/Engine/RemoveCompassHaloFromLighting.md","Documents/Plans/Engine/ReplaceFlightPlanesWithBaseHeight.md","Documents/Plans/Engine/SingleLayerSmoke.md","Documents/Plans/Engine/WaterWaveIsolationControls.md"]} -->
+<!-- broken-engine-plan/v2 {"createdUtc":"2026-11-25T20:59:38.853Z","dependsOn":["Documents/Plans/Engine/AllocateOnlyActiveLightingSpreadPasses.md","Documents/Plans/Engine/FftMediumWaves.md","Documents/Plans/Engine/MergeRenderTargetTexturesLighting.md","Documents/Plans/Engine/ModernGerstnerLowDirectionalWaves.md","Documents/Plans/Engine/PrepareLightingSpreadTaps.md","Documents/Plans/Engine/RemoveCompassHaloFromLighting.md","Documents/Plans/Engine/SingleLayerSmoke.md"]} -->
 # Add Shore-Directed Beach Waves, Swash Foam, and Wet Sand
 
 ## Context
 
-After `FftMediumWaves.md` and `ModernGerstnerLowDirectionalWaves.md`, open-ocean
+After the FFT medium-wave and low-directional Gerstner rewrites, open-ocean
 medium waves run on multi-cascade GPU FFT and low-directional swells run on a
 spectral asymmetric Gerstner solver. Those low-directional swells travel in a
 global world direction, so around an island they run parallel to or away from
@@ -21,6 +21,30 @@ add geometry seams and overdraw. What reads unmistakably from altitude is a
 existing ocean grid (`895 x 511` LOD 0 quads, `0.105..0.713 m` per quad across
 `framing = 100..600`), paired with per-pixel breaking foam, rhythmic swash,
 retained surf-zone foam trails, and wet-sand darkening/gloss on the beach.
+
+This is the final Plan in the four-plan water-wave rewrite series.
+`WaterWaveIsolationControls` and earlier series commits live on branch
+`water-waves`, while the primary checkout stays on `main` so other agents are
+not disrupted. Because `/next-plan` claims this Plan from `main`, the session
+worktree starts at `main`. Keep the session branch at `main` through
+`/next-plan` step 6's claim refresh — inspecting `water-waves` code via Git
+during step-4/5 preparation and review so `Invoke-NextPlanClaim.ps1` does not
+block with `claim.session-diverged` — and move the session worktree onto
+`water-waves` only **after** step 6's claim refresh completes — merging `main`
+into `water-waves` first (without rewriting `water-waves` history) if `main`
+holds completed external prerequisites or overlapping updates — then implement,
+build, and verify on `water-waves`, leaving `main`'s code untouched. At landing
+(`/finalize-changes`), land the implementation and Plan completion onto
+`water-waves` under the global landing lock — either by switching primary to
+`water-waves` for preparation and landing together (then switching primary back
+to `main`), or via a user-authorized locked update of `refs/heads/water-waves`
+while primary stays on `main` — then release the Plan claim and sync only the
+Plan deletion and any child `dependsOn` edge removals onto `main` (with no
+water-wave code on `main`). Merging `water-waves` into `main` remains a
+separate post-series, user-confirmed integration step; if the user directs
+removal of the temporary wave-isolation controls, perform that removal and its
+build/visual verification on `water-waves` before requesting confirmation to
+land onto `main`.
 
 ### Engine Scale and Integration Constraints
 
@@ -48,11 +72,11 @@ retained surf-zone foam trails, and wet-sand darkening/gloss on the beach.
   deeper interior where `s < 0`) in one pass with zero extra render targets,
   draw calls, or descriptor bindings.
 - `WaterDisplacement.comp` must preserve the shared render-target and
-  slope-addition contract established by `FftMediumWaves.md` and
-  `ModernGerstnerLowDirectionalWaves.md`: `displacementImage = vec4(Dx_total,
-  Dy_total, Dz_total, fMediumWeight)` and `normalImage = vec4(n_low_and_shore,
-  J_total)`, with `Water.frag` combining `normalize(f3InNormal)` with `n_fft`
-  and applying `fWaterWaveNormalBlend` once.
+  slope-addition contract from the FFT medium-wave and low-directional Gerstner
+  rewrites: `displacementImage = vec4(Dx_total, Dy_total, Dz_total,
+  fMediumWeight)` and `normalImage = vec4(n_low_and_shore, J_total)`, with
+  `Water.frag` combining `normalize(f3InNormal)` with `n_fft` and applying
+  `fWaterWaveNormalBlend` once.
 - CPU terrain height queries in `Engine/Source/Frame/IslandTerrain.cpp` must
   remain bit-identical for simulation determinism and collision CRC.
 
@@ -217,10 +241,10 @@ retained surf-zone foam trails, and wet-sand darkening/gloss on the beach.
        0.7`, plus a safety margin for shore curvature). Paired in
        `WaterDisplacement.comp` with convex coastal blending (`fOpenWeight +
        fBeachWeight <= 1` in the overlap zone, preserving the deliberate
-       spatially-varying envelope approximation from
-       `ModernGerstnerLowDirectionalWaves.md`), this prevents vertex reversal
-       across the entire final displaced grid sampled by `Water.vert` without
-       per-vertex clamping kinks or attenuation discontinuities.
+       spatially-varying envelope approximation from the low-directional
+       Gerstner rewrite), this prevents vertex reversal across the entire final
+       displaced grid sampled by `Water.vert` without per-vertex clamping kinks
+       or attenuation discontinuities.
    - Define two flags in `MainLayout` / `GlobalLayout` (`ShaderMainLayout.h` /
      `ShaderGlobalLayout.h`, populated by `WaterUniforms.cpp`):
      - `iWaterBeachVisualsActive`: `0` when `gWaterDisableBeachWaves` or
@@ -246,9 +270,9 @@ retained surf-zone foam trails, and wet-sand darkening/gloss on the beach.
      >= 3.0 * (fOpenHorizAmpMax + Q_beach * A_beach)` while keeping the coastal
      handoff convex (`fOpenWeight + fBeachWeight <= 1` in the overlap zone,
      preserving the deliberate spatially-varying envelope approximation from
-     `ModernGerstnerLowDirectionalWaves.md`); when `0`, fall back to the
-     existing depth-based coast fade (preserving `gWaterIgnoreCoastMask`
-     open-ocean isolation mode).
+     the low-directional Gerstner rewrite); when `0`, fall back to the existing
+     depth-based coast fade (preserving `gWaterIgnoreCoastMask` open-ocean
+     isolation mode).
    - Inside `0 < fShoreSdf < fWaterBeachZoneWidth` (when
      `iWaterBeachDisplacementActive != 0`), evaluate the shared `WaterBeach.h`
      shore wave train:
@@ -477,12 +501,12 @@ retained surf-zone foam trails, and wet-sand darkening/gloss on the beach.
   depth-based coast fade when `0`) with minimum coast-handoff transition width
   `fCoastBlendWidth >= 3.0 * (fOpenHorizAmpMax + Q_beach * A_beach)` and convex
   coastal blending (`fOpenWeight + fBeachWeight <= 1` in the overlap zone,
-  preserving the deliberate spatially-varying envelope approximation from
-  `ModernGerstnerLowDirectionalWaves.md`), and gate asymmetric shoaling beach
-  waves via `WaterBeach.h` (with analytical normals, Jacobian contribution, and
+  preserving the deliberate spatially-varying envelope approximation from the
+  low-directional Gerstner rewrite), and gate asymmetric shoaling beach waves
+  via `WaterBeach.h` (with analytical normals, Jacobian contribution, and
   uniform CPU-capped steepness so the entire final displaced grid sampled by
-  `Water.vert` stays non-folding without per-vertex attenuation
-  discontinuities) on `iWaterBeachDisplacementActive != 0`.
+  `Water.vert` stays non-folding without per-vertex attenuation discontinuities)
+  on `iWaterBeachDisplacementActive != 0`.
 - `Engine/Data/Shaders/Water/WaterFoam.comp` and `Water.frag`: gated on
   `iWaterBeachVisualsActive != 0`, add per-pixel breaker crest foam and
   seaward swash foam everywhere `fTerrainElevation <= 0` (keeping the existing
@@ -518,11 +542,14 @@ retained surf-zone foam trails, and wet-sand darkening/gloss on the beach.
 - Custom per-island shoreline ribbon meshes or 3D curling-barrel overhang
   geometry.
 - Runtime GPU Jump Flooding distance-field generation.
-- Changes to FFT medium-wave spectrum math (`FftMediumWaves.md`) or open-ocean
-  spectral Gerstner math (`ModernGerstnerLowDirectionalWaves.md`) beyond
-  coastal fade handoff.
+- Changes to FFT medium-wave spectrum math or open-ocean spectral Gerstner math
+  beyond coastal fade handoff.
 - Gameplay collision, ship buoyancy, or simulation determinism/CRC changes
   (CPU height queries must remain bit-identical).
+- Merging or landing `water-waves` onto `main` (handled as a separate
+  post-series user-confirmed integration step; any user-directed removal of the
+  temporary wave-isolation controls and its build/visual verification happen on
+  `water-waves` before requesting confirmation to land onto `main`).
 - Unit tests.
 
 ## Risk triggers and invariants
@@ -565,11 +592,11 @@ independently owned subsystems (`DataPacker`, `Frame`, `Terrain`, and `Water`).
   (fOpenHorizAmpMax + Q_beach * A_beach) * (1.5 / fCoastBlendWidth) < 1` with
   `|c_skew| < 0.7` plus a safety margin for shore curvature. Paired with convex
   open-ocean and beach blending (`fOpenWeight + fBeachWeight <= 1` in the
-  overlap zone, preserving `ModernGerstnerLowDirectionalWaves.md`'s
+  overlap zone, preserving the low-directional Gerstner rewrite's
   spatially-varying envelope approximation) in `WaterDisplacement.comp`, this
   prevents vertex reversal across the entire final displaced grid sampled by
-  `Water.vert` without per-vertex attenuation kinks, and beach-wave
-  displacement tapers cleanly to zero at `fShoreSdf <= 0`.
+  `Water.vert` without per-vertex attenuation kinks, and beach-wave displacement
+  tapers cleanly to zero at `fShoreSdf <= 0`.
 - **Unbounded cell precision:** Along-shore procedural noise phase offsets in
   `WaterBeach.h` must use CPU-reduced camera-cell origins so beach wave breakup
   never jumps across cell boundaries.
@@ -615,4 +642,20 @@ independently owned subsystems (`DataPacker`, `Frame`, `Terrain`, and `Water`).
    glint after each wave recedes, then dries back smoothly before the next
    wave, without affecting rock or snow masks.
 8. User explicitly signs off on the beach waves, foam, and wet sand across zoom
-   levels before landing.
+   levels before landing onto `water-waves`.
+9. The session branch stays at `main` through `/next-plan` step 6's claim
+   refresh (inspecting `water-waves` via Git during step-4/5 preparation and
+   review), then moves onto `water-waves` (with `main` merged into
+   `water-waves` first if `main` holds completed external prerequisites or
+   overlapping updates) for implementation, builds, and verification; at
+   `/finalize-changes`, the implementation and Plan completion land onto
+   `water-waves` under the global landing lock — either by switching primary to
+   `water-waves` for preparation and landing together (then switching primary
+   back to `main`), or via a user-authorized locked update of
+   `refs/heads/water-waves` while primary stays on `main` — then the Plan claim
+   is released and only the Plan deletion and any child `dependsOn` edge
+   removals sync onto `main` (with no water-wave code on `main`). Merging
+   `water-waves` into `main` remains a separate post-series user-confirmed
+   integration step, with any user-directed removal of the temporary
+   wave-isolation controls built and visually verified on `water-waves` before
+   requesting confirmation to land onto `main`.

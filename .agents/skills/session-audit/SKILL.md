@@ -96,9 +96,9 @@ pre-existing defect, incomplete trace, or pending external verdict, using
 audit never edits a file.
 
 Use `NEEDS_ACTION` for findings or pending external verification and `BLOCKED`
-only for missing required evidence. Critical means data loss, broken
-functionality, determinism failure, or an equivalent contract breach; every
-other finding is Required.
+only for missing required evidence. Grade each finding by
+[`../../references/subagent-handoff.md`](../../references/subagent-handoff.md)
+`## Severity`.
 
 The main session reads every finding, deduplicates it, and classifies Intent
 (`conformance | plan_delta`) and Scope (`non_structural | structural`) before

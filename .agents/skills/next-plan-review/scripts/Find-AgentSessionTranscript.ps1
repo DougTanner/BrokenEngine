@@ -418,7 +418,9 @@ try {
 	}
 	$eligibleWorktreeRoots = Get-EligibleWorktreeRoots $commitHash $commonDirectory
 
-	$userProfile = [Environment]::GetFolderPath([Environment+SpecialFolder]::UserProfile)
+	# The inherited profile first: a Codex sandbox reports its own account's special folder.
+	$userProfile = $env:USERPROFILE
+	if ([string]::IsNullOrWhiteSpace($userProfile)) { $userProfile = [Environment]::GetFolderPath([Environment+SpecialFolder]::UserProfile) }
 	if ([string]::IsNullOrWhiteSpace($SessionStoreRoot)) { $SessionStoreRoot = Join-Path $userProfile '.codex\sessions' }
 	if ([string]::IsNullOrWhiteSpace($ArchivedSessionStoreRoot)) { $ArchivedSessionStoreRoot = Join-Path $userProfile '.codex\archived_sessions' }
 	if ([string]::IsNullOrWhiteSpace($ClaudeSessionStoreRoot)) { $ClaudeSessionStoreRoot = Join-Path $userProfile '.claude\projects' }

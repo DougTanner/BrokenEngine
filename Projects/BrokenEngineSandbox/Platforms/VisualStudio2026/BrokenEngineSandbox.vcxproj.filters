@@ -549,9 +549,6 @@
     <ClInclude Include="..\..\..\..\Engine\Source\Audio\AudioManager.h">
       <Filter>Engine\Audio</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Source\Frame\FlightPlaneTable.h">
-      <Filter>Game\Frame</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Source\Frame\Frame.h">
       <Filter>Game\Frame</Filter>
     </ClInclude>
@@ -895,9 +892,6 @@
       <Filter>Engine\Ui\Screens</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\Alignments.h">
-      <Filter>Engine\Frame</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Engine\Source\Frame\FlightPlanes.h">
       <Filter>Engine\Frame</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Common\ErrorUtils.h">
@@ -1581,9 +1575,6 @@
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\Alignments.cpp">
       <Filter>Engine\Frame</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Frame\FlightPlanes.cpp">
-      <Filter>Engine\Frame</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\GraphicsUtils.cpp">
       <Filter>Engine\Graphics</Filter>
     </ClCompile>
@@ -1608,9 +1599,6 @@
     <ClCompile Include="..\..\..\..\Engine\Source\Network\Client\ClientCrashReport.cpp">
       <Filter>Engine\Network\Client</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Graphics\FlightPlaneProjection.cpp">
-      <Filter>Engine\Graphics</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\UiScreens.cpp">
       <Filter>Engine\Ui\Screens</Filter>
     </ClCompile>
@@ -1628,6 +1616,9 @@
     </ClCompile>
     <ClCompile Include="..\..\Source\Input\GameKeybinds.cpp">
       <Filter>Game\Input</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Graphics\BaseHeightProjection.cpp">
+      <Filter>Engine\Graphics</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

@@ -49,11 +49,11 @@ crossfades.
   eviction and reacquisition. Apply final 3D mix before playback and route
   near-unity pitch ratios through `SnapFrequencyRatio` to avoid unnecessary
   resampling.
-- Distance to the full emitter position from a listener above the look-at, at
-  1.1 times the highest flight plane's height, drives manual fade while the
-  camera look-at drives pan and Doppler; each emitter is flattened to the
-  look-at's height for pan. Keep these listener roles separate when changing
-  spatialization.
+- Both pan and Doppler use the camera look-at with each emitter flattened to the
+  look-at's height, while manual fade uses the full 3D distance from the camera
+  look-at to the emitter (`StaticVoices::UpdateListenerPosition`,
+  `StaticVoices::ApplyThreeDimensionalVolume`). Keep these listener roles
+  separate when changing spatialization.
 - An emitter position arrives local to its own cell, paired with that cell's
   coordinate, and is converted once into the listener's cell
   (`StaticVoices.cpp`); spatialization works only in that listener frame.
