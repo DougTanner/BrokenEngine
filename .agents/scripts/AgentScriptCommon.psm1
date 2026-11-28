@@ -552,4 +552,85 @@ function Get-AgentCppTokenPattern() {
 	return '(?<comment>//(?:[^\n]*\\\n)*[^\n]*|/\*[\s\S]*?(?:\*/|\z))|(?<literal>(?:u8|u|U|L)?R"(?<delimiter>[^\s()\\]{0,16})\([\s\S]*?\)\k<delimiter>"|\b[0-9][\w''.]*|"(?:\\[\s\S]|[^"\\])*"|''(?:\\[\s\S]|[^''\\])*'')|(?<space>\s+)|(?<code>.)'
 }
 
-Export-ModuleMember -Function Get-AgentCanonicalPath, Invoke-AgentGit, Invoke-AgentProcess, Get-AgentNormalizedText, Measure-AgentTokenCount, Get-AgentMarkdownSearchText, Get-AgentModelFamily, Compare-AgentModelVersion, Get-AgentGameProjects, Get-AgentCoretideRepository, Test-AgentDataInputPath, Get-AgentDataInputChanges, Get-AgentSharedDataStampPath, Get-AgentWorktreeCliRepositoryIdentity, Invoke-AgentBootstrapLock, Get-AgentSharedDataRecordPath, Write-AgentSharedDataRecord, Get-AgentSharedDataRecord, Get-AgentDataListing, Compare-AgentSharedDataRecord, Write-AgentModelViewerResolvedData, Get-AgentHarnessLaunchConfiguration, Get-AgentPlansLayoutViolation, Find-AgentLivePlanCitations, Get-AgentCppTokenPattern
+# True when the calling process's immediate Windows Job Object sets JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+# (0x2000) without JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK (0x1000). Does not inspect ancestor jobs in a
+# nested hierarchy; callers still rely on post-exit liveness checks for launches that proceed.
+function Test-AgentKillOnCloseJob {
+	Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+
+namespace BrokenEngineAgent {
+	public static class JobObjectProbe {
+		[StructLayout(LayoutKind.Sequential)]
+		struct JOBOBJECT_BASIC_LIMIT_INFORMATION {
+			public long PerProcessUserTimeLimit;
+			public long PerJobUserTimeLimit;
+			public uint LimitFlags;
+			public UIntPtr MinimumWorkingSetSize;
+			public UIntPtr MaximumWorkingSetSize;
+			public uint ActiveProcessLimit;
+			public UIntPtr Affinity;
+			public uint PriorityClass;
+			public uint SchedulingClass;
+		}
+
+		[StructLayout(LayoutKind.Sequential)]
+		struct IO_COUNTERS {
+			public ulong ReadOperationCount;
+			public ulong WriteOperationCount;
+			public ulong OtherOperationCount;
+			public ulong ReadTransferCount;
+			public ulong WriteTransferCount;
+			public ulong OtherTransferCount;
+		}
+
+		[StructLayout(LayoutKind.Sequential)]
+		struct JOBOBJECT_EXTENDED_LIMIT_INFORMATION {
+			public JOBOBJECT_BASIC_LIMIT_INFORMATION BasicLimitInformation;
+			public IO_COUNTERS IoInfo;
+			public UIntPtr ProcessMemoryLimit;
+			public UIntPtr JobMemoryLimit;
+			public UIntPtr PeakProcessMemoryUsed;
+			public UIntPtr PeakJobMemoryUsed;
+		}
+
+		[DllImport("kernel32.dll", SetLastError = true)]
+		static extern IntPtr GetCurrentProcess();
+
+		[DllImport("kernel32.dll", SetLastError = true)]
+		static extern bool IsProcessInJob(IntPtr ProcessHandle, IntPtr JobHandle, out bool Result);
+
+		[DllImport("kernel32.dll", SetLastError = true)]
+		static extern bool QueryInformationJobObject(
+			IntPtr hJob,
+			int JobObjectInfoClass,
+			out JOBOBJECT_EXTENDED_LIMIT_INFORMATION lpJobObjectInfo,
+			uint cbJobObjectInfoLength,
+			out uint lpReturnLength);
+
+		public static bool IsKillOnCloseWithoutSilentBreakaway() {
+			bool inJob;
+			if (!IsProcessInJob(GetCurrentProcess(), IntPtr.Zero, out inJob) || !inJob) {
+				return false;
+			}
+			JOBOBJECT_EXTENDED_LIMIT_INFORMATION info;
+			uint returnLength;
+			if (!QueryInformationJobObject(
+				IntPtr.Zero,
+				9,
+				out info,
+				(uint)Marshal.SizeOf(typeof(JOBOBJECT_EXTENDED_LIMIT_INFORMATION)),
+				out returnLength)) {
+				return false;
+			}
+			uint flags = info.BasicLimitInformation.LimitFlags;
+			return (flags & 0x00002000u) != 0 && (flags & 0x00001000u) == 0;
+		}
+	}
+}
+'@
+	return [BrokenEngineAgent.JobObjectProbe]::IsKillOnCloseWithoutSilentBreakaway()
+}
+
+Export-ModuleMember -Function Get-AgentCanonicalPath, Invoke-AgentGit, Invoke-AgentProcess, Get-AgentNormalizedText, Measure-AgentTokenCount, Get-AgentMarkdownSearchText, Get-AgentModelFamily, Compare-AgentModelVersion, Get-AgentGameProjects, Get-AgentCoretideRepository, Test-AgentDataInputPath, Get-AgentDataInputChanges, Get-AgentSharedDataStampPath, Get-AgentWorktreeCliRepositoryIdentity, Invoke-AgentBootstrapLock, Get-AgentSharedDataRecordPath, Write-AgentSharedDataRecord, Get-AgentSharedDataRecord, Get-AgentDataListing, Compare-AgentSharedDataRecord, Write-AgentModelViewerResolvedData, Get-AgentHarnessLaunchConfiguration, Get-AgentPlansLayoutViolation, Find-AgentLivePlanCitations, Get-AgentCppTokenPattern, Test-AgentKillOnCloseJob

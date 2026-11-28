@@ -141,6 +141,11 @@ try {
 		}
 	}
 
+	if (Test-AgentKillOnCloseJob) {
+		Complete-HarnessLaunch 2 'blocked' 'launch.kill-on-close-job' ("This shell's immediate Windows Job Object sets JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE without " +
+			"JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK; refusing to launch role '$Role'. Use the desktop launch fallback.")
+	}
+
 	$executable = Join-Path $launch.OutputDirectory $(if ($Role -ceq 'server') { $launch.ServerExe } else { $launch.ClientExe })
 	# Start-Process joins ArgumentList items. An app-data filesystem root retains its trailing
 	# backslash after canonicalization, so double it before the closing quote.

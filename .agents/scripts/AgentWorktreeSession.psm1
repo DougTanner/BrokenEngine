@@ -208,7 +208,8 @@ function Repair-AgentWorktreeForkPoint([string] $Worktree, [string] $PrimaryBran
 		else { @(Invoke-AgentGit @('-C', $Worktree, 'merge-base', 'HEAD', $PrimaryTip))[0].Trim() }
 	& git -C $Worktree merge-base --is-ancestor $baseline $PrimaryTip
 	if ($LASTEXITCODE -eq 0) { return [pscustomobject]@{ Outcome = 'ancestor'; ForkPoint = $baseline; Baseline = $baseline } }
-	$repair = "git -C '$Worktree' rebase --onto $PrimaryTip $baseline $Branch"
+	$quotedWorktree = [Management.Automation.Language.CodeGeneration]::EscapeSingleQuotedStringContent($Worktree)
+	$repair = "git -C '$quotedWorktree' rebase --onto $PrimaryTip $baseline $Branch"
 	$refusal = "Primary branch '$PrimaryBranch' was rewritten: fork point $baseline is no longer on its history, which is now at $PrimaryTip. Replay this session onto the new tip manually: $repair"
 	Test-AgentWorktreeNoGitOperation $Worktree
 	$snapshot = $null
@@ -223,7 +224,7 @@ function Repair-AgentWorktreeForkPoint([string] $Worktree, [string] $PrimaryBran
 			$entries = @(Invoke-AgentGit @('-C', $Worktree, 'stash', 'list', '--format=%H%x09%gs') | Where-Object { $_.EndsWith($tag, [StringComparison]::Ordinal) })
 			if ($entries.Count -eq 1) {
 				$snapshot = $entries[0].Split("`t")[0]
-				$recovery = "Retained recovery stash $snapshot (tag: $tag). After resolving any partial operation or restoration, recover manually with: git -C '$Worktree' stash apply --index $snapshot."
+				$recovery = "Retained recovery stash $snapshot (tag: $tag). After resolving any partial operation or restoration, recover manually with: git -C '$quotedWorktree' stash apply --index $snapshot."
 			}
 			if ($saveExit -ne 0 -or $null -eq $snapshot) { throw "Stash save did not complete with an identified snapshot: $($saveOutput -join '; ')" }
 			if (@(Invoke-AgentGit @('-C', $Worktree, 'status', '--porcelain', '-z', '--untracked-files=all')).Count -ne 0) { throw 'Stash save left local changes in the worktree.' }
@@ -237,7 +238,7 @@ function Repair-AgentWorktreeForkPoint([string] $Worktree, [string] $PrimaryBran
 			$markerPath = Get-AgentWorktreeGitValue $Worktree @('rev-parse', '--path-format=absolute', '--git-path', $marker) "Git operation marker '$marker'"
 			if (-not (Test-Path -LiteralPath $markerPath)) { continue }
 			$abortOutput = @(& git -C $Worktree rebase --abort 2>&1)
-			if ($LASTEXITCODE -ne 0) { throw "Replaying this session failed, and abort failed, so '$Worktree' is left mid-rebase. No saved local work was applied. Roll it back manually: git -C '$Worktree' rebase --abort. $($abortOutput -join '; ') $recovery $refusal" }
+			if ($LASTEXITCODE -ne 0) { throw "Replaying this session failed, and abort failed, so '$Worktree' is left mid-rebase. No saved local work was applied. Roll it back manually: git -C '$quotedWorktree' rebase --abort. $($abortOutput -join '; ') $recovery $refusal" }
 			$aborted = $true
 			break
 		}

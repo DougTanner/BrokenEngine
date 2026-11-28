@@ -4,8 +4,9 @@
 
 Vulkan 1.2 GLSL compiled to SPIR-V by DataPacker. The project `ShaderLayouts.h`
 wrapper extends engine `ShaderLayoutsBase.h`, keeping CPU and shader layouts
-single-sourced. GLSL indents with tabs and aligns with spaces after them, as
-`Documents/C++StyleGuide.txt` rules 1 and 51 require of C++.
+single-sourced. GLSL follows `Documents/C++StyleGuide.txt` rules 1 and 51 for
+indentation and alignment and rule 64 for shader comments and established
+terminology.
 
 ## Shared Contract
 

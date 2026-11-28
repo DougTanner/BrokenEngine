@@ -1,22 +1,26 @@
-<!-- broken-engine-plan/v2 {"createdUtc":"2026-11-26T14:01:16.172Z","dependsOn":[]} -->
+<!-- broken-engine-plan/v2 {"createdUtc":"2026-11-26T14:01:16.172Z","dependsOn":[],"agentCli":"agy"} -->
 # Find-CommentBlocks.ps1 emits trailing `//` comments as blocks
 
 ## Context
 
 `.agents/skills/comment-review/scripts/Find-CommentBlocks.ps1` defines
-`$script:CommentPattern = '^\s*//'` (line 26), and `Get-CommentBlock` (lines
-85-121) builds blocks only from lines matching it. A trailing comment after
-code on the same line never becomes a block, so `/comment-review`
-(`references/worker.md` step 2 keeps only scanner blocks overlapping changed
-regions) never classifies it.
+`$script:CommentPattern = '^\s*//'` (line 31), and `Get-CommentBlock` (lines
+139-178) builds blocks only from lines matching it. A trailing comment after
+code on the same line never becomes a block, so `/comment-review` never
+classifies it: in `Session` mode the scanner sets each block's
+`overlapsRegion` from the session change inventory's changed regions and
+`references/worker.md` step 2 keeps blocks with `overlapsRegion` true, while in
+`WholeFile` mode (`-Path`) it keeps every returned block.
 
 Observed instance: `Engine/Source/Ui/LightingWrappersBase.h:67` carries the
 trailing comment "Fraction of gCombineMaxBrightness; paired with
-gCombineMaxBrightness >= 0.1f and gCombineLinearLength <= 0.8f, bounds keep
-0 < m < S1 < P, m >= 0.001f, and P - S1 >= 0.004f." It copies values the code
-owns, the same copied derived bound the session's comment review raised at
-`LightingUniforms.cpp:164`, yet the scanner emitted no block for it. Lines 66
-and 70 of the same file hold similar trailing comments.
+gCombineMaxBrightness's minimum and gCombineLinearLength's maximum, bounds keep
+0 < m < S1 < P, m >= 0.001f, and P - S1 >= 0.004f." It copies derived bounds
+the code owns (`0.001f`, `0.004f`), the copied-bound class the session's
+comment review raised in `LightingUniforms.cpp`, whose tone-curve comment now
+defers to the bounds documented at `gCombineLinearStart` (lines 110-111), yet a
+`WholeFile` scan of the header emits no block for it. Lines 66 and 70 of the
+same file hold similar trailing comments.
 
 ## Design
 
@@ -27,8 +31,9 @@ holding that comment text. A `//` inside a string or character literal (for
 example a URL) is not a comment; the author recommends a simple scan that
 skips quoted spans rather than a tokenizer, since a missed or extra hint only
 affects reviewer input. A trailing comment stays its own block and never joins
-an adjacent full-line block. The block row shape is unchanged, so the
-`broken-engine-comment-blocks/v2` schema version stays; the executing session
+an adjacent full-line block, and its `overlapsRegion` is computed from that
+line as for any block. The block row shape is unchanged, so the
+`broken-engine-comment-blocks/v3` schema version stays; the executing session
 bumps it only if it adds a field.
 
 Check that whole-repository runs stay under `$script:MaximumBlocks` often

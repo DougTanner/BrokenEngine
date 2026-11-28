@@ -151,7 +151,9 @@ GLSL sources under `Engine/Data/Shaders/` are `<None>` items in the client
 project only — IDE visibility; DataPacker compiles them, not MSBuild. Shared
 engine dual-language layout headers under `Engine/Data/Shaders/` are
 `<ClInclude>` items in every consuming project; keep their project and filter
-entries synchronized when a layout header is added.
+entries synchronized when a layout header is added. The game project's
+`Data/Shaders/ShaderLayouts.h` wrapper is a deliberate client-only `<ClInclude>`
+exception despite having no `BT_CLIENT` guard.
 
 ## vcxproj.filters Rules
 

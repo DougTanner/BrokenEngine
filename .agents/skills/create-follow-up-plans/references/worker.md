@@ -49,7 +49,7 @@ architectural choices instead of deciding them. Phrase every choice you do make
 as the author's recommendation with its rationale rather than in binding
 language, per
 [`../../../references/authority-order.md`](../../../references/authority-order.md).
-Do not add unit tests or unsupported implementation detail.
+Do not add unsupported implementation detail.
 
 Derive the future implementation's Change Workflow Tier 1/2/3 from the highest
 risk trigger in [`risk-tiers.md`](../../../references/risk-tiers.md) and record

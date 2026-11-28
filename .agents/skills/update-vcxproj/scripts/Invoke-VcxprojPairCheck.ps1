@@ -1,10 +1,16 @@
 [CmdletBinding()]
 param(
-	[string[]]$ProjectPath
+	[string[]]$ProjectPath,
+	[string]$RepositoryRoot,
+	[switch]$AllGameProjects
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+$script:SharedScriptsDir = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\..\scripts'))
+Import-Module (Join-Path $script:SharedScriptsDir 'AgentScriptCommon.psm1') -Force
+Import-Module (Join-Path $script:SharedScriptsDir 'SourceAffinity.psm1') -Force
 
 $script:MsbuildNamespace = 'http://schemas.microsoft.com/developer/msbuild/2003'
 $script:RepoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\..\..'))
@@ -13,6 +19,7 @@ $script:MaximumViolations = 16
 $script:MaximumTextLength = 96
 $script:MaximumMessageLength = 256
 $script:MaximumOutputBytes = 8192
+$script:InvalidIncludeChars = [char[]]@(([IO.Path]::GetInvalidFileNameChars() | Where-Object { $_ -ne '\' -and $_ -ne '/' -and $_ -ne ':' }))
 
 function Get-CanonicalPath
 {
@@ -26,6 +33,157 @@ function Get-CanonicalPath
 	}
 
 	return $fullPath.Replace([IO.Path]::DirectorySeparatorChar, '/')
+}
+
+function Test-PathWithinRoot
+{
+	param([string]$Path, [string]$Root)
+
+	$trimmedRoot = $Root.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+	$trimmedPath = $Path.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+	if ($trimmedPath.Equals($trimmedRoot, [StringComparison]::OrdinalIgnoreCase))
+	{
+		return $true
+	}
+
+	$rootWithSeparator = $trimmedRoot + [IO.Path]::DirectorySeparatorChar
+	return $trimmedPath.StartsWith($rootWithSeparator, [StringComparison]::OrdinalIgnoreCase)
+}
+
+function Resolve-PhysicalPath
+{
+	param(
+		[string]$Path,
+		[System.Collections.Generic.Dictionary[string, string]]$DirectoryCache
+	)
+
+	$currentFull = [IO.Path]::GetFullPath($Path)
+	$maxHops = 64
+	$hops = 0
+
+	while ($true)
+	{
+		$root = [IO.Path]::GetPathRoot($currentFull)
+		if ([string]::IsNullOrEmpty($root))
+		{
+			return $null
+		}
+
+		$relative = $currentFull.Substring($root.Length)
+		$segments = @()
+		if (-not [string]::IsNullOrEmpty($relative))
+		{
+			$segments = @($relative.Split([char[]]@([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar), [StringSplitOptions]::RemoveEmptyEntries))
+		}
+
+		$prefix = $root
+		$redirected = $false
+		for ($i = 0; $i -lt $segments.Count; $i++)
+		{
+			$candidate = [IO.Path]::Combine($prefix, $segments[$i])
+			$isLast = ($i -eq ($segments.Count - 1))
+
+			if (-not $isLast -and $DirectoryCache.ContainsKey($candidate))
+			{
+				$cached = $DirectoryCache[$candidate]
+				if (-not $cached.Equals($candidate, [StringComparison]::OrdinalIgnoreCase))
+				{
+					$hops++
+					if ($hops -gt $maxHops)
+					{
+						return $null
+					}
+					$remaining = ($segments[($i + 1)..($segments.Count - 1)]) -join [IO.Path]::DirectorySeparatorChar
+					$currentFull = [IO.Path]::GetFullPath([IO.Path]::Combine($cached, $remaining))
+					$redirected = $true
+					break
+				}
+				$prefix = $candidate
+				continue
+			}
+
+			try
+			{
+				$attrs = [IO.File]::GetAttributes($candidate)
+			}
+			catch [IO.FileNotFoundException], [IO.DirectoryNotFoundException]
+			{
+				$remaining = ($segments[$i..($segments.Count - 1)]) -join [IO.Path]::DirectorySeparatorChar
+				return [IO.Path]::GetFullPath([IO.Path]::Combine($prefix, $remaining))
+			}
+			catch
+			{
+				return $null
+			}
+
+			$resolvedTarget = $null
+			if (($attrs -band [IO.FileAttributes]::ReparsePoint) -ne 0)
+			{
+				try
+				{
+					$fsi = if (($attrs -band [IO.FileAttributes]::Directory) -ne 0)
+					{
+						[IO.DirectoryInfo]::new($candidate)
+					}
+					else
+					{
+						[IO.FileInfo]::new($candidate)
+					}
+					$targetInfo = $fsi.ResolveLinkTarget($true)
+					if ($null -ne $targetInfo)
+					{
+						$resolvedTarget = [IO.Path]::GetFullPath($targetInfo.FullName)
+						if ($resolvedTarget.StartsWith('\\?\', [StringComparison]::Ordinal) -and
+							$resolvedTarget.Length -ge 7 -and
+							$resolvedTarget[5] -eq ':' -and
+							$resolvedTarget[6] -eq '\')
+						{
+							$resolvedTarget = $resolvedTarget.Substring(4)
+						}
+					}
+				}
+				catch
+				{
+					return $null
+				}
+			}
+
+			if ($null -ne $resolvedTarget)
+			{
+				if (-not $isLast)
+				{
+					$DirectoryCache[$candidate] = $resolvedTarget
+				}
+				$hops++
+				if ($hops -gt $maxHops)
+				{
+					return $null
+				}
+				if ($isLast)
+				{
+					$currentFull = $resolvedTarget
+				}
+				else
+				{
+					$remaining = ($segments[($i + 1)..($segments.Count - 1)]) -join [IO.Path]::DirectorySeparatorChar
+					$currentFull = [IO.Path]::GetFullPath([IO.Path]::Combine($resolvedTarget, $remaining))
+				}
+				$redirected = $true
+				break
+			}
+
+			if (-not $isLast)
+			{
+				$DirectoryCache[$candidate] = $candidate
+			}
+			$prefix = $candidate
+		}
+
+		if (-not $redirected)
+		{
+			return $prefix
+		}
+	}
 }
 
 function Get-Sha256
@@ -182,6 +340,40 @@ function Get-ItemIdentityKey
 	return "$($Type.Length):$Type$($Include.Length):$Include"
 }
 
+function Get-ItemDiagnosticIdentity
+{
+	param([string]$Type, [string]$Include)
+
+	if (-not [string]::IsNullOrEmpty($Include) -and [IO.Path]::IsPathRooted($Include))
+	{
+		return "$Type|<rooted:$(Get-Sha256 $Include)>"
+	}
+
+	return "$Type|$Include"
+}
+
+function Test-HasInvalidIncludeColon
+{
+	param([string]$Include)
+
+	$firstColon = $Include.IndexOf(':')
+	if ($firstColon -lt 0)
+	{
+		return $false
+	}
+
+	if ($firstColon -eq 1 -and
+		$Include.Length -ge 3 -and
+		(($Include[0] -ge 'A' -and $Include[0] -le 'Z') -or ($Include[0] -ge 'a' -and $Include[0] -le 'z')) -and
+		($Include[2] -eq '\' -or $Include[2] -eq '/') -and
+		$Include.IndexOf(':', 2) -lt 0)
+	{
+		return $false
+	}
+
+	return $true
+}
+
 function Get-CandidateItems
 {
 	param([Xml.XmlDocument]$Document)
@@ -206,7 +398,9 @@ function Get-CandidateItems
 				$include = $element.GetAttribute('Include')
 				$null = $items.Add([pscustomobject][ordered]@{
 					key = Get-ItemIdentityKey $element.LocalName $include
-					identity = "$($element.LocalName)|$include"
+					identity = Get-ItemDiagnosticIdentity $element.LocalName $include
+					type = $element.LocalName
+					include = $include
 					element = $element
 				})
 			}
@@ -352,18 +546,55 @@ function Get-ParentFilterNames
 	return ,$parents
 }
 
+function Get-ClassifiedXml
+{
+	param(
+		[string]$Path,
+		[System.Collections.Generic.Dictionary[string, object]]$XmlCache
+	)
+
+	$canonicalPath = Get-CanonicalPath $Path
+	if ($XmlCache.ContainsKey($canonicalPath))
+	{
+		return $XmlCache[$canonicalPath]
+	}
+
+	$read = Read-ProjectXml $Path
+	$namespaceValid = $false
+	$candidateItems = $null
+	if (-not $read.readFailed -and $null -ne $read.document)
+	{
+		$namespaceValid = Test-MsbuildNamespace $read.document
+		if ($namespaceValid)
+		{
+			$candidateItems = Get-CandidateItems $read.document
+		}
+	}
+
+	$classified = [pscustomobject][ordered]@{
+		canonicalPath = $canonicalPath
+		readFailed = $read.readFailed
+		document = $read.document
+		namespaceValid = $namespaceValid
+		candidateItems = $candidateItems
+	}
+	$XmlCache[$canonicalPath] = $classified
+	return $classified
+}
+
 function Test-Pair
 {
 	param(
 		[string]$ProjectFile,
 		[string]$FiltersFile,
 		[System.Collections.Generic.List[object]]$PairRecords,
-		[System.Collections.Generic.List[object]]$Violations
+		[System.Collections.Generic.List[object]]$Violations,
+		[System.Collections.Generic.Dictionary[string, object]]$XmlCache
 	)
 
 	$pairPath = Get-CanonicalPath $ProjectFile
-	$projectRead = Read-ProjectXml $ProjectFile
-	$filtersRead = Read-ProjectXml $FiltersFile
+	$projectRead = Get-ClassifiedXml $ProjectFile $XmlCache
+	$filtersRead = Get-ClassifiedXml $FiltersFile $XmlCache
 	if ($projectRead.readFailed -or $filtersRead.readFailed)
 	{
 		throw 'input.read-failed'
@@ -371,7 +602,7 @@ function Test-Pair
 
 	$record = [pscustomobject][ordered]@{
 		CanonicalPath = $pairPath
-		ProjectPath = Get-CanonicalPath $ProjectFile
+		ProjectPath = $pairPath
 		FiltersPath = Get-CanonicalPath $FiltersFile
 		ProjectItemCount = $null
 		FilterItemCount = $null
@@ -392,21 +623,21 @@ function Test-Pair
 		return
 	}
 
-	if (-not (Test-MsbuildNamespace $projectRead.document))
+	if (-not $projectRead.namespaceValid)
 	{
 		Add-Violation $Violations $pairPath 'xml.namespace-invalid' 'project'
 	}
-	if (-not (Test-MsbuildNamespace $filtersRead.document))
+	if (-not $filtersRead.namespaceValid)
 	{
 		Add-Violation $Violations $pairPath 'xml.namespace-invalid' 'filters'
 	}
-	if (-not (Test-MsbuildNamespace $projectRead.document) -or -not (Test-MsbuildNamespace $filtersRead.document))
+	if (-not $projectRead.namespaceValid -or -not $filtersRead.namespaceValid)
 	{
 		return
 	}
 
-	$projectItems = Get-CandidateItems $projectRead.document
-	$filterItems = Get-CandidateItems $filtersRead.document
+	$projectItems = $projectRead.candidateItems
+	$filterItems = $filtersRead.candidateItems
 	$declarations = Get-FilterDeclarations $filtersRead.document
 	$record.ProjectItemCount = $projectItems.Count
 	$record.FilterItemCount = $filterItems.Count
@@ -506,6 +737,211 @@ function Test-Pair
 			if (-not $declarationIndex.ContainsKey($parent))
 			{
 				Add-Violation $Violations $pairPath 'filter.ancestor-missing' $parent
+			}
+		}
+	}
+}
+
+function Get-AffinityItems
+{
+	param(
+		[System.Collections.Generic.List[object]]$CandidateItems,
+		[string]$ProjectDirectory,
+		[string]$PairPath,
+		[System.Collections.Generic.Dictionary[string, string]]$PhysicalDirectoryCache,
+		[System.Collections.Generic.List[object]]$Violations
+	)
+
+	$resolved = [System.Collections.Generic.List[object]]::new()
+	foreach ($item in $CandidateItems)
+	{
+		if ($item.type -cne 'ClCompile' -and $item.type -cne 'ClInclude')
+		{
+			continue
+		}
+		if ($item.type -ceq 'ClInclude' -and
+			($item.include.StartsWith('$(GameDataDirectory)\', [StringComparison]::OrdinalIgnoreCase) -or
+				$item.include.StartsWith('$(GameDataDirectory)/', [StringComparison]::OrdinalIgnoreCase)) -and
+			$item.include.EndsWith('.h', [StringComparison]::OrdinalIgnoreCase))
+		{
+			$generatedRelative = $item.include.Substring('$(GameDataDirectory)\'.Length)
+			if ($generatedRelative.Length -gt 2 -and
+				$generatedRelative.IndexOfAny([char[]]@('\', '/')) -lt 0 -and
+				$generatedRelative.IndexOfAny($script:InvalidIncludeChars) -lt 0 -and
+				$generatedRelative.IndexOf(':') -lt 0)
+			{
+				continue
+			}
+		}
+
+		$fullPath = $null
+		$canonical = $null
+		$physicalPath = $null
+		if (-not [string]::IsNullOrWhiteSpace($item.include) -and
+			$item.include.IndexOfAny($script:InvalidIncludeChars) -lt 0 -and
+			-not (Test-HasInvalidIncludeColon $item.include))
+		{
+			try
+			{
+				$fullPath = [IO.Path]::GetFullPath($item.include, $ProjectDirectory)
+				$canonical = Get-CanonicalPath $fullPath
+			}
+			catch
+			{
+				$canonical = $null
+			}
+		}
+
+		if (-not [string]::IsNullOrEmpty($canonical) -and -not [IO.Path]::IsPathRooted($canonical) -and $canonical.IndexOf(':') -lt 0)
+		{
+			$physicalPath = Resolve-PhysicalPath $fullPath $PhysicalDirectoryCache
+		}
+
+		if ([string]::IsNullOrEmpty($canonical) -or
+			[IO.Path]::IsPathRooted($canonical) -or
+			$canonical.IndexOf(':') -ge 0 -or
+			[string]::IsNullOrEmpty($physicalPath) -or
+			-not (Test-PathWithinRoot $physicalPath $script:PhysicalRepoRoot))
+		{
+			Add-Violation $Violations $PairPath 'affinity.path-outside-root' $item.identity
+			continue
+		}
+
+		$null = $resolved.Add([pscustomobject][ordered]@{
+			type = $item.type
+			fullPath = $physicalPath
+			canonicalPath = $canonical
+			identity = "$($item.type)|$canonical"
+		})
+	}
+
+	return ,$resolved
+}
+
+function Test-GamePairAffinity
+{
+	param(
+		[string]$GameName,
+		[string]$ClientProjectPath,
+		[string]$ServerProjectPath,
+		[System.Collections.Generic.HashSet[string]]$ValidatedProjectPaths,
+		[System.Collections.Generic.Dictionary[string, object]]$XmlCache,
+		[System.Collections.Generic.Dictionary[string, string]]$AffinityCache,
+		[System.Collections.Generic.Dictionary[string, string]]$PhysicalDirectoryCache,
+		[System.Collections.Generic.List[object]]$Violations
+	)
+
+	$clientClassified = Get-ClassifiedXml $ClientProjectPath $XmlCache
+	$serverClassified = Get-ClassifiedXml $ServerProjectPath $XmlCache
+	if ($clientClassified.readFailed -or $serverClassified.readFailed)
+	{
+		throw 'input.read-failed'
+	}
+
+	$canCheckAffinity = $true
+	foreach ($classified in @($clientClassified, $serverClassified))
+	{
+		$wasValidated = $ValidatedProjectPaths.Contains($classified.canonicalPath)
+		if ($null -eq $classified.document)
+		{
+			if (-not $wasValidated)
+			{
+				Add-Violation $Violations $classified.canonicalPath 'xml.parse-failed' 'project'
+			}
+			$canCheckAffinity = $false
+		}
+		elseif (-not $classified.namespaceValid)
+		{
+			if (-not $wasValidated)
+			{
+				Add-Violation $Violations $classified.canonicalPath 'xml.namespace-invalid' 'project'
+			}
+			$canCheckAffinity = $false
+		}
+	}
+	if (-not $canCheckAffinity)
+	{
+		return
+	}
+
+	$projectDirectory = [IO.Path]::GetDirectoryName($ClientProjectPath)
+	$clientItems = Get-AffinityItems $clientClassified.candidateItems $projectDirectory $clientClassified.canonicalPath $PhysicalDirectoryCache $Violations
+	$serverItems = Get-AffinityItems $serverClassified.candidateItems $projectDirectory $serverClassified.canonicalPath $PhysicalDirectoryCache $Violations
+
+	$clientIdentities = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+	foreach ($item in $clientItems)
+	{
+		$null = $clientIdentities.Add($item.identity)
+	}
+	$serverIdentities = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+	foreach ($item in $serverItems)
+	{
+		$null = $serverIdentities.Add($item.identity)
+	}
+
+	$clientShaderLayoutsPath = "Projects/$GameName/Data/Shaders/ShaderLayouts.h"
+	$sides = @(
+		[pscustomobject]@{
+			name = 'client'
+			opposite = 'server'
+			pairPath = $clientClassified.canonicalPath
+			items = $clientItems
+			otherIdentities = $serverIdentities
+		},
+		[pscustomobject]@{
+			name = 'server'
+			opposite = 'client'
+			pairPath = $serverClassified.canonicalPath
+			items = $serverItems
+			otherIdentities = $clientIdentities
+		}
+	)
+
+	foreach ($side in $sides)
+	{
+		foreach ($item in $side.items)
+		{
+			if (-not [IO.File]::Exists($item.fullPath))
+			{
+				Add-Violation $Violations $side.pairPath 'affinity.file-missing' $item.identity
+				continue
+			}
+
+			if (-not $AffinityCache.ContainsKey($item.canonicalPath))
+			{
+				try
+				{
+					$text = [IO.File]::ReadAllText($item.fullPath)
+				}
+				catch
+				{
+					throw 'input.read-failed'
+				}
+				$AffinityCache[$item.canonicalPath] = [string](Resolve-FileAffinity $text).affinity
+			}
+
+			$affinity = $AffinityCache[$item.canonicalPath]
+			if ($affinity -ceq 'unprovable')
+			{
+				Add-Violation $Violations $side.pairPath 'affinity.unprovable' $item.identity
+				continue
+			}
+			if ($affinity -ceq $side.opposite)
+			{
+				Add-Violation $Violations $side.pairPath 'affinity.wrong-side' $item.identity
+				continue
+			}
+			if (-not $side.otherIdentities.Contains($item.identity) -and $affinity -ceq 'shared')
+			{
+				$isClientShaderLayouts = $side.name -ceq 'client' -and $item.type -ceq 'ClInclude' -and
+					$item.canonicalPath.Equals($clientShaderLayoutsPath, [StringComparison]::OrdinalIgnoreCase)
+				$isEngineShaderHeader = $item.type -ceq 'ClInclude' -and
+					$item.canonicalPath.StartsWith('Engine/Data/Shaders/', [StringComparison]::OrdinalIgnoreCase) -and
+					$item.canonicalPath.EndsWith('.h', [StringComparison]::OrdinalIgnoreCase)
+				if (-not $isClientShaderLayouts -and -not $isEngineShaderHeader)
+				{
+					Add-Violation $Violations $side.pairPath 'affinity.one-sided-mismatch' $item.identity
+				}
 			}
 		}
 	}
@@ -659,13 +1095,65 @@ $exitCode = 0
 
 try
 {
-	if ($null -eq $ProjectPath -or $ProjectPath.Count -eq 0)
+	if ($PSBoundParameters.ContainsKey('RepositoryRoot'))
+	{
+		$resolvedRoot = $null
+		if (-not [string]::IsNullOrWhiteSpace($RepositoryRoot))
+		{
+			try
+			{
+				$candidateRoot = [IO.Path]::GetFullPath($RepositoryRoot, (Get-Location).ProviderPath)
+				if ([IO.Directory]::Exists($candidateRoot))
+				{
+					$resolvedRoot = $candidateRoot
+				}
+			}
+			catch
+			{
+				$resolvedRoot = $null
+			}
+		}
+
+		if ($null -eq $resolvedRoot)
+		{
+			$status = 'error'
+			$code = 'input.repository-root-invalid'
+			$message = "RepositoryRoot does not resolve to an existing directory: $RepositoryRoot"
+			$exitCode = 1
+		}
+		else
+		{
+			$script:RepoRoot = $resolvedRoot
+		}
+	}
+
+	$gameProjects = @()
+	if ($exitCode -eq 0 -and [IO.Directory]::Exists((Join-Path $script:RepoRoot 'Projects')))
+	{
+		$gameProjects = @(Get-AgentGameProjects $script:RepoRoot)
+	}
+
+	if ($exitCode -eq 0 -and $AllGameProjects -and ($null -eq $ProjectPath -or $ProjectPath.Count -eq 0))
+	{
+		$resolvedProjectPaths = [System.Collections.Generic.List[string]]::new()
+		foreach ($gameName in $gameProjects)
+		{
+			$null = $resolvedProjectPaths.Add("Projects/$gameName/Platforms/VisualStudio2026/$gameName.vcxproj")
+			$null = $resolvedProjectPaths.Add("Projects/$gameName/Platforms/VisualStudio2026/${gameName}Server.vcxproj")
+		}
+		$ProjectPath = @($resolvedProjectPaths)
+	}
+
+	if ($exitCode -eq 0 -and ($null -eq $ProjectPath -or $ProjectPath.Count -eq 0))
 	{
 		$status = 'error'
 		$code = 'input.project-invalid'
 		$message = 'ProjectPath must contain at least one path.'
 		$exitCode = 1
 	}
+
+	$xmlCache = [System.Collections.Generic.Dictionary[string, object]]::new([StringComparer]::OrdinalIgnoreCase)
+	$validatedProjectPaths = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
 	foreach ($inputPath in $ProjectPath)
 	{
 		if ($exitCode -ne 0)
@@ -681,8 +1169,29 @@ try
 			$exitCode = 1
 			break
 		}
-		Test-Pair $inputResult.path $inputResult.filtersPath $pairRecords $violations
+		Test-Pair $inputResult.path $inputResult.filtersPath $pairRecords $violations $xmlCache
+		$null = $validatedProjectPaths.Add((Get-CanonicalPath $inputResult.path))
 	}
+
+	if ($exitCode -eq 0 -and $gameProjects.Count -gt 0)
+	{
+		$physicalDirectoryCache = [System.Collections.Generic.Dictionary[string, string]]::new([StringComparer]::OrdinalIgnoreCase)
+		$resolvedPhysicalRoot = Resolve-PhysicalPath $script:RepoRoot $physicalDirectoryCache
+		$script:PhysicalRepoRoot = if ([string]::IsNullOrEmpty($resolvedPhysicalRoot)) { $script:RepoRoot } else { $resolvedPhysicalRoot }
+		$affinityCache = [System.Collections.Generic.Dictionary[string, string]]::new([StringComparer]::OrdinalIgnoreCase)
+		foreach ($gameName in $gameProjects)
+		{
+			$clientProjectPath = [IO.Path]::GetFullPath((Join-Path $script:RepoRoot "Projects/$gameName/Platforms/VisualStudio2026/$gameName.vcxproj"))
+			$serverProjectPath = [IO.Path]::GetFullPath((Join-Path $script:RepoRoot "Projects/$gameName/Platforms/VisualStudio2026/${gameName}Server.vcxproj"))
+			$clientCanonical = Get-CanonicalPath $clientProjectPath
+			$serverCanonical = Get-CanonicalPath $serverProjectPath
+			if ($validatedProjectPaths.Contains($clientCanonical) -or $validatedProjectPaths.Contains($serverCanonical))
+			{
+				Test-GamePairAffinity $gameName $clientProjectPath $serverProjectPath $validatedProjectPaths $xmlCache $affinityCache $physicalDirectoryCache $violations
+			}
+		}
+	}
+
 	if ($exitCode -eq 0 -and $violations.Count -gt 0)
 	{
 		$status = 'failed'

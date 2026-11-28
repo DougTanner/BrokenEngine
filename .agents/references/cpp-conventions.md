@@ -1,6 +1,7 @@
 # C++ Conventions
 
-These are the C++ conventions every implementer and reviewer of C++ applies.
+Apply these C++ conventions together with `Documents/C++StyleGuide.txt`
+(including rule 64 for code comments and established terminology).
 
 - Error handling at trust boundaries only — no defensive code: assume function
   parameters from within the codebase are valid. Add no check for a state no

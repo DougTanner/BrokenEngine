@@ -1,5 +1,6 @@
 # Comment-block scanner for /comment-review: it lists every run of consecutive `//` lines in surviving
-# session-changed C++/shader files (Session mode, with per-block `overlapsRegion`) or in the files and
+# session-changed C++/shader files (Session mode, with per-block `overlapsRegion`; `-Head` takes the files and
+# regions from the baseline-to-snapshot diff while file text stays read from disk) or in the files and
 # directories a caller names (WholeFile mode, `-Path`), with the regex kinds each run hits, so a review
 # never has to hand-hunt comment blocks. The scan reports candidates only — it never decides whether a
 # block is a finding, never edits a file, and writes nothing to disk, so it is safe under a read-only
@@ -8,6 +9,7 @@
 param(
 	[Parameter(Mandatory, ParameterSetName = 'Session')][string] $RepositoryRoot,
 	[Parameter(Mandatory, ParameterSetName = 'Session')][string] $Baseline,
+	[Parameter(ParameterSetName = 'Session')][string] $Head,
 	[Parameter(ParameterSetName = 'Session')][switch] $IncludeUntracked,
 	[Parameter(ParameterSetName = 'Session')][string[]] $PathPrefix,
 	[Parameter(Mandatory, ParameterSetName = 'WholeFile')][string[]] $Path
@@ -191,6 +193,7 @@ try {
 			Complete-CommentBlocks 2 'blocked' 'comments.inventory-unavailable' $_.Exception.Message
 		}
 		$inventoryParams = @{ RepositoryRoot = $RepositoryRoot; Baseline = $Baseline; Regions = $true }
+		if ($Head) { $inventoryParams.Head = $Head }
 		if ($IncludeUntracked) { $inventoryParams.IncludeUntracked = $true }
 		if ($PathPrefix) { $inventoryParams.PathPrefix = $PathPrefix }
 		$inventory = Get-SessionChangeInventory @inventoryParams

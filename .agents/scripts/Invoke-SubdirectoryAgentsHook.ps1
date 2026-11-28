@@ -352,17 +352,16 @@ function Get-LeafName([string] $PathText) {
 	return $PathText
 }
 
-function Test-IsContentReadElement($Tokens, $Elements, [int] $Index, [string] $CwdComparable, [bool] $HasRedirection, [bool] $IsTopLevel) {
-	$el = $Elements[$Index]
-	if ($el.CommandIndex -lt 0) { return $false }
-	if (($script:DirectReadCommands -contains $el.Name -or $script:MetadataSearchCommands -contains $el.Name) -and
-		-not (Test-IsMetadataLookupElement $Tokens $Elements $Index $CwdComparable $HasRedirection $IsTopLevel)) {
+function Test-IsContentReadElement($El, [string] $CwdComparable) {
+	if ($El.CommandIndex -lt 0) { return $false }
+	if (($script:DirectReadCommands -contains $El.Name -or $script:MetadataSearchCommands -contains $El.Name) -and
+		-not (Test-IsMetadataLookupElement $El $CwdComparable)) {
 		return $true
 	}
 	return $false
 }
 
-function Get-PreservedMetadataIndices($Tokens, $Elements, [bool] $PreserveAll, [string] $CwdComparable, [bool] $HasRedirection, [bool] $IsTopLevel) {
+function Get-PreservedMetadataIndices($Tokens, $Elements, [bool] $PreserveAll, [string] $CwdComparable) {
 	$preserved = [Collections.Generic.HashSet[int]]::new()
 	if ($Elements.Count -eq 0) { return , $preserved }
 	if ($PreserveAll) {
@@ -373,7 +372,7 @@ function Get-PreservedMetadataIndices($Tokens, $Elements, [bool] $PreserveAll, [
 	$isContentRead = [bool[]]::new($Elements.Count)
 	$hasAnyContentRead = $false
 	for ($i = 0; $i -lt $Elements.Count; $i++) {
-		if (Test-IsContentReadElement $Tokens $Elements $i $CwdComparable $HasRedirection $IsTopLevel) {
+		if (Test-IsContentReadElement $Elements[$i] $CwdComparable) {
 			$isContentRead[$i] = $true
 			$hasAnyContentRead = $true
 		}
@@ -524,49 +523,8 @@ function Test-IsAgentScriptWord($Word, [string] $CwdComparable) {
 	return $resolved.EndsWith('.ps1', [StringComparison]::OrdinalIgnoreCase) -and (Test-UnderDirectory $resolved "$CwdComparable/.agents")
 }
 
-function Test-IsMetadataLookupElement($Tokens, $Elements, [int] $Index, [string] $CwdComparable, [bool] $HasRedirection, [bool] $IsTopLevel) {
-	$El = $Elements[$Index]
+function Test-IsMetadataLookupElement($El, [string] $CwdComparable) {
 	if ($script:MetadataPathCommands -contains $El.Name) { return $true }
-
-	if ($script:DirectReadCommands -contains $El.Name) {
-		if ($HasRedirection -or -not $IsTopLevel) { return $false }
-		if ($El.CommandIndex -ne 0) { return $false }
-		if ($Index + 1 -ge $Elements.Count) { return $false }
-		$next = $Elements[$Index + 1]
-		if ($next.CommandIndex -ne 0 -or $next.Words.Count -ne 1 -or @('.count', '.length') -notcontains $next.Name) { return $false }
-		if ($null -eq (Get-DirectReadLiteralOperands $El)) { return $false }
-
-		$startIdx = -1
-		$depth = 0
-		for ($ti = 0; $ti -lt $Tokens.Count; $ti++) {
-			if ([object]::ReferenceEquals($Tokens[$ti], $El.Words[0])) {
-				$startIdx = $ti
-				break
-			}
-			if ($Tokens[$ti] -is [string]) {
-				if ($Tokens[$ti] -ceq '(' -or $Tokens[$ti] -ceq '{') { $depth++ }
-				elseif ($Tokens[$ti] -ceq ')' -or $Tokens[$ti] -ceq '}') { $depth-- }
-			}
-		}
-		if ($startIdx -le 0 -or $depth -ne 1) { return $false }
-		if (-not ($Tokens[$startIdx - 1] -is [string] -and $Tokens[$startIdx - 1] -ceq '(')) { return $false }
-		$endIdx = $startIdx + $El.Words.Count
-		if ($endIdx + 1 -ge $Tokens.Count) { return $false }
-		for ($wi = 1; $wi -lt $El.Words.Count; $wi++) {
-			if (-not [object]::ReferenceEquals($Tokens[$startIdx + $wi], $El.Words[$wi])) { return $false }
-		}
-		if (-not ($Tokens[$endIdx] -is [string] -and $Tokens[$endIdx] -ceq ')')) { return $false }
-		if (-not [object]::ReferenceEquals($Tokens[$endIdx + 1], $next.Words[0])) { return $false }
-		if ($startIdx -gt 1) {
-			$beforeOpen = $Tokens[$startIdx - 2]
-			if ($beforeOpen -isnot [string] -or $beforeOpen -cne ';') { return $false }
-		}
-		if ($endIdx + 2 -lt $Tokens.Count) {
-			$afterMember = $Tokens[$endIdx + 2]
-			if ($afterMember -isnot [string] -or $afterMember -cne ';') { return $false }
-		}
-		return $true
-	}
 
 	$isDirectCommand = (-not [string]::IsNullOrEmpty($El.Name)) -or ($El.CommandIndex -gt 0 -and $El.Words[$El.CommandIndex - 1].Raw -ceq '.')
 	if ($isDirectCommand -and (Test-IsAgentScriptWord $El.Words[$El.CommandIndex] $CwdComparable)) {
@@ -897,7 +855,6 @@ function Get-ShellAccessedTargets([string] $Command, [string] $CwdComparable) {
 	try {
 		$lex = Get-ShellTokenLists $Command $false
 		$tokenLists = $lex.TokenLists
-		$hasRedirection = $lex.HasRedirection
 	}
 	catch {
 		return , $targets
@@ -915,7 +872,7 @@ function Get-ShellAccessedTargets([string] $Command, [string] $CwdComparable) {
 		if (-not $hasContentReaderWithSubstitution -and $tokenLists.Count -gt 1) {
 			for ($ei = 0; $ei -lt $elements.Count; $ei++) {
 				$el = $elements[$ei]
-				if (-not (Test-IsContentReadElement $tokenLists[$t] $elements $ei $CwdComparable $hasRedirection ($t -eq 0))) { continue }
+				if (-not (Test-IsContentReadElement $el $CwdComparable)) { continue }
 				for ($w = $el.CommandIndex + 1; $w -lt $el.Words.Count; $w++) {
 					if ($el.Words[$w].HasSubstitution) {
 						$hasContentReaderWithSubstitution = $true
@@ -928,13 +885,12 @@ function Get-ShellAccessedTargets([string] $Command, [string] $CwdComparable) {
 	}
 	foreach ($entry in $parsedLists) {
 		$elements = $entry.Elements
-		$isTopLevel = ($entry.Index -eq 0)
-		$preserved = Get-PreservedMetadataIndices $entry.Tokens $elements ($entry.Index -gt 0 -and $hasContentReaderWithSubstitution) $CwdComparable $hasRedirection $isTopLevel
+		$preserved = Get-PreservedMetadataIndices $entry.Tokens $elements ($entry.Index -gt 0 -and $hasContentReaderWithSubstitution) $CwdComparable
 		for ($i = 0; $i -lt $elements.Count; $i++) {
 			$el = $elements[$i]
 			if ($el.CommandIndex -lt 0) { continue }
 			if ($script:SkipOutputCommands -contains $el.Name) { continue }
-			if ((Test-IsMetadataLookupElement $entry.Tokens $elements $i $CwdComparable $hasRedirection $isTopLevel) -and -not $preserved.Contains($i)) { continue }
+			if ((Test-IsMetadataLookupElement $el $CwdComparable) -and -not $preserved.Contains($i)) { continue }
 			$isDirectRead = $script:DirectReadCommands -contains $el.Name
 			$cmdWord = $el.Words[$el.CommandIndex]
 			$wordsToScan = [Collections.Generic.List[object]]::new()

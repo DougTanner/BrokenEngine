@@ -237,7 +237,8 @@ foreach ($relativePath in $modulePaths) {
 	$currentPin = Get-GitlinkPin $root $relativePath 'Current worktree'
 	$sourceHead = @(Invoke-AgentGit @('-C', $source, 'rev-parse', 'HEAD'))[0].Trim()
 	if ([string]::IsNullOrWhiteSpace($primaryPin) -or $primaryPin -ne $currentPin -or $primaryPin -ne $sourceHead) {
-		throw "Submodule '$relativePath' pin mismatch (primary=$primaryPin, worktree=$currentPin, source=$sourceHead). If the primary checkout updated this submodule after this worktree was created, rebase the worktree onto the primary tip so the pins agree: git -C '$root' rebase <primary-branch>."
+		$quotedRoot = [Management.Automation.Language.CodeGeneration]::EscapeSingleQuotedStringContent($root)
+		throw "Submodule '$relativePath' pin mismatch (primary=$primaryPin, worktree=$currentPin, source=$sourceHead). If the primary checkout updated this submodule after this worktree was created, rebase the worktree onto the primary tip so the pins agree: git -C '$quotedRoot' rebase <primary-branch>."
 	}
 	$sourceStatus = @(Invoke-AgentGit @('-C', $source, 'status', '--porcelain', '--untracked-files=all'))
 	if ($sourceStatus.Count -ne 0) { throw "Primary submodule '$relativePath' has local changes: $($sourceStatus -join '; ')." }

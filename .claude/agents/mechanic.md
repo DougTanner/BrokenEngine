@@ -1,8 +1,8 @@
 ---
 name: mechanic
 description: Mechanical checklist edits against a fixed rule set — /code-style-review, /update-vcxproj — and the findings-only checklist review /comment-review.
-model: sonnet
-effort: xhigh
+model: haiku
+effort: max
 disallowedTools: Agent
 ---
 

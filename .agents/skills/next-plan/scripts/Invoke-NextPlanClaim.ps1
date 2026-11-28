@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param([string] $Plan,[switch] $ResumeRetained,[switch] $UserAuthorizedTakeover,[switch] $AllowAgentCliMismatch)
 $ErrorActionPreference='Stop'; Set-StrictMode -Version Latest
-$result=[ordered]@{schemaVersion='broken-engine-next-plan-claim-result/v10';status='error';code='internal.error';message='Claim did not run.';nextAction='stop-report-to-user';claim=$null}
+$result=[ordered]@{schemaVersion='broken-engine-next-plan-claim-result/v11';status='error';code='internal.error';message='Claim did not run.';nextAction='stop-report-to-user';claim=$null}
 function Complete-Claim([int]$ExitCode,[string]$Status,[string]$Code,[string]$Message,[string]$NextAction){$result.status=$Status;$result.code=$Code;$result.message=$Message;if($null -ne $result.claim -and $Status -cne 'pass'){$result.message+=" This session's claim on '$($result.claim.plan)' remains held."};$result.nextAction=$NextAction;[Console]::Out.Write(($result|ConvertTo-Json -Depth 100 -Compress));exit $ExitCode}
 # NUL-delimited porcelain v1 emits raw paths, so a path containing a space or a quotable character is never C-quoted;
 # a rename or copy record is followed by one extra field holding the original path, and both sides matter because both
@@ -9,6 +9,22 @@ function Complete-Claim([int]$ExitCode,[string]$Status,[string]$Code,[string]$Me
 function Get-DirtyPath([string]$Porcelain){$paths=[Collections.Generic.List[string]]::new();$fields=@($Porcelain -split "`0");$index=0;while($index -lt $fields.Count){$record=$fields[$index];$index++;if($record.Length -lt 4){continue};$paths.Add($record.Substring(3));$state=$record.Substring(0,2);if($state.Contains('R') -or $state.Contains('C')){if($index -lt $fields.Count){$paths.Add($fields[$index]);$index++}}};return $paths}
 function Format-DirtyPath([string[]]$Paths){$text=@($Paths|Select-Object -First 10) -join ', ';if($Paths.Count -gt 10){$text+=" (+$($Paths.Count-10) more)"};return $text}
 function Test-CanonicalPlanPath([string]$Path){if([string]::IsNullOrEmpty($Path) -or $Path.IndexOf("`0",[StringComparison]::Ordinal) -ge 0 -or $Path.IndexOf("`r",[StringComparison]::Ordinal) -ge 0 -or $Path.IndexOf("`n",[StringComparison]::Ordinal) -ge 0){return $false};$relative=$null;foreach($plansRoot in @('Documents/Plans/','Projects/Coretide/Documents/Plans/')){if($Path.StartsWith($plansRoot,[StringComparison]::Ordinal)){$relative=$Path.Substring($plansRoot.Length);break}};if($null -eq $relative){return $false};$segments=@($relative.Split('/'));if($segments.Count -ne 2){return $false};$area=$segments[0];$name=$segments[1];if([string]::IsNullOrWhiteSpace($area) -or $area -ceq '.' -or $area -ceq '..'){return $false};if(-not $name.EndsWith('.md',[StringComparison]::Ordinal) -or $name.Length -le 3 -or $name -ceq 'AGENTS.md' -or [string]::IsNullOrWhiteSpace($name.Substring(0,$name.Length-3))){return $false};return $true}
+function Get-PlanSectionMetadata([string]$WorktreeRoot,[string]$PlanPath){
+	$fullPath=Join-Path $WorktreeRoot $PlanPath
+	if(-not [IO.File]::Exists($fullPath)){return [ordered]@{lineCount=0;sections=[object[]]@()}}
+	$lines=[IO.File]::ReadAllLines($fullPath,[Text.Encoding]::UTF8)
+	$sections=[Collections.Generic.List[object]]::new()
+	if($lines.Length -gt 0){
+		$searchLines=(Get-AgentMarkdownSearchText -Body ($lines -join "`n") -KeepInlineCode).Split("`n")
+		for($i=0;$i -lt $lines.Length;$i++){
+			if($searchLines[$i] -match '^##\s+'){
+				if($sections.Count -gt 0){$sections[$sections.Count-1].endLine=$i}
+				$sections.Add([ordered]@{heading=$lines[$i].TrimEnd();startLine=$i+1;endLine=$lines.Length})
+			}
+		}
+	}
+	return [ordered]@{lineCount=$lines.Length;sections=[object[]]@($sections)}
+}
 function Get-TargetedNoneMessage($Context,[string]$RequestedPlan){
 	$fallback="The requested Plan '$RequestedPlan' could not be classified after the claim attempt; retry the targeted claim."
 	try {
@@ -91,14 +107,15 @@ try {
  }
  $context=Get-NextPlanContext
  # A bare or exact request reports an authoritative different-Plan mismatch before the gates below. A held claim is
- # reused without tree work or scheduler mutation only when the session is at the primary tip; off it, the request falls
- # through so the fast-forward below reports the sync object the /next-plan final claim refresh reads. A partial pattern
- # needs tree-backed resolution below. Remaining claim-status outcomes, unreadable output included, fall through to the
- # ordinary flow, which can synchronize before plan claim-next re-reports the held claim or returns the scheduler's stop.
+ # reused without git/tree gates or scheduler mutation only when the session is at the primary tip (still reading
+ # claim.lineCount and claim.sections from the working-copy Plan file, or 0/[] when locally absent); off it, the request
+ # falls through so the fast-forward below reports the sync object the /next-plan final claim refresh reads. A partial
+ # pattern needs tree-backed resolution below. Remaining claim-status outcomes, unreadable output included, fall through
+ # to the ordinary flow, which can synchronize before plan claim-next re-reports the held claim or returns the scheduler's stop.
  $heldClaim=$null
  if($null -eq $pattern){try{$claimStatus=Get-NextPlanClaimStatus $context $Plan;if($claimStatus.ExitCode -eq 2 -and [string]$claimStatus.Status.code -ceq 'claim-plan-mismatch'){$result.conflict=[ordered]@{requestedPlan=[string]$claimStatus.Status.requestedPlan;heldPlan=[string]$claimStatus.Status.heldPlan};Complete-Claim 2 'blocked' 'claim.plan-mismatch' 'This session already holds a different Plan claim.' 'stop-report-to-user'};if($claimStatus.ExitCode -eq 0 -and [string]$claimStatus.Status.code -ceq 'claimed'){$heldClaim=$claimStatus.Status}}catch{$heldClaim=$null}}
  if($null -ne $heldClaim){$result.claim=[ordered]@{claimed=$true;plan=[string]$heldClaim.plan;state='existing'}}
- if($null -ne $heldClaim -and $context.SessionHead -ceq $context.PrimaryTip){Complete-Claim 0 'pass' 'reused' 'Existing Plan claim remains live for this session.' 'prepare'}
+ if($null -ne $heldClaim -and $context.SessionHead -ceq $context.PrimaryTip){$planMeta=Get-PlanSectionMetadata $context.Worktree $result.claim.plan;$result.claim.lineCount=$planMeta.lineCount;$result.claim.sections=$planMeta.sections;Complete-Claim 0 'pass' 'reused' 'Existing Plan claim remains live for this session.' 'prepare'}
  $status=Invoke-NextPlanProcess 'git.exe' @('-C',$context.Worktree,'status','--porcelain=v1','-z','--untracked-files=all') $context.Worktree
  if($status.ExitCode -ne 0){throw (New-NextPlanStateBlocker "git status could not read the session worktree. $($status.Stderr.Trim())")}
  $dirty=@(Get-DirtyPath $status.Stdout)
@@ -243,6 +260,8 @@ try {
  }
  if($code -cne 'claimed' -and $code -cne 'existing'){throw "plan claim-next returned an unknown result code '$code'."}
  $result.claim=[ordered]@{claimed=$true;plan=[string]$claim.plan;state=$code}
+ $planMeta=Get-PlanSectionMetadata $context.Worktree $result.claim.plan
+ $result.claim.lineCount=$planMeta.lineCount;$result.claim.sections=$planMeta.sections
  if($code -ceq 'existing'){Complete-Claim 0 'pass' 'reused' 'Existing Plan claim remains live for this session.' 'prepare'}
  Complete-Claim 0 'pass' 'ok' 'Plan claimed for this session.' 'prepare'
 } catch {if(Get-Command Test-NextPlanStateBlocker -ErrorAction SilentlyContinue){if(Test-NextPlanStateBlocker $_){Complete-Claim 2 'blocked' 'claim.context-conflict' $_.Exception.Message 'stop-report-to-user'}};Complete-Claim 1 'error' 'claim.failed' $_.Exception.Message 'stop-report-to-user'}

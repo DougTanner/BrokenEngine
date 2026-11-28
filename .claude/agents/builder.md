@@ -2,7 +2,7 @@
 name: builder
 description: Builds via /compile. Returns the build reporting /compile's `## Handoff` defines.
 model: haiku
-effort: high
+effort: xhigh
 disallowedTools: Agent
 ---
 

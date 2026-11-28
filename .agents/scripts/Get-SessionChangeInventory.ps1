@@ -21,6 +21,7 @@ param(
 	[switch] $IncludeUntracked,
 	[string[]] $PathPrefix,
 	[switch] $Regions,
+	[switch] $SinceLastRound,
 	[switch] $Landing,
 	[switch] $EmitManifest,
 	[string] $OutputPath,
@@ -99,6 +100,7 @@ try {
 	if ($PSBoundParameters.ContainsKey('PathPrefix')) { $invokeParams.PathPrefix = $PathPrefix }
 	if ($IncludeUntracked) { $invokeParams.IncludeUntracked = $true }
 	if ($Regions) { $invokeParams.Regions = $true }
+	if ($SinceLastRound) { $invokeParams.SinceLastRound = $true }
 	if ($Landing) { $invokeParams.Landing = $true }
 	if ($EmitManifest) { $invokeParams.EmitManifest = $true }
 	if ($PSBoundParameters.ContainsKey('SavePlanPaths')) { $invokeParams.SavePlanPaths = $SavePlanPaths }

@@ -39,7 +39,7 @@ included, runs the full audit in [`references/worker.md`](references/worker.md).
   user explicitly asked for it.
 - The authoritative shared task-brief fields from
   [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
-  `## Task brief`,
+  `## Task brief` and `## Session baseline`,
   including repository identity and session baseline.
 
 Run the finder once, adding `-SessionId <exact-id>` when supplied.

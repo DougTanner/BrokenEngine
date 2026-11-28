@@ -14,24 +14,23 @@ carrying the `sync` object records that result's `sync.to` as the session
 baseline, and a result without one leaves the recorded baseline unchanged, so
 the `Get-NextPlanContext` baseline holds only until the first claim reports a
 `sync` object. The shared
-[baseline rule](../../../references/subagent-reporting.md#task-brief) owns its
-later use and storage.
+[baseline rule](../../../references/subagent-reporting.md#session-baseline)
+owns its later use and storage.
 
 ### Reuse, dirty-worktree, fast-forward, and integrity
 
-A bare request or an exact request for the Plan this session already holds,
-made while the session is at the primary tip, is reported as `reused` with
-`nextAction: prepare` before the tree is examined, so that result is unchanged
-by a dirty worktree. Off the primary tip, the same request runs the ordinary
-flow below, which can stop at its dirty-worktree or divergence gate or return
-`reused` carrying the `sync` object. An exact request for a different Plan
-follows the mismatch result below. A partial pattern requires the normal
-tree-backed validation and unique-match resolution before WorktreeCli compares
-the resolved Plan with the held claim. The early `reused` result carries
-neither a `sync` nor a `retained` object and leaves the recorded baseline
-unchanged when the early lookup succeeds. When that lookup is busy or
-unreadable, the run falls through into the ordinary flow below, so a later
-`reused` result can carry a `sync` object and the baseline rule above applies.
+A bare or exact request for the Plan this session already holds, at the primary
+tip, returns `reused` (`nextAction: prepare`) skipping dirty-worktree and
+fast-forward gates, so held-claim reuse is unaffected by a dirty worktree while
+`claim.lineCount` and `claim.sections` read the working-copy Plan
+(`Get-PlanSectionMetadata` fallback if absent). Off the primary tip, it runs the
+ordinary flow below (stopping at its dirty-worktree or divergence gate, or
+returning `reused` with `sync`). An exact request for another Plan follows the
+mismatch result below; a partial pattern needs tree-backed validation and
+unique-match resolution first. Early `reused` carries no `sync` or `retained`
+and leaves the baseline unchanged. If the early lookup is busy or unreadable,
+the run falls through to the ordinary flow, so a later `reused` can carry
+`sync`.
 
 Any other claim run, bare or targeted, is refused with `stop-report-to-user`,
 never `resume-with-flag`, when the session worktree or its Coretide clone holds
@@ -156,12 +155,11 @@ matching several validated executable Plans yields `plan-name-ambiguous`, whose
 `message` names no match; the matching Plan paths are in the result's
 `candidates` array.
 
-If an exact or resolved request differs from the Plan the session already
-holds, the `/v10` claim envelope returns
-`claim.plan-mismatch` with `status: blocked`, exit 2, and
-`nextAction: stop-report-to-user`. Its `conflict` object carries the normalized
-`requestedPlan` and `heldPlan`; WorktreeCli makes the comparison and the wrapper
-only projects those paths. The existing claim remains unchanged.
+If an exact or resolved request differs from the Plan the session already holds,
+the claim result is `claim.plan-mismatch` (exit 2, `status: blocked`,
+`nextAction: stop-report-to-user`). Its `conflict` object projects
+WorktreeCli's normalized `requestedPlan` and `heldPlan`; the existing claim
+remains unchanged.
 
 ## Claim-exit result fields
 
@@ -195,8 +193,11 @@ pass result.
 Every claim, deferral, and completion result carries a `nextAction` naming the
 one thing to do next, drawn from these six values:
 
-- `prepare` — this session holds the claim; continue the preparation workflow.
-  On the `completion.plan-cited` completion result, follow that code's row in
+- `prepare` — this session holds the claim; continue preparation. On
+  `Invoke-NextPlanClaim.ps1` results only (not `Complete-NextPlan.ps1`'s
+  `completion.plan-cited`), `claim` also carries `lineCount` and `sections`
+  (`heading`, `startLine`, `endLine` for unfenced `##` headings). On
+  `completion.plan-cited`, follow its row in
   [post-checkpoint outcomes](../SKILL.md#post-checkpoint-outcomes).
 - `stop-report-to-user` — the run stops here; report the result and let the user
   decide what happens next, after [the `/next-plan` steps](../SKILL.md#steps)

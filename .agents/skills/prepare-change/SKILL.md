@@ -47,13 +47,15 @@ Ordinary preparation (omitted `mode:`) adds:
 
 `mode: claimed-plan` adds:
 
-- ordinary claim: claimed Plan path plus section line ranges from a heading
-  lookup (`AGENTS.md` `## Environment`), written from the Plan's own citations
-  (`path:line-range`). Main reads only Plan sections it must state from (such as
-  the risk tier for roles), follows `subagent-reporting.md` `## Task brief` for
-  workflow-reference reads, leaves target source and non-exempt references to
-  the `planner`, and reads source only for a decision the Plan and handoff
-  cannot settle;
+- ordinary claim: the claim result's `claim.plan` as the Plan's identity, plus
+  `claim.sections` line ranges from `Invoke-NextPlanClaim.ps1`
+  (`path:line-range`). Of the Plan's text, main reads only the risk-tier
+  statement, not its section, found by a line search wherever the Plan states it
+  (for role assignments), and the critical-files list (for the `Governing paths`
+  chain). Main follows `subagent-reporting.md`
+  `## Pre-dispatch inventory and bounded reading` for workflow-reference reads,
+  leaves target source and non-exempt references to the `planner`, and reads
+  source only for a decision the Plan and handoff cannot settle;
 - difference re-entry (per
   [`claim-exceptions.md`](../next-plan/references/claim-exceptions.md)
   `## Changes requested at landing` or `completion.plan-cited`): the original

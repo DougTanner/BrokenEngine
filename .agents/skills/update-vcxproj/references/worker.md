@@ -96,19 +96,18 @@ For each affected project pair:
    pwsh -NoProfile -File .agents/skills/update-vcxproj/scripts/Invoke-VcxprojPairCheck.ps1 -ProjectPath <project>.vcxproj
    ```
 
-   After an `Update-EngineVcxprojItem.ps1` run, run this multi-project form
-   once in place of those projects' single-pair runs, validating every game
-   client and server project the standard layout defines, not only those named
-   in its output, because its per-path records can be truncated:
+   After an `Update-EngineVcxprojItem.ps1` run, validate all game pairs once in
+   place of their single-pair runs:
 
    ```powershell
-   pwsh -NoProfile -Command "& '.agents/skills/update-vcxproj/scripts/Invoke-VcxprojPairCheck.ps1' -ProjectPath '<project>.vcxproj','<project>.vcxproj'"
+   pwsh -NoProfile -NonInteractive -File .agents/skills/update-vcxproj/scripts/Invoke-VcxprojPairCheck.ps1 -AllGameProjects
    ```
 
    Require exit `0`. On compact failure, report its `code` and violations, fix
    only authorized XML, and rerun. A pass is authoritative for XML parsing,
-   project/filter mirroring, filter declarations/ancestors, and GUID uniqueness;
-   do not recreate those checks manually. Done when the run exits `0`.
+   project/filter mirroring, filter declarations/ancestors, GUID uniqueness, and
+   paired game client/server whole-file guard affinity; do not recreate those
+   checks manually. Done when the run exits `0`.
 4. Leave any unresolved invariant as `FAIL`; partial reconciliation is not
    success. Done when the returned status reflects every invariant's state.
 

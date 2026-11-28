@@ -8,7 +8,9 @@ namespace engine
 struct CellStaticData;
 struct NavData;
 
-SegmentHit XM_CALLCONV TracePointAgainstTerrain(const CellStaticData& rStaticData, FXMVECTOR vecStartPosition, FXMVECTOR vecEndPosition);
+// Traces a point segment against the cell's elevation grid up to fMaximumTime, the caller's cell-exit cutoff in [0, 1]
+// (1.0f when the segment stays inside the cell), keeping the traced sub-segment inside the cell hexagon.
+SegmentHit XM_CALLCONV TracePointAgainstTerrain(const CellStaticData& rStaticData, FXMVECTOR vecStartPosition, FXMVECTOR vecEndPosition, float fMaximumTime);
 
 enum class DiscTerrainFlags : uint8_t
 {

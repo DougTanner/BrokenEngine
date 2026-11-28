@@ -32,11 +32,12 @@ A game project provides:
 
 The shared checkers `.agents/scripts/Invoke-CollectionLayoutCheck.ps1` and
 `.agents/scripts/Invoke-IncludeOrderCheck.ps1`, `/update-vcxproj`'s
-`Update-EngineVcxprojItem.ps1`, `/compile`, the bootstrap Shared-data refresh
-(`.agents/scripts/Bootstrap-AgentTools.ps1`), the `/agent-harness` claim,
-DataPacker's zero-argument run, diagsession symbolization, and code-quality
-metrics history derive each game project's paths from its name. A new game
-project that follows this layout needs no change to that tooling.
+`Update-EngineVcxprojItem.ps1` and `Invoke-VcxprojPairCheck.ps1`, `/compile`,
+the bootstrap Shared-data refresh (`.agents/scripts/Bootstrap-AgentTools.ps1`),
+the `/agent-harness` claim, DataPacker's zero-argument run, diagsession
+symbolization, and code-quality metrics history derive each game project's paths
+from its name. A new game project that follows this layout needs no change to
+that tooling.
 
 ## See Also
 

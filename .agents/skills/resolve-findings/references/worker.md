@@ -18,7 +18,9 @@ and the handoff form.
    Done when every item has a named cause, or is left unchanged because its
    cause is uncertain or out of scope.
 2. Apply the smallest change that restores approved behavior for each item with
-   a confirmed cause. Done when the edit is complete within the assigned files
+   a confirmed cause, adding code only after the reuse-before-adding search of
+   [`cpp-conventions.md`](../../../references/cpp-conventions.md) in each
+   changed language. Done when the edit is complete within the assigned files
    and functions.
 3. Check the sites the edit affects. Done when each one is consistent or
    recorded as an out-of-scope candidate for the manager.

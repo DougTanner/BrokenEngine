@@ -12,11 +12,9 @@ The finder pass runs steps 1-3; the validator pass runs steps 4-8.
    - Create `Temp/` if absent in its own call, then run
      `pwsh -NoProfile -NonInteractive -File
      .agents/scripts/Get-SessionChangeInventory.ps1 -RepositoryRoot '<absolute
-     repository toplevel>' -Baseline <baseline SHA> -Regions -OutputPath
-     Temp/over-engineering-review-inventory.json`.
-   - Add `-IncludeUntracked` for briefed untracked paths, and
-     `-PathPrefix '<comma-separated paths>'` for a `Scope` of
-     `session-changed C++ in <paths>` (its paths).
+     repository toplevel>' -Baseline <baseline SHA> -Regions -SinceLastRound
+     -OutputPath Temp/over-engineering-review-inventory.json`.
+   - Add `-IncludeUntracked` for briefed untracked paths.
    - Read the output only after the script prints its receipt (usability per
      `../SKILL.md` `## Handoff`).
    - Keep `cpp` `entries` and their `regions`; refresh the same inventory with

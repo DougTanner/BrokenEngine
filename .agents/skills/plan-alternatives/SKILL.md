@@ -65,15 +65,19 @@ Self-serving machinery: <new state or code that exists only to make this mechani
 Pays off when: <the condition that makes it the right call>
 ```
 
-Supporting or quoted source text stays out of every row; a researcher that wants
-to show its sourcing cites the existing repository path plus selector under
-`Evidence` instead.
+Keep `Decisive checks` to concise option-specific verdicts (one check/result per
+key fact, no verification rationale). Keep supporting or quoted source text out
+of every row; cite supporting paths and selectors under `Evidence`. Read-only
+researchers stay under the `../../references/subagent-handoff.md` `## Handoffs`
+cap (no `Temp/` overflow).
 
 ### Comparison
 
 When researcher handoffs contradict each other on a repository fact a
-comparison depends on, main dispatches one `locator` to settle that fact and
-scores from its returned rows instead of reading source itself.
+comparison depends on, main dispatches one `locator` to settle that fact,
+asking for one single-line row per disputed fact: its ID, settled value, and
+settling `path:line`, or `none` when nothing settles it, with no source text.
+Main scores from those rows instead of reading source itself.
 
 Main scores candidate zero from the rows of the preparation handoff's
 `Candidate zero` field when a preparation handoff returned that field's rows,

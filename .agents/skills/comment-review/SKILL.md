@@ -30,16 +30,15 @@ each with the shortest present-tense replacement keeping every preserved fact.
 
 Run in the delegated execution context of
 [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
-`## Delegated execution context` as one `mechanic`. Dispatch is once per printed
-step-script row.
+`## Delegated execution context` as one `mechanic`.
 
 ## Inputs
 
 - `Scope` — the C++ and shader files or directories of a caller-supplied sweep
   scope, or none to review the ranges changed in this session.
 - `Baseline` — the full 40-character session baseline SHA and the absolute
-  repository toplevel, required for a session-changed scope, plus any untracked
-  paths the review must cover.
+  repository toplevel, required for a session-changed scope, plus the review
+  row's `Head` when one applies, else any untracked paths the review must cover.
 
 Use `Scope` and `Baseline` alone to set the review scope.
 

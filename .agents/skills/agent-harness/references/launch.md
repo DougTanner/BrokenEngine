@@ -11,14 +11,14 @@ launch notes and launch caveats.
 
 ## Launch
 
-Run each complete `Invoke-HarnessLaunch.ps1` call, including its Register
-action and watcher, in a context where the processes survive shell exit.
-Use the direct call on a working host or its official per-command approval
-when available and granted. Prove survival with a later owned ping and an
-identity check after the launch shell exits. When the host cannot provide
-that lifetime, give the user the desktop call below with actual values.
-Run from the adopted worktree root and double embedded apostrophes in
-PowerShell single-quoted literals.
+Run `Invoke-HarnessLaunch.ps1` directly on a working host, or via granted
+per-command approval. Before launch, it calls `Test-AgentKillOnCloseJob` and
+exits `2` (`blocked`, `launch.kill-on-close-job`) without starting or
+registering on an immediate kill-on-close Job Object without silent breakaway.
+Proceeding launches prove survival with a post-exit owned ping and identity
+check. On refusal or an unsupported host, give the user the desktop block below
+with actual values. Run from the adopted worktree root and double apostrophes
+in PowerShell single-quoted literals.
 
 The server is single-instance per machine, so a harness server started while any
 `<server process-name prefix>*` process runs exits at once. Every server launch
@@ -83,11 +83,11 @@ switches from worker step 21:
 pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-HarnessLaunch.ps1 -RepositoryRoot '<absolute adopted worktree>' -Role '<role>' -GameDataDirectory '<normalized Data path>' -AgentHarness '<absolute AgentHarness path>' -Owner '<owner token>' -ProcessCheckStatePath '<absolute process-check state path>' -AppDataDirectory '<absolute app-data root>' -LogFile '<absolute role log path>' -GameName '<role game name>'
 ```
 
-For a user-operated desktop launch, put that exact launch line immediately
-after the guard below in a single `& { ... }` block. Redirect the launch's
-stdout to a fresh worktree `Temp` receipt and print `$LASTEXITCODE` separately
-in the same block. When the guard fails, retain its output and follow the
-worker's ownership rules before supplying any next command:
+For desktop launch (including after `launch.kill-on-close-job`), keep the live
+claim and heartbeat, put that launch line after the guard below in one
+`& { ... }` block with the live token and run paths, redirect stdout to a
+fresh `Temp` receipt, and print `$LASTEXITCODE`. On guard failure, keep its
+output and follow ownership rules before any next command:
 
 ```powershell
 $PSNativeCommandUseErrorActionPreference = $false
@@ -95,19 +95,19 @@ $PSNativeCommandUseErrorActionPreference = $false
 if ($LASTEXITCODE -ne 0) { throw "Harness ownership check failed (exit $LASTEXITCODE)." }
 ```
 
-Keep normal heartbeat duties while owned. Any separate Register call uses
-the same durable context, original role and state, PID, and start time.
+Any separate Register call uses the same durable context, original role and
+state, PID, and start time.
 
 Keep every launch result, including a failed Register or readiness wait. Use
-the following release block for cleanup across calls under worker steps 39–42.
-Use both latest receipts, including an earlier successful role, and the
-project hub's executable names for their launch configurations without
-`.exe`. Use `0` and an empty timestamp where a role never started. For
-`<absolute process-check state path or empty>`, supply the original run path
-when the launch, Register, or Check receipts show any role registered or leave
-registration uncertain, as with a failed Register or unreadable state. Use an
-empty string only when the receipts establish that no role registered, such as
-when no role started or only Baseline ran.
+the following release block for cleanup across calls under worker steps 39–42,
+including desktop-launch abandonment or completion. Use both latest receipts,
+including an earlier successful role, and the project hub's executable names
+for their launch configurations without `.exe`. Use `0` and an empty timestamp
+where a role never started. For `<absolute process-check state path or empty>`,
+supply the original run path when the launch, Register, or Check receipts show
+any role registered or leave registration uncertain, as with a failed Register
+or unreadable state. Use an empty string only when the receipts establish that
+no role registered, such as when no role started or only Baseline ran.
 
 ```powershell
 & {
@@ -259,11 +259,11 @@ for a running Normal server, claim under session `normal-launch`, then start
 the server and client with ordinary visible windows, loopback and per-user
 settings. The client's fullscreen state follows
 [`Engine/Source/AGENTS.md`](../../../../Engine/Source/AGENTS.md)
-`## Startup and Main Loop`. Use the granted desktop execution if required
-for window lifetime. When unavailable, give the user the applicable blocks
-below as exact commands from the adopted worktree. Collect fresh `Temp`
-receipts and exit codes from each operation before supplying a contingent
-next command.
+`## Startup and Main Loop`. Run directly on a working host, or via granted
+desktop execution if needed for window lifetime. When neither is available or
+after kill-on-close refusal, give the user the blocks below from the adopted
+worktree and collect fresh `Temp` receipts and exit codes before any next
+command.
 
 The claim waits out harness servers. Check first for a Normal server, including
 one whose command line is unreadable. Report any listed processes and end the
@@ -334,6 +334,8 @@ absolute log path for Profile and to `''` for Debug:
 		$conflicts = @(Get-CimInstance Win32_Process -Filter "Name LIKE '<server process-name prefix>%'" -ErrorAction Stop |
 			Where-Object { [string]$_.CommandLine -notmatch '--agent-port' })
 		if ($conflicts.Count -gt 0) { throw "A Normal server is running (PID $($conflicts.ProcessId -join ', '))." }
+		Import-Module './.agents/scripts/AgentScriptCommon.psm1'
+		if (Test-AgentKillOnCloseJob) { throw 'Immediate kill-on-close Job Object; re-claim and use desktop launch.' }
 		$server = Start-Process -FilePath '<absolute mapped server executable>' -ArgumentList $gameArguments -PassThru -ErrorAction Stop
 		$receipt.serverPid = $server.Id
 		$receipt.serverStartTimeUtc = $server.StartTime.ToUniversalTime().ToString('o')
@@ -354,10 +356,11 @@ absolute log path for Profile and to `''` for Debug:
 }
 ```
 
-Read `releaseExitCode` from the receipt. Exit `0` released the lock. Exit `2`
-means the lock is absent or another owner holds it. Report any other exit or
-exception with its release result, and discard the token when release is
-settled. Report any launch failure and any process that started. Reconcile
-the returned PIDs and start times, the claim and the release before sending
-a next command after a partial or ambiguous result. Leave Normal windows
-running for the user to close. The client connects as `## Launch` describes.
+Read `releaseExitCode` (`ToolCliCommon.h`: `kiExitOk` released;
+`kiExitStateConflict` absent or foreign). Report other exits or exceptions with
+release output; discard the token once settled. On kill-on-close refusal,
+reconcile ambiguous release, re-run the conflict check and claim for a fresh
+token, and give the user the desktop pair-start block with it. Report other
+launch failures and started processes, reconciling PIDs, start times, claim,
+and release first. Leave Normal windows for the user to close; the client
+connects as `## Launch` describes.

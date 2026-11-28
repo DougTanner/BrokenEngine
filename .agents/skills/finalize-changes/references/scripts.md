@@ -334,8 +334,8 @@ review and overwrites the artifact.
   directory, and landing makes no capture decision of its own. All three
   generated files are then committed over the approved source commit through a
   temporary index as one sole-parent commit with the frozen approved metadata;
-  no branch ref moves while that object is built. The final result is
-  `broken-engine-finalize-landing/v7` and separates `approvedSource`,
+  no branch ref moves while that object is built. The final result carries the
+  script's emitted `schemaVersion` and separates `approvedSource`,
   `rebasedSource`, `historyUpdate`, and `final` commit/tree fields. The reviewed
   PNG deletion remains an ordinary source change; only the three generated paths
   are allowed after confirmation. When primary advanced first it makes at most
@@ -356,13 +356,11 @@ review and overwrites the artifact.
   through `Invoke-FinalizeLockClaim.ps1` first and pass the new owner token.
   When it acquired but did not release the lock (`lock.claimed` true,
   `lock.released` false), the claim is retained: handle it per the release
-  paragraph below before claiming anew. Re-invoke neither a `recovery` nor a
-  `terminal` result with the same arguments. A `recovery` result returns to
-  main for recovery ([`SKILL.md`](../SKILL.md#landing-confirmation)); a
-  `terminal` result ends this landing attempt and stops without recovery
-  (including `rebase.abort-failed`, which leaves restoration unproven and
-  retains the lease). `landing.retry-exhausted` is `retryable-wait` and leaves
-  the confirmed session commit restored. Blocked
+  paragraph below before claiming anew. A `recovery` or `review-round` result
+  follows [`worker.md`](worker.md#recovery) `## Recovery`; a `terminal` result
+  ends this landing attempt and stops without recovery (including `rebase.abort-failed`, which leaves restoration unproven
+  and retains the lease). `landing.retry-exhausted` is `retryable-wait` and
+  leaves the confirmed session commit restored. Blocked
   `history.overlay-invalid` means the temporary overlay tree changed something
   other than exactly the three reserved history paths; its message names the
   unexpected paths, and any reserved path the overlay failed to add. That guard
@@ -393,12 +391,12 @@ review and overwrites the artifact.
   target. Pass `-ReleasePlanClaim` when a claimed Plan reached final
   preparation; the script then deletes the claim best-effort. Without the switch
   it invokes no `plan` command at all.
-- `Invoke-FinalizeCoretide.ps1` prints one `broken-engine-finalize-coretide/v2`
-  result (`status`, `code`, `message`, `disposition`, `coretideCommit`,
-  `planClaim`, `residuals`; header owns status/exit, rebase, `none` idempotency,
-  and which refusals are `recovery`). `-Prepare` `pass` fetches `coretideCommit`
-  into primary Coretide moving no ref for SmartGit (`error`
-  `primary.coretide-absent` if missing). `-Land` requires a live
+- `Invoke-FinalizeCoretide.ps1` prints one result (`schemaVersion`, `status`,
+  `code`, `message`, `disposition`, `coretideCommit`, `planClaim`,
+  `residuals`; header owns status/exit, rebase, `none` idempotency,
+  and which refusals are `recovery` or `review-round`). `-Prepare` `pass`
+  fetches `coretideCommit` into primary Coretide moving no ref for SmartGit
+  (`error` `primary.coretide-absent` if missing). `-Land` requires a live
   session/worktree `-OwnerToken` lease (`landing-lock.not-held`) and advances
   primary to and reports the verified commit; a `blocked` result's
   `disposition` takes the landing values, acted on as the bullet above states.

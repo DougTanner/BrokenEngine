@@ -13,11 +13,11 @@ here. Once the user makes the choice, it becomes a Plan under
 `.agents/references/change-workflow.md` `### Delegation roles` table). The
 diagnosis worker is an `implementer` (`change-workflow.md` line 218), and a
 subagent cannot dispatch one, so its only build route is the shared
-`Build required` field. `subagent-reporting.md` line 114 sends that field to a
-`builder`. The field carries "exact targets", meaning target plus
-configuration/platform (`.agents/references/subagent-handoff.md` lines 18 and
-50-52), and it is returned only in a handoff. This record leaves that
-constraint as it is.
+`Build required` field. The `Build required` row of `subagent-reporting.md`
+`## Handoffs` sends that field to a `builder`. The field carries "exact
+targets", meaning target plus configuration/platform
+(`.agents/references/subagent-handoff.md` lines 18 and 50-52), and it is
+returned only in a handoff. This record leaves that constraint as it is.
 
 Step 2 item 3 (the `/compile` signal for build, link, and static failures)
 already routes build signals through `Build required`

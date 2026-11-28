@@ -2,9 +2,10 @@
 # the commits its upstream lacks into one commit on their merge base under the Coretide message file. -Land, under the
 # landing lease the caller already holds, checks the approval receipts, rebases onto a moved upstream only for an
 # identical patch, and fast-forwards the primary Coretide checkout from the clone; a rerun after landing reports none.
-# It never pushes and changes no primary Coretide configuration. Result schema broken-engine-finalize-coretide/v2;
+# It never pushes and changes no primary Coretide configuration. Result schema broken-engine-finalize-coretide/v3;
 # exit 0 for pass, none, or landed, 2 for blocked, 1 for error. Its disposition takes the Invoke-FinalizeLanding.ps1
-# values: recovery for a refusal a rebase or review round can cure with the clone branch restored, else terminal.
+# values: review-round for a refusal a review round can cure and recovery for one a rebase can cure, each with the
+# clone branch restored, else terminal.
 [CmdletBinding()]
 param(
 	[Parameter(Mandatory, ParameterSetName = 'Prepare')][switch] $Prepare,
@@ -35,7 +36,7 @@ Import-Module (Join-Path $scripts 'AgentWorktreeSession.psm1') -Force -DisableNa
 Import-Module (Join-Path $scripts 'SessionChangeInventory.psm1') -Force
 
 $result = [ordered]@{
-	schemaVersion = 'broken-engine-finalize-coretide/v2'
+	schemaVersion = 'broken-engine-finalize-coretide/v3'
 	status = 'error'
 	code = 'internal.error'
 	message = 'Coretide finalization did not run.'
@@ -164,7 +165,7 @@ try {
 			$restore = Restore-FinalizeBranch $coretide $branch $approved
 			if (-not $restore.Restored) { Complete-FinalizeCoretide 2 'blocked' 'rebase.abort-failed' "$($coverage.Message) $($restore.Message)" }
 		}
-		Complete-FinalizeCoretide 2 'blocked' $coverage.Code $coverage.Message $(if ($coverage.Code.StartsWith('inventory.review-round-')) { 'recovery' } else { 'terminal' })
+		Complete-FinalizeCoretide 2 'blocked' $coverage.Code $coverage.Message $(if ($coverage.Code.StartsWith('inventory.review-round-')) { 'review-round' } else { 'terminal' })
 	}
 	$advance = Invoke-FinalizeNativeText 'git.exe' @('-C', $primaryCoretide, 'pull', '--ff-only', '--no-rebase', $coretide, $landCommit) $primaryCoretide
 	if ($advance.ExitCode -ne 0) {

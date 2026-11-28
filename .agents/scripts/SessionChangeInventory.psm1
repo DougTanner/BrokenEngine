@@ -1277,6 +1277,7 @@ function Get-SessionChangeInventory {
 		[string[]] $PathPrefix,
 		[switch] $Regions,
 		[switch] $CoherenceOnly,
+		[switch] $SinceLastRound,
 		[switch] $Landing,
 		[switch] $EmitManifest,
 		[string] $SavePlanPaths,
@@ -1321,8 +1322,9 @@ function Get-SessionChangeInventory {
 		$coherenceConflict = $CoherenceOnly -and ($Landing -or $EmitManifest)
 		$savePlanConflict = $PSBoundParameters.ContainsKey('SavePlanPaths') -and -not $Landing
 		$sinceConflict = $PSBoundParameters.ContainsKey('Since') -and ($Regions -or $Landing -or $EmitManifest)
-		if (($Regions -and $Landing) -or $manifestConflict -or $prefixConflict -or $coherenceConflict -or $savePlanConflict -or $sinceConflict) {
-			$message = if ($manifestConflict) { 'The -EmitManifest mode is exclusive with -Regions, -Landing, -Head, -IncludeUntracked, and -UntrackedPath.' } elseif ($prefixConflict) { 'The -PathPrefix filter is exclusive with -Landing and -EmitManifest.' } elseif ($coherenceConflict) { 'The -CoherenceOnly filter is exclusive with -Landing and -EmitManifest.' } elseif ($savePlanConflict) { 'The -SavePlanPaths option is valid only with -Landing.' } elseif ($sinceConflict) { 'The -Since option is exclusive with -Regions, -Landing, and -EmitManifest.' } else { 'Supply at most one of -Regions and -Landing.' }
+		$sinceLastRoundConflict = $SinceLastRound -and ($Landing -or $EmitManifest -or $PSBoundParameters.ContainsKey('Since'))
+		if (($Regions -and $Landing) -or $manifestConflict -or $prefixConflict -or $coherenceConflict -or $savePlanConflict -or $sinceConflict -or $sinceLastRoundConflict) {
+			$message = if ($manifestConflict) { 'The -EmitManifest mode is exclusive with -Regions, -Landing, -Head, -IncludeUntracked, and -UntrackedPath.' } elseif ($prefixConflict) { 'The -PathPrefix filter is exclusive with -Landing and -EmitManifest.' } elseif ($coherenceConflict) { 'The -CoherenceOnly filter is exclusive with -Landing and -EmitManifest.' } elseif ($savePlanConflict) { 'The -SavePlanPaths option is valid only with -Landing.' } elseif ($sinceConflict) { 'The -Since option is exclusive with -Regions, -Landing, and -EmitManifest.' } elseif ($sinceLastRoundConflict) { 'The -SinceLastRound filter is exclusive with -Landing, -EmitManifest, and -Since.' } else { 'Supply at most one of -Regions and -Landing.' }
 			return Set-InventoryOutcome $result 'blocked' 'inventory.mode-conflict' $message
 		}
 		$script:Root = Get-AgentCanonicalPath $RepositoryRoot
@@ -1386,6 +1388,36 @@ function Get-SessionChangeInventory {
 			if ($treeSha -notmatch '^[0-9a-fA-F]{40}$') { throw "The baseline tree did not resolve to a full Git SHA: '$treeSha'." }
 			$manifestEntries = Get-ManifestTreeEntries $baselineSha
 			return Get-SessionManifest $baselineSha $treeSha ([object[]] $manifestEntries)
+		}
+
+		$sincePaths = $null
+		if ($SinceLastRound) {
+			$roundState = Get-ReviewRoundState -RepositoryRoot $script:Root -ChainOnly
+			$lastClosed = $null
+			foreach ($round in $roundState.Rounds) {
+				if ($null -ne $round.Close) { $lastClosed = $round }
+			}
+			if ($null -ne $lastClosed) {
+				$sinceParams = @{
+					RepositoryRoot = $script:Root
+					Baseline = $baselineSha
+					Since = $lastClosed.Snapshot
+				}
+				if (-not [string]::IsNullOrEmpty($headSha)) { $sinceParams.Head = $headSha }
+				if ($IncludeUntracked) { $sinceParams.IncludeUntracked = $true }
+				if ($PSBoundParameters.ContainsKey('UntrackedPath')) { $sinceParams.UntrackedPath = $UntrackedPath }
+				$saved = Save-InventoryState
+				try { $sinceDoc = Get-SessionChangeInventory @sinceParams }
+				finally { Restore-InventoryState $saved }
+				if ($sinceDoc.status -cne 'pass') {
+					return Set-InventoryOutcome $result $sinceDoc.status $sinceDoc.code $sinceDoc.message
+				}
+				$sincePaths = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+				foreach ($entry in $sinceDoc.entries) {
+					[void] $sincePaths.Add($entry.path)
+					if (-not [string]::IsNullOrEmpty($entry.oldPath)) { [void] $sincePaths.Add($entry.oldPath) }
+				}
+			}
 		}
 
 		$prefixes = ConvertTo-NormalizedPathFilter $PathPrefix $true
@@ -1485,6 +1517,11 @@ function Get-SessionChangeInventory {
 			$scoped = [Collections.Generic.List[object]]::new()
 			foreach ($entry in $sorted) { if (Test-InventoryPathInScope $entry.Path $prefixes) { $scoped.Add($entry) } }
 		}
+		if ($null -ne $sincePaths) {
+			$sinceScoped = [Collections.Generic.List[object]]::new()
+			foreach ($entry in $scoped) { if ($sincePaths.Contains($entry.Path)) { $sinceScoped.Add($entry) } }
+			$scoped = $sinceScoped
+		}
 		if ($CoherenceOnly) {
 			$coherenceScoped = [Collections.Generic.List[object]]::new()
 			foreach ($entry in $scoped) { if (Test-CoherenceReviewEntry $entry) { $coherenceScoped.Add($entry) } }
@@ -1511,7 +1548,7 @@ function Get-SessionChangeInventory {
 			$regionList = [Collections.Generic.List[object]]::new()
 			foreach ($region in $allRegions) { if (Test-InventoryPathInScope $region.path $prefixes) { $regionList.Add($region) } }
 		}
-		if ($CoherenceOnly) {
+		if ($CoherenceOnly -or $null -ne $sincePaths) {
 			$keptPaths = [Collections.Generic.HashSet[string]]::new([string[]] @(), [StringComparer]::Ordinal)
 			foreach ($entry in $scoped) { [void] $keptPaths.Add($entry.Path) }
 			$allRegions = $regionList

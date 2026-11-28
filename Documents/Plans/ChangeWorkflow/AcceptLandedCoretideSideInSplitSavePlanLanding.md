@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v2 {"createdUtc":"2026-11-27T01:04:46.923Z","dependsOn":[]} -->
+<!-- broken-engine-plan/v2 {"createdUtc":"2026-11-27T01:04:46.923Z","dependsOn":[],"agentCli":"claude"} -->
 # Accept a landed Coretide side in a split /save-plan landing
 
 ## Context
@@ -75,5 +75,5 @@ live-verification exposure.
 
 ## Notes
 
-- `Documents/Plans/ChangeWorkflow/KeepReviewRoundScenarioScripts/check5.ps1`
-  holds the split-save scenario setup to start from.
+- `.agents/scripts/ReviewRoundScenarios/RoundSequence.ps1` holds the split-save
+  scenario setup to start from.

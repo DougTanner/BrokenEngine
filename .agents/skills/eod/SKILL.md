@@ -32,9 +32,9 @@ resumes the work.
    when every stopped worker has one.
 4. From the worktree root, run `Get-AgentWorktreeSessionContext` as
    [`subagent-reporting.md`](../../references/subagent-reporting.md)
-   `## Task brief` shows, and `git status --porcelain`. Done when `Worktree`,
-   `Branch`, `PrimaryRoot`, `Baseline`, and the uncommitted files are in
-   context.
+   `## Session baseline` shows, and `git status --porcelain`. Done when
+   `Worktree`, `Branch`, `PrimaryRoot`, `Baseline`, and the uncommitted files
+   are in context.
 5. Write `Temp/eod-resume.md` in the worktree, replacing any earlier copy. Open
    it with: "Resume from this file: first resolve any conflicts in the worktree
    hunk by hunk, tracing each side's intent, preserving both where compatible,

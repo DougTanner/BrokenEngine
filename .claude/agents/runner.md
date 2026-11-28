@@ -1,8 +1,8 @@
 ---
 name: runner
 description: Runs /agent-harness. Returns the handoff /agent-harness's `## Handoff` defines.
-model: sonnet
-effort: high
+model: haiku
+effort: max
 disallowedTools: Agent
 ---
 

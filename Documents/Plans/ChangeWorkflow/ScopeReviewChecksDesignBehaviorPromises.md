@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v2 {"createdUtc":"2026-11-26T14:01:13.027Z","dependsOn":[]} -->
+<!-- broken-engine-plan/v2 {"createdUtc":"2026-11-26T14:01:13.027Z","dependsOn":[],"agentCli":"claude"} -->
 # Scope review checks the plan's Design-section behavior promises
 
 ## Context

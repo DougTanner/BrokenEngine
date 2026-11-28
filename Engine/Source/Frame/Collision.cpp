@@ -144,12 +144,13 @@ int64_t Collision::AddLayer(const CollisionLayer& rLayer)
 
 	for (int64_t i = 0; i < rLayer.iCount; ++i)
 	{
+		SegmentHit boundaryHit = TracePointToCellExit(rLayer.pVecStartPositions[i], rLayer.pVecEndPositions[i]);
 		SegmentHit terrainHit {};
 		if (rLayer.pTerrainStaticData != nullptr)
 		{
-			terrainHit = TracePointAgainstTerrain(*rLayer.pTerrainStaticData, rLayer.pVecStartPositions[i], rLayer.pVecEndPositions[i]);
+			float fMaximumTerrainTime = boundaryHit.bHit ? boundaryHit.fTime : 1.0f;
+			terrainHit = TracePointAgainstTerrain(*rLayer.pTerrainStaticData, rLayer.pVecStartPositions[i], rLayer.pVecEndPositions[i], fMaximumTerrainTime);
 		}
-		SegmentHit boundaryHit = TracePointToCellExit(rLayer.pVecStartPositions[i], rLayer.pVecEndPositions[i]);
 		// A cell-exit hit time is finite and below float max, so a terrain-free layer's cutoff is exactly the boundary time.
 		float fMaximumTime = std::numeric_limits<float>::max();
 		if (terrainHit.bHit)

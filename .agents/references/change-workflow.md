@@ -107,10 +107,11 @@ model and effort settings. Skills name a role and describe the work.
   every heading, label, and list.
 - Footer: only the main-session message that asks the `/finalize-changes`
   landing confirmation question carries it; that message ends with
-  `Follow-up Plans created:` and the single word `none`, or one line per Plan
-  created since the session's last landing: its repo-relative path; a tag,
-  `unlanded in worktree` or `executed in this change` (folded in by the
-  Leftovers do-now rule); and whether to do it this session while its context
+  `Follow-up Plans created:` and one line per follow-up Plan created since the
+  session's last landing that still exists in the worktree (excluding any Plan
+  executed and removed under the Leftovers do-now rule), or the single word
+  `none` when none remain. Each line carries its repo-relative path; the tag
+  `unlanded in worktree`; and whether to do it this session while its context
   is fresh: `do now: yes` when it is Tier 1 or 2, bounded, and needs only files
   and facts already read or changed this session (so it adds little new
   context), otherwise `do now: no` with the failed condition in a few words.
@@ -316,11 +317,10 @@ directly instead of passing `-HarnessChecks`. Main passes the handoff's
 post-edit `runner` without reading it. Main dispatches rows per the script
 header's `Output:` contract. A zero-dispatch row satisfies non-harness
 dependents immediately, never a script-emitted `runner /agent-harness`, which
-requires the emitted `/compile` row's matching-build condition. A round's
-close row waits until main has decided every finding its rows returned,
-`/verify-external-claims` included. Main reruns the script as the Review and
-resolve correctness step states. The script owns triggered dispatches, roles,
-scopes, and order, and each brief carries its skill's `## Inputs`.
+requires the emitted `/compile` row's matching-build condition. Main reruns the
+script as the Review and resolve correctness step states. The script owns
+triggered dispatches, roles, scopes, and order, and each brief carries its
+skill's `## Inputs`.
 
 Main splits the work into disjoint slices where possible. Review-fix exceptions
 belong to `/resolve-findings`.

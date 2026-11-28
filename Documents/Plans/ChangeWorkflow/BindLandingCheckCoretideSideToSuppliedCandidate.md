@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v2 {"createdUtc":"2026-11-27T01:04:44.789Z","dependsOn":[]} -->
+<!-- broken-engine-plan/v2 {"createdUtc":"2026-11-27T01:04:44.789Z","dependsOn":[],"agentCli":"claude"} -->
 # Bind the landing check's Coretide side to the supplied candidate
 
 ## Context
@@ -81,5 +81,5 @@ No C++, shader, build, `.pack`, replay, or live-verification exposure.
 
 ## Notes
 
-- `Documents/Plans/ChangeWorkflow/KeepReviewRoundScenarioScripts/check5.ps1`
-  holds the two-repository scenario setup to start from.
+- `.agents/scripts/ReviewRoundScenarios/RoundSequence.ps1` holds the
+  two-repository scenario setup to start from.

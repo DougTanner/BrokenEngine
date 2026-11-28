@@ -51,7 +51,7 @@ if (-not (Test-Path -LiteralPath $inventoryModule)) {
 Import-Module $inventoryModule -Force
 
 $result = [ordered]@{
-	schemaVersion = 'broken-engine-finalize-landing/v7'
+	schemaVersion = 'broken-engine-finalize-landing/v8'
 	status = 'error'
 	code = 'internal.error'
 	message = 'Landing transaction did not complete.'
@@ -162,7 +162,7 @@ function New-LandingProjection {
 	} 'Invoke-FinalizeLanding'
 	$residuals = New-LandingCollection @($result.residuals) { param($residual); $text = Get-BoundedLandingText ([string]$residual) 512; [ordered]@{ message = $text.Text; messageLength = $text.Length; messageTruncated = $text.Truncated } } 'Invoke-FinalizeLanding'
 	return [ordered]@{
-		schemaVersion = 'broken-engine-finalize-landing/v7'; status = $result.status; code = $code.Text; message = $message.Text; messageLength = $message.Length; messageTruncated = $message.Truncated
+		schemaVersion = 'broken-engine-finalize-landing/v8'; status = $result.status; code = $code.Text; message = $message.Text; messageLength = $message.Length; messageTruncated = $message.Truncated
 		primaryAdvanced = [bool]$result.primaryAdvanced; candidate = [ordered]@{ commit = Get-LandingGitObjectId $result.candidate.commit; tree = Get-LandingGitObjectId $result.candidate.tree; treeVerified = [bool]$result.candidate.treeVerified }
 		landed = [ordered]@{ commit = $(if ($result.status -ceq 'landed') { Get-LandingGitObjectId $result.landed.commit } else { $null }); tree = $(if ($result.status -ceq 'landed') { Get-LandingGitObjectId $result.landed.tree } else { $null }); rebaseAttempts = [int]$result.landed.rebaseAttempts }
 		approvedSource = [ordered]@{ commit = Get-LandingGitObjectId $result.approvedSource.commit; tree = Get-LandingGitObjectId $result.approvedSource.tree; parent = Get-LandingGitObjectId $result.approvedSource.parent; patch = $result.approvedSource.patch; metadata = $result.approvedSource.metadata }
@@ -717,7 +717,7 @@ function Assert-LandingReviewRoundCoverage {
 		$restore = Restore-FinalizeBranch $script:CurrentIdentity.Worktree $CurrentBranch $ApprovedSessionCommit
 		if (-not $restore.Restored) { Throw-LandingRestorationUnproven "$($coverage.Message) $($restore.Message)" }
 	}
-	Throw-Landing 2 $coverage.Code $coverage.Message $(if ($coverage.Code.StartsWith('inventory.review-round-')) { 'recovery' } else { 'terminal' })
+	Throw-Landing 2 $coverage.Code $coverage.Message $(if ($coverage.Code.StartsWith('inventory.review-round-')) { 'review-round' } else { 'terminal' })
 }
 
 # Returns $false when primary moved under the held lease, either before the attempt or between the

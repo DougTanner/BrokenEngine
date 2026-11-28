@@ -412,6 +412,8 @@ and the handoff this run returns.
     - `launch.server-running` (exit `2`) means a server process was already
       running, and nothing started; follow the running-server route in
       `launch.md`.
+    - On `launch.kill-on-close-job`, follow the desktop launch route in
+      `launch.md`.
     - The passed-through `check.unexpected-exit` (exit `2`, from the immediate
       `Check`) keeps its step 22 meaning, and `process.unexpected-exit` and
       `ping.timeout` (exit `2`, from the readiness wait) keep their step 23

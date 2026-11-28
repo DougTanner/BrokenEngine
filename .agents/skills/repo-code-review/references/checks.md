@@ -238,6 +238,14 @@ Flag incomplete integration and reachable edge failures. Report a near-copy or
 repeated multi-condition logic as a hard flag only when it violates the
 conventions reference's "Reuse before adding" bullet.
 
+On net diff deletion of a retained declaration's read, write, call, or
+reference, stop at the first surviving same-kind use (read vs. write;
+call/reference otherwise) in the full repo (not `ThirdParty/`) and
+`Projects/Coretide/` if present at their `subagent-reporting.md` snapshots,
+and `Scope` untracked files (working-tree only). Exhaust that scope only
+before flagging it `Medium` if none survives (despite opposite reads/writes),
+waiving reachable-failure and changed-region limits.
+
 Exclude micro-simplifications, style preferences, naming, header placement
 other than the required `Common/ExternalHeaders.h` rule above, formatting, and
 general documentation checks.

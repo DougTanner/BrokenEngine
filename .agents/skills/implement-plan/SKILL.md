@@ -34,8 +34,9 @@ That worker performs both implementation and its same-context assumption audit.
 
 Supply the authoritative task-brief fields
 ([`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
-`## Task brief`)
-plus these skill-specific fields, in both implementation and audit-only modes:
+`## Task brief`), with `Acceptance` holding only the assigned items' focused
+self-checks, plus these skill-specific fields, in both implementation and
+audit-only modes:
 
 - mode: `implementation` or `audit-only`;
 - final approved plan and execution card (when present), cited per

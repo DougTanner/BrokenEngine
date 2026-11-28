@@ -40,9 +40,9 @@ step.
    guarantees it relies on, what machinery it adds that serves only itself, and
    when it would be the right call. Done when every row is stated, with `none`
    where nothing applies.
-5. Return the `../SKILL.md` `## Handoff` extension fields followed by the shared
-   handoff lines, or `no viable candidate on this axis` in `Candidate` with the
-   reason in `Mechanism`. Done when the handoff carries every declared field.
+5. Return the handoff per `../SKILL.md` `## Handoff`. Done when every declared
+   field is present and fits the `../../../references/subagent-handoff.md`
+   `## Handoffs` cap as that section directs.
 
 ## Rules
 
@@ -50,9 +50,9 @@ step.
   runs no build, and dispatches no worker.
 - Measure or read every repository fact a returned row depends on, such as a
   size against a threshold, a style-rule conflict, or a count of callers or
-  sites, and cite each as a `Decisive checks` row with its result. Report a
-  fact that reading cannot settle, such as runtime cost that needs a build or
-  harness run, in its row as unmeasured, naming the missing check.
+  sites. Report a fact that reading cannot settle, such as runtime cost that
+  needs a build or harness run, in its row as unmeasured, naming the missing
+  check.
 - Each researcher returns once. There is no second round, so it decides from the
   brief and the repository rather than asking main for more.
 - Each researcher works blind, from its own brief alone, and never sees another

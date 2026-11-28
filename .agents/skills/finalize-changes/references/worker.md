@@ -91,7 +91,11 @@ preparation dispatch recovers `primary.path-overlap` itself under
 3. Fill the acceptance table on the resulting diff.
    - Load and follow
      [`landing-acceptance-table.md`](landing-acceptance-table.md) first, which
-     owns the typed-artifact rules.
+     owns the typed-artifact rules. When its `-Landing` inventory reports the
+     review-round refusal, return the `BLOCKED` table to main at once with that
+     result's `status`, `code`, and `message`, skipping steps 4-8 from every
+     entry to this step, step 5's skipped-Steps-1-3 completion sequence and
+     `## Recovery` included.
    - Fill the landing receipt's `acceptanceSkeleton` rows with evidence from the
      handoffs they name, and the `Executable Plan check` row from the
      `plan validate` run
@@ -286,30 +290,28 @@ preparation dispatch recovers `primary.path-overlap` itself under
 
 - A `blocked` `Invoke-FinalizeCoretide.ps1 -Land` stops before engine landing
   and reports a `disposition` with the engine landing result's values
-  ([`scripts.md`](scripts.md#landing-and-recovery)). On `recovery`, release the
-  lease (`Invoke-FinalizeLockClaim.ps1 -Release`) and return for recovery to
-  rebase Coretide onto `@{upstream}` and re-run `-Prepare`, then, except after
-  an `inventory.review-round-*` refusal (next bullet), continue through steps
-  3-6 (fresh step-3 acceptance table, applicable movement checks, and step-6
-  receipt reuse or refreshed review, or return the meaning-change handoff if
-  code meaning changed). If `-Prepare` returns `coretide.no-changes` after a
-  recovery rebase, stop, release any held landing lease, and report to main
-  without auto-releasing the Plan claim or auto-completing. Any other
-  disposition returns a user blocker, retaining the lease only on
-  `rebase.abort-failed`.
-- Postconfirmation engine `Invoke-FinalizeLanding.ps1` `recovery` result: prior
-  landing arguments, baseline, expected tips, and acceptance table are invalid;
-  confirmation authority, drift routing, and receipt reuse follow `SKILL.md`
-  `### Landing confirmation` and step 6, while prior verification handoffs stay
-  valid where their evidence still applies under the
+  ([`scripts.md`](scripts.md#landing-and-recovery)). On `recovery` or
+  `review-round`, release the lease (`Invoke-FinalizeLockClaim.ps1 -Release`)
+  and return for recovery to rebase Coretide onto `@{upstream}` and re-run
+  `-Prepare`, then continue through steps 3-6 (fresh step-3 acceptance table,
+  applicable movement checks, and step-6 receipt reuse or refreshed review, or
+  return the meaning-change handoff if code meaning changed). If `-Prepare`
+  returns `coretide.no-changes` after a recovery rebase, stop, release any held
+  landing lease, and report to main without auto-releasing the Plan claim or
+  auto-completing. Any other disposition returns a user blocker, retaining the
+  lease only on `rebase.abort-failed`.
+- Postconfirmation engine `Invoke-FinalizeLanding.ps1` `recovery` or
+  `review-round` result: prior landing arguments, baseline, expected tips, and
+  acceptance table are invalid; confirmation authority, drift routing, and
+  receipt reuse follow `SKILL.md` `### Landing confirmation` and step 6, while
+  prior verification handoffs stay valid where their evidence still applies
+  under the
   [table rules](landing-acceptance-table.md#reviewed-diff-and-authorization).
-  When the result's `disposition` is `recovery` and `lock.released` is true,
-  return for a fresh preparation worker entering at step 4 (`SKILL.md`
-  `## Inputs`); otherwise retain the blocker and lease and stop. Never change
-  primary before a fresh landing acceptance table and `SKILL.md`
-  `### Landing confirmation` complete, or reuse prior landing arguments. After
-  an `inventory.review-round-*` refusal from either script, return once the
-  rebased bytes are reproduced (`SKILL.md` `### Landing confirmation`).
+  When `lock.released` is true, return for a fresh preparation worker entering
+  at step 4 (`SKILL.md` `## Inputs`); otherwise retain the blocker and lease and
+  stop. Never change primary before a fresh landing acceptance table and
+  `SKILL.md` `### Landing confirmation` complete, or reuse prior landing
+  arguments.
 - Reconciliation conflict: resolve under the approved invariants, return the
   changed paths as step 3 states for a meaningful change, and follow `SKILL.md`
   `### Landing confirmation`. Resolve hunk by hunk, tracing

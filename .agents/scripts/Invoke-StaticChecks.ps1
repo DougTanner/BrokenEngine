@@ -20,10 +20,19 @@
 # `comment-values` fails on a `//` comment in an added line of a changed `cpp`, `dual-language-header`, or
 # `glsl` entry that copies a `k`-prefixed constant's value (`CommentValuePattern`), splitting each line
 # with AgentScriptCommon's C++ token pattern so a `//` inside a literal is not a comment.
-# `validate-skill` composes an existing script (the bundled skill validator). The
-# run reports results only — it never decides whether a failing check blocks a slice, never edits a
-# file, and writes nothing to disk (GIT_OPTIONAL_LOCKS=0 keeps Git from refreshing the index), so it is
-# safe under a read-only sandbox. Stdout carries only the result document.
+# `vcxproj-affinity` runs the project-pair validator (`-AllGameProjects`) when a discovered game project's
+# `.vcxproj`/`.vcxproj.filters`, a `.h`/`.cpp` under a discovered game project, `Engine/Source/`,
+# `Engine/Data/Shaders/`, or `Common/`, or the validator/affinity/discovery scripts change.
+# `review-round-scenarios` runs every case file under `ReviewRoundScenarios/` but `ScenarioCommon.ps1` at
+# once, each in its own subdirectory of one scratch directory under the worktree's `Temp/`, when a path
+# there or a script the cases run changes; a case still running `ReviewRoundScenarioDeadlineSeconds` after
+# the run started is stopped and blocks the row, so the run reports inside the host's foreground limit.
+# `validate-skill` and `vcxproj-affinity` compose existing scripts (the bundled skill validator and the
+# project-pair validator). The run reports results only — it never decides whether a failing check blocks
+# a slice and never edits a file. Every other row writes nothing to disk (GIT_OPTIONAL_LOCKS=0 keeps Git
+# from refreshing the index); `review-round-scenarios` writes only its scratch directory under `Temp/`,
+# which it removes, so under a read-only sandbox it reports `blocked`. Stdout carries only the result
+# document.
 # The result document holds one `checks` row per check, each carrying a boolean `triggered` and a
 # `status` (pass, fail, blocked, or skipped); a passing or failing `line-length` row's detail also
 # carries the enforced `limit`. The run passes (exit 0) when no triggered row fails or is
@@ -32,7 +41,8 @@
 # an unexpected error exits 1 with status `error`. `-Head <commit>` selects the changed
 # files from a committed head instead of the working tree, and `-IncludeUntracked` adds the untracked
 # files when checking the working tree. `markdown-links`, `file-hygiene`, `line-length`,
-# `instruction-size`, `model-names`, `workflow-incidents`, and `comment-values` read content from that commit; `validate-skill` validates the working tree's copy of each selected package.
+# `instruction-size`, `model-names`, `workflow-incidents`, and `comment-values` read content from that commit;
+# `validate-skill`, `vcxproj-affinity`, and `review-round-scenarios` run against the working tree.
 # Every Git read of a Projects/Coretide/ entry runs in the session Coretide clone, against the inventory's
 # `coretide` baseline and head.
 [CmdletBinding()]
@@ -43,15 +53,21 @@ param(
 	[switch] $IncludeUntracked
 )
 
+$script:RunClock = [Diagnostics.Stopwatch]::StartNew()
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 Import-Module (Join-Path $PSScriptRoot 'AgentScriptCommon.psm1') -Force
 
 $script:MaximumMessageLength = 256
 $script:MaximumLineLength = 500
+# Leaves the rest of the host's 600-second foreground command limit for stopping overdue cases, removing the
+# scratch directory, and writing the result.
+$script:ReviewRoundScenarioDeadlineSeconds = 540
 
 $script:InventoryModule = Join-Path $PSScriptRoot 'SessionChangeInventory.psm1'
 $script:ValidateSkillScript = Join-Path $PSScriptRoot '../skills/external-skill-creator/scripts/Validate-Skill.ps1'
+$script:VcxprojPairCheckScript = Join-Path $PSScriptRoot '../skills/update-vcxproj/scripts/Invoke-VcxprojPairCheck.ps1'
+$script:ScenarioCommonScript = Join-Path $PSScriptRoot 'ReviewRoundScenarios/ScenarioCommon.ps1'
 $script:Utf8 = [Text.UTF8Encoding]::new($false)
 $script:Root = $null
 $script:HeadSha = ''
@@ -73,7 +89,7 @@ $script:CppTokenPattern = Get-AgentCppTokenPattern
 $script:CommentValuePattern = [regex]::new('\bk[a-z]*[A-Z]\w*\s*==?\s*-?[0-9]')
 
 $result = [ordered]@{
-	schemaVersion = 'broken-engine-static-checks/v8'
+	schemaVersion = 'broken-engine-static-checks/v10'
 	status = 'error'
 	code = 'internal.error'
 	message = 'Static checks did not run.'
@@ -739,12 +755,267 @@ function Invoke-WorkflowIncidentsCheck([object] $Inventory) {
 	return New-CheckRow 'workflow-incidents' $true $status ([ordered]@{ rowCount = $rowCount; failures = [object[]] $failures.ToArray() })
 }
 
+function Test-VcxprojAffinityTriggerPath([string] $Path, [string[]] $GameProjects) {
+	if ([string]::IsNullOrEmpty($Path)) { return $false }
+	$sweepPaths = @(
+		'.agents/skills/update-vcxproj/scripts/Invoke-VcxprojPairCheck.ps1',
+		'.agents/scripts/SourceAffinity.psm1',
+		'.agents/scripts/AgentScriptCommon.psm1'
+	)
+	if ($sweepPaths -icontains $Path) { return $true }
+	$lower = $Path.ToLowerInvariant()
+	$isCppSource = $lower.EndsWith('.h') -or $lower.EndsWith('.cpp')
+	if ($isCppSource) {
+		foreach ($prefix in @('Engine/Source/', 'Engine/Data/Shaders/', 'Common/')) {
+			if ($Path.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) { return $true }
+		}
+	}
+	foreach ($name in $GameProjects) {
+		$projectBase = "Projects/$name/Platforms/VisualStudio2026/"
+		if ($Path -ieq "$projectBase$name.vcxproj" -or
+			$Path -ieq "$projectBase$name.vcxproj.filters" -or
+			$Path -ieq "$projectBase${name}Server.vcxproj" -or
+			$Path -ieq "$projectBase${name}Server.vcxproj.filters") {
+			return $true
+		}
+		if ($isCppSource -and $Path.StartsWith("Projects/$name/", [StringComparison]::OrdinalIgnoreCase)) {
+			return $true
+		}
+	}
+	return $false
+}
+
+function Convert-ToNonNegativeInt([object] $Value) {
+	if ($null -eq $Value) { return $null }
+	if ($Value -is [int] -or $Value -is [long] -or $Value -is [int16] -or $Value -is [byte]) {
+		if ($Value -ge 0 -and $Value -le [int]::MaxValue) {
+			return [int] $Value
+		}
+	}
+	return $null
+}
+
+function Get-BaselineGameProjects() {
+	$names = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+	$projectDirs = @((Invoke-StaticCheckGit @('ls-tree', '-d', '--name-only', '-z', $Baseline, 'Projects/')) -split "`0" |
+		Where-Object { -not [string]::IsNullOrEmpty($_) -and $_.StartsWith('Projects/', [StringComparison]::OrdinalIgnoreCase) } |
+		ForEach-Object { $_.Substring('Projects/'.Length) })
+	if ($projectDirs.Count -gt 0) {
+		$candidatePaths = [Collections.Generic.List[string]]::new()
+		foreach ($name in $projectDirs) {
+			$candidatePaths.Add("Projects/$name/Platforms/VisualStudio2026/$name.vcxproj")
+			$candidatePaths.Add("Projects/$name/Platforms/VisualStudio2026/${name}Server.vcxproj")
+		}
+		$present = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+		foreach ($line in ((Invoke-StaticCheckGit (@('ls-tree', '-r', '--name-only', '-z', $Baseline, '--') + $candidatePaths.ToArray())) -split "`0")) {
+			if (-not [string]::IsNullOrEmpty($line)) { [void] $present.Add($line) }
+		}
+		foreach ($name in $projectDirs) {
+			if ($present.Contains("Projects/$name/Platforms/VisualStudio2026/$name.vcxproj") -and
+				$present.Contains("Projects/$name/Platforms/VisualStudio2026/${name}Server.vcxproj")) {
+				[void] $names.Add($name)
+			}
+		}
+	}
+	if ($null -ne $script:Coretide -and -not [string]::IsNullOrWhiteSpace($script:Coretide.BaselineSha)) {
+		$coretidePresent = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+		foreach ($line in ((Invoke-StaticCheckGit @('ls-tree', '-r', '--name-only', '-z', $script:Coretide.BaselineSha, '--', 'Platforms/VisualStudio2026/Coretide.vcxproj', 'Platforms/VisualStudio2026/CoretideServer.vcxproj') -Root $script:Coretide.Root) -split "`0")) {
+			if (-not [string]::IsNullOrEmpty($line)) { [void] $coretidePresent.Add($line) }
+		}
+		if ($coretidePresent.Contains('Platforms/VisualStudio2026/Coretide.vcxproj') -and
+			$coretidePresent.Contains('Platforms/VisualStudio2026/CoretideServer.vcxproj')) {
+			[void] $names.Add('Coretide')
+		}
+	}
+	return @($names)
+}
+
+function Invoke-VcxprojAffinityCheck([object] $Inventory) {
+	$triggerSet = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+	if ([IO.Directory]::Exists((Join-Path $script:Root 'Projects'))) {
+		foreach ($name in @(Get-AgentGameProjects $script:Root)) { [void] $triggerSet.Add($name) }
+	}
+	foreach ($name in @(Get-BaselineGameProjects)) { [void] $triggerSet.Add($name) }
+	[string[]] $gameProjects = @($triggerSet)
+	if ($gameProjects.Count -eq 0) { return New-CheckRow 'vcxproj-affinity' $false 'skipped' $null }
+	$triggered = $false
+	foreach ($entry in $Inventory.entries) {
+		if ((Test-VcxprojAffinityTriggerPath $entry.path $gameProjects) -or
+			(Test-VcxprojAffinityTriggerPath $entry.oldPath $gameProjects)) {
+			$triggered = $true
+			break
+		}
+	}
+	if (-not $triggered) { return New-CheckRow 'vcxproj-affinity' $false 'skipped' $null }
+
+	$run = Invoke-StaticCheckProcess (Get-StaticCheckShell) @(
+		'-NoProfile', '-NonInteractive', '-File', $script:VcxprojPairCheckScript,
+		'-RepositoryRoot', $script:Root, '-AllGameProjects'
+	) $script:Root
+
+	$parsed = $null
+	if (-not [string]::IsNullOrWhiteSpace($run.Stdout)) {
+		try { $parsed = $run.Stdout | ConvertFrom-Json -Depth 16 }
+		catch { $parsed = $null }
+	}
+	$hasStructure = $null -ne $parsed -and
+		$null -ne $parsed.PSObject.Properties['pairs'] -and
+		$null -ne $parsed.pairs -and
+		$null -ne $parsed.pairs.PSObject.Properties['totalCount'] -and
+		$null -ne $parsed.PSObject.Properties['violations'] -and
+		$null -ne $parsed.violations -and
+		$null -ne $parsed.violations.PSObject.Properties['totalCount'] -and
+		$null -ne $parsed.violations.PSObject.Properties['omittedCount'] -and
+		$null -ne $parsed.violations.PSObject.Properties['items']
+
+	$pairCount = $null
+	$violationTotalCount = $null
+	$violationOmittedCount = $null
+	if ($hasStructure) {
+		$pairCount = Convert-ToNonNegativeInt $parsed.pairs.totalCount
+		$violationTotalCount = Convert-ToNonNegativeInt $parsed.violations.totalCount
+		$violationOmittedCount = Convert-ToNonNegativeInt $parsed.violations.omittedCount
+	}
+	$hasValidCounts = $null -ne $pairCount -and $null -ne $violationTotalCount -and $null -ne $violationOmittedCount
+
+	$items = [object[]] @()
+	if ($hasStructure -and $null -ne $parsed.violations.items) {
+		$items = [object[]] @($parsed.violations.items)
+	}
+
+	if (($run.ExitCode -eq 0 -or $run.ExitCode -eq 2) -and $hasValidCounts) {
+		$status = if ($run.ExitCode -eq 0) { 'pass' } else { 'fail' }
+		return New-CheckRow 'vcxproj-affinity' $true $status ([ordered]@{
+			pairCount = $pairCount
+			violationTotalCount = $violationTotalCount
+			violationOmittedCount = $violationOmittedCount
+			failures = $items
+		})
+	}
+
+	$hasStructuredError = ($run.ExitCode -ne 0 -and $run.ExitCode -ne 2) -and
+		$null -ne $parsed -and
+		$null -ne $parsed.PSObject.Properties['code'] -and
+		-not [string]::IsNullOrWhiteSpace([string] $parsed.code)
+	$blockedCode = if ($hasStructuredError) { [string] $parsed.code } else { 'unparseable-output' }
+	$blockedMessage = if ($hasStructuredError -and $null -ne $parsed.PSObject.Properties['message'] -and -not [string]::IsNullOrWhiteSpace([string] $parsed.message)) {
+		[string] $parsed.message
+	}
+	elseif (-not $hasValidCounts -and $hasStructure) {
+		'Invoke-VcxprojPairCheck.ps1 returned invalid count values.'
+	}
+	elseif (-not [string]::IsNullOrWhiteSpace($run.Stderr)) {
+		$run.Stderr.Trim()
+	}
+	else {
+		'Invoke-VcxprojPairCheck.ps1 returned unparseable output.'
+	}
+	$blockedDetail = [ordered]@{
+		pairCount = if ($null -ne $pairCount) { $pairCount } else { 0 }
+		violationTotalCount = if ($null -ne $violationTotalCount) { $violationTotalCount } else { 0 }
+		violationOmittedCount = if ($null -ne $violationOmittedCount) { $violationOmittedCount } else { 0 }
+		failures = $items
+		exitCode = $run.ExitCode
+		code = $blockedCode
+		message = $blockedMessage
+	}
+	return New-CheckRow 'vcxproj-affinity' $true 'blocked' $blockedDetail
+}
+
+function Test-ReviewRoundScenarioTriggerPath([string] $Path) {
+	if ([string]::IsNullOrEmpty($Path)) { return $false }
+	# The scripts the cases run; the modules those scripts import are not triggers.
+	$scenarioScripts = @(
+		'.agents/scripts/Get-ChangeWorkflowSteps.ps1',
+		'.agents/scripts/ReviewRounds.psm1',
+		'.agents/scripts/SessionChangeInventory.psm1',
+		'.agents/scripts/Get-SessionChangeInventory.ps1',
+		'.agents/skills/sweep/scripts/Invoke-Sweep.ps1',
+		'.agents/skills/finalize-changes/scripts/Invoke-FinalizeCoretide.ps1'
+	)
+	if ($scenarioScripts -icontains $Path) { return $true }
+	return $Path.StartsWith('.agents/scripts/ReviewRoundScenarios/', [StringComparison]::OrdinalIgnoreCase)
+}
+
+function Invoke-ReviewRoundScenarioCheck([object] $Inventory) {
+	$triggered = $false
+	foreach ($entry in $Inventory.entries) {
+		if ((Test-ReviewRoundScenarioTriggerPath $entry.path) -or
+			(Test-ReviewRoundScenarioTriggerPath $entry.oldPath)) {
+			$triggered = $true
+			break
+		}
+	}
+	if (-not $triggered) { return New-CheckRow 'review-round-scenarios' $false 'skipped' $null }
+
+	$cases = @(Get-ChildItem -LiteralPath (Split-Path $script:ScenarioCommonScript) -File |
+		Where-Object { $_.Extension -ieq '.ps1' -and $_.Name -ine 'ScenarioCommon.ps1' } | Sort-Object Name)
+	$failures = [Collections.Generic.List[object]]::new()
+	$scratch = Join-Path $script:Root "Temp/review-round-scenarios-$([guid]::NewGuid().ToString('N'))"
+	try { [void] [IO.Directory]::CreateDirectory($scratch) }
+	catch {
+		$failures.Add([ordered]@{ path = $scratch; message = $_.Exception.Message })
+		return New-CheckRow 'review-round-scenarios' $true 'blocked' ([ordered]@{ caseCount = $cases.Count; passCount = 0; failures = [object[]] $failures.ToArray() })
+	}
+	$runs = [Collections.Generic.List[object]]::new()
+	try {
+		# Every case starts before the row waits on any, so the run takes as long as its slowest case.
+		foreach ($case in $cases) {
+			$directory = Join-Path $scratch $case.BaseName
+			[void] [IO.Directory]::CreateDirectory($directory)
+			$stdout = Join-Path $directory 'stdout.txt'
+			# Start-Process joins ArgumentList with spaces, so each path is quoted here.
+			$process = Start-Process (Get-StaticCheckShell) -PassThru -NoNewWindow -WorkingDirectory $script:Root `
+				-Environment @{ GIT_OPTIONAL_LOCKS = '0' } -RedirectStandardOutput $stdout -RedirectStandardError (Join-Path $directory 'stderr.txt') `
+				-ArgumentList @('-NoProfile', '-NonInteractive', '-File', "`"$($case.FullName)`"", '-ScratchRoot', "`"$directory`"")
+			$runs.Add([pscustomobject] @{ Name = $case.Name; Process = $process; Stdout = $stdout; TimedOut = $false })
+		}
+		foreach ($run in $runs) {
+			$remaining = [math]::Max(0, $script:ReviewRoundScenarioDeadlineSeconds * 1000 - $script:RunClock.ElapsedMilliseconds)
+			if ($run.Process.WaitForExit([int] $remaining)) { continue }
+			$run.TimedOut = $true
+			$run.Process.Kill($true)
+			$run.Process.WaitForExit()
+		}
+		# A case that exits non-zero or is stopped is blocked whatever FAIL lines it printed.
+		$status = 'pass'
+		$passCount = 0
+		foreach ($run in $runs) {
+			$lines = @(Get-Content -LiteralPath $run.Stdout)
+			$passCount += @($lines | Where-Object { $_.StartsWith('PASS:') }).Count
+			$failLines = @($lines | Where-Object { $_.StartsWith('FAIL:') })
+			foreach ($line in $failLines) { $failures.Add([ordered]@{ caseFile = $run.Name; assertion = $line.Substring('FAIL:'.Length).Trim() }) }
+			if ($run.TimedOut -or $run.Process.ExitCode -ne 0) {
+				$exitCode = if ($run.TimedOut) { 'timeout' } else { $run.Process.ExitCode }
+				$failures.Add([ordered]@{ caseFile = $run.Name; exitCode = $exitCode })
+				$status = 'blocked'
+			}
+			elseif ($failLines.Count -gt 0 -and $status -cne 'blocked') { $status = 'fail' }
+		}
+	}
+	finally {
+		# A case left running by an exception above would hold files in the scratch directory.
+		foreach ($run in $runs) {
+			if ($run.Process.HasExited) { continue }
+			$run.Process.Kill($true)
+			$run.Process.WaitForExit()
+		}
+		# A scratch directory that cannot be removed is a run that could not complete, so the row reports blocked.
+		try { Remove-Item -LiteralPath $scratch -Recurse -Force }
+		catch {
+			$failures.Add([ordered]@{ path = $scratch; message = $_.Exception.Message })
+			$status = 'blocked'
+		}
+	}
+	return New-CheckRow 'review-round-scenarios' $true $status ([ordered]@{ caseCount = $cases.Count; passCount = $passCount; failures = [object[]] $failures.ToArray() })
+}
+
 try {
 	$script:Root = Get-AgentCanonicalPath $RepositoryRoot
 	if (-not (Test-Path -LiteralPath $script:Root -PathType Container)) {
 		Complete-StaticChecks 2 'blocked' 'static-checks.repository-root-invalid' "-RepositoryRoot must be an existing directory: '$RepositoryRoot'."
 	}
-	foreach ($composed in @($script:InventoryModule, $script:ValidateSkillScript)) {
+	foreach ($composed in @($script:InventoryModule, $script:ValidateSkillScript, $script:VcxprojPairCheckScript, $script:ScenarioCommonScript)) {
 		if (-not (Test-Path -LiteralPath $composed -PathType Leaf)) {
 			Complete-StaticChecks 2 'blocked' 'static-checks.script-missing' "A composed script is missing: '$composed'."
 		}
@@ -761,7 +1032,7 @@ try {
 		}
 	}
 
-	# All eight rows are always present, triggered or not.
+	# All ten rows are always present, triggered or not.
 	$checks = @(
 		(Invoke-ValidateSkillCheck $inventory)
 		(Invoke-MarkdownLinkCheck $inventory)
@@ -771,6 +1042,8 @@ try {
 		(Invoke-ModelNameCheck $inventory)
 		(Invoke-WorkflowIncidentsCheck $inventory)
 		(Invoke-CommentValueCheck $inventory)
+		(Invoke-VcxprojAffinityCheck $inventory)
+		(Invoke-ReviewRoundScenarioCheck $inventory)
 	)
 	$result.checks = [object[]] $checks
 	$triggeredStatuses = @($checks | Where-Object { $_.triggered } | ForEach-Object { $_.status })

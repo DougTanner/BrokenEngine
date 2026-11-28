@@ -8,7 +8,8 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
 1. Fix the review scope and scanner mode.
    - Caller-supplied file or directory scope uses `WholeFile` mode (`-Path`).
    - Session-changed scope uses `Session` mode (`-RepositoryRoot '<absolute
-     repository toplevel>' -Baseline <baseline SHA>`, adding
+     repository toplevel>' -Baseline <baseline SHA>`, adding `-Head <SHA>`
+     with the review row's `Head` when the brief names one, else
      `-IncludeUntracked` when the caller supplied untracked files).
    - Done when the scope is fixed and stated as session-changed or
      caller-supplied.
@@ -65,5 +66,5 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
   replacement slot is `route: /repo-code-review`.
 - Raise fresh findings only on the blocks step 2 kept. Report a pre-existing
   comment outside them as a residual and never as a finding.
-- Introduce no severity beyond the `Medium` and `Low` that `comment-classes.md`
-  assigns each class.
+- Give each finding the severity the `comment-classes.md` `severity` column
+  assigns its class.

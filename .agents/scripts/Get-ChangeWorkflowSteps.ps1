@@ -163,17 +163,14 @@ $carriedLabels = @{
 
 # Renders the active rows of a table in its order. Each row's dependency key is Name. After holds predecessor
 # keys or selectors: 'review' expands to active Review and resolve correctness rows (falling back to
-# Invoke-StaticChecks.ps1 and /compile when none matches), and '*' expands to every other active row; absent
-# predecessors are omitted. A Final row (main's -StartRound or -CloseRound call) is never a 'review' predecessor.
-# Tail is appended after the after clause.
+# Invoke-StaticChecks.ps1 and /compile when none matches); absent predecessors are omitted. A Final row (main's
+# -StartRound or -CloseRound call) is never a 'review' predecessor. Tail is appended after the after clause.
 function Format-Rows([object[]] $Table) {
 	$rows = @($Table | Where-Object { $_.When })
-	$activeKeys = [Collections.Generic.List[string]]::new()
 	$activeKeySet = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
 	$activeReviewKeys = [Collections.Generic.List[string]]::new()
 	foreach ($row in $rows) {
 		$key = $row.Name
-		$activeKeys.Add($key)
 		[void] $activeKeySet.Add($key)
 		if ($row.Step -ceq $review -and -not $row.ContainsKey('Final')) { $activeReviewKeys.Add($key) }
 	}
@@ -191,8 +188,7 @@ function Format-Rows([object[]] $Table) {
 		}
 		$rowKey = $row.Name
 		$candidates = @(foreach ($dep in $row.After) {
-			if ($dep -ceq '*') { $activeKeys }
-			elseif ($dep -ceq 'review') { $activeReviewKeys }
+			if ($dep -ceq 'review') { $activeReviewKeys }
 			else { $dep }
 		})
 		$resolvedKeys = @(& $resolve $rowKey $candidates)
@@ -231,7 +227,7 @@ function Get-RoundLines([object] $Plan, [string] $Snapshot, [string] $CoretideSn
 	}
 	$template = (@($printed) | ForEach-Object { "$_=<severity>" }) -join ','
 	$table.Add(@{ Step = $review; When = $true; Role = 'main'; Name = '-CloseRound'; Mode = ''; After = [string[]] $printed; Final = $true
-		Scope = "pwsh -NoProfile -NonInteractive -File .agents/scripts/Get-ChangeWorkflowSteps.ps1 -RepositoryRoot '$RepositoryRoot' -CloseRound -Head $Snapshot -Results '$template'" })
+		Scope = "pwsh -NoProfile -NonInteractive -File .agents/scripts/Get-ChangeWorkflowSteps.ps1 -RepositoryRoot . -CloseRound -Head $Snapshot -Results '$template'" })
 	return Format-Rows ([object[]] $table.ToArray())
 }
 
@@ -345,8 +341,6 @@ try {
 	$plan = $state.Plan
 	$t = $plan.DB.triggers
 	$afterDone = $null -eq $state.Last -or $state.Last.Close.Next -ceq 'done'
-	$oeScope = 'changed cpp-class files'
-	if ($null -ne $state.Last) { $oeScope = "session-changed C++ in $((@($plan.DB.entries | Where-Object { $_.class -ceq 'cpp' } | ForEach-Object { $_.path })) -join ', ')" }
 	$vcxprojScope = (@($t.vcxprojCandidates) | ForEach-Object { "$($_.path) ($($_.reason))" }) -join ', '
 	$diagnosis = $state.ConsecutiveHigh -eq 3
 
@@ -357,7 +351,7 @@ try {
 		@{ Step = $preReview; When = $t.codeStyleReview; Role = 'mechanic'; Name = '/code-style-review'; Mode = ''; Scope = 'changed C++'; After = @('/update-affected-code', '/update-vcxproj') }
 		@{ Step = $preReview; When = $true; Role = 'main'; Name = 'Invoke-StaticChecks.ps1'; Mode = ''; Scope = '-IncludeUntracked'; After = @('/update-affected-code', '/code-style-review', '/update-vcxproj') }
 		@{ Step = $preReview; When = $true; Role = 'builder'; Name = '/compile'; Mode = ''; Scope = $compileScope; After = @('/update-affected-code', '/code-style-review', '/update-vcxproj') }
-		@{ Step = $review; When = $t.overEngineeringReview; Role = 'fresh reviewer'; Name = '/over-engineering-review finder'; Mode = ''; Scope = $oeScope; After = @('/compile') }
+		@{ Step = $review; When = $t.overEngineeringReview; Role = 'fresh reviewer'; Name = '/over-engineering-review finder'; Mode = ''; Scope = 'changed cpp-class files'; After = @('/compile') }
 		@{ Step = $review; When = $t.overEngineeringReview; Role = 'fresh implementer'; Name = '/over-engineering-review validator'; Mode = ''
 			Scope = "the finder's removal candidates; skipped when it returns none"; After = @('Invoke-StaticChecks.ps1', '/over-engineering-review finder') }
 		@{ Step = $cleanup; When = $plan.Phase -ceq 'words' -and $plan.DW.triggers.updateClaudeDocs; Role = 'implementer'; Name = '/update-claude-docs'; Mode = ''; Scope = 'changed C++ and GLSL'; After = @('review') }
@@ -366,7 +360,7 @@ try {
 	$runsAcceptance = $plan.Phase -ceq 'acceptance' -or $plan.Carried -ccontains '/verify-acceptance'
 	$waitKeys = @($table | Where-Object { $_.When -and ($_.Name -cne '/agent-harness' -or $runsAcceptance) } | ForEach-Object { $_.Name })
 	if ($diagnosis) { $waitKeys += '/external-diagnose-bug' }
-	$command = "pwsh -NoProfile -NonInteractive -File .agents/scripts/Get-ChangeWorkflowSteps.ps1 -RepositoryRoot '$RepositoryRoot' -Baseline $Baseline -Tier $Tier"
+	$command = "pwsh -NoProfile -NonInteractive -File .agents/scripts/Get-ChangeWorkflowSteps.ps1 -RepositoryRoot . -Baseline $Baseline -Tier $Tier"
 	if ($Landing) { $command += ' -Landing' }
 	if ($HarnessChecks) { $command += ' -HarnessChecks' }
 	if ($diagnosis) {

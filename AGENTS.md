@@ -95,10 +95,11 @@ client-only visuals are not, and stay out of the CRC, split as
   prefer making the wrong action impossible. Name roles, not models; the
   static-checks `model-names` row owns the exemptions.
 - Bounded reading: when a citation names a `##` section, read only that
-  section (except `.agents/references/subagent-reporting.md` `## Task brief`
-  whole-read exemptions). Before editing a file or relying on subdirectory
-  contracts, read every unread ancestor `AGENTS.md` down to its directory
-  (excluding `Temp/` and reparse points).
+  section (except `.agents/references/subagent-reporting.md`
+  `## Pre-dispatch inventory and bounded reading` whole-read exemptions).
+  Before editing a file or relying on subdirectory contracts, read every unread
+  ancestor `AGENTS.md` down to its directory (excluding `Temp/` and reparse
+  points).
 - One term per concept: use the established repository term or the code's own
   name, never a coined nickname; prefer plain words over formal ones.
 - Prose wrapping: wrap the prose of Markdown files and the top-level
@@ -107,7 +108,11 @@ client-only visuals are not, and stay out of the CRC, split as
   you did not edit unless it holds a `line-length` failure the static-checks
   runner reports; a paragraph that is one long line becomes short lines the
   first time it is edited. No repository-wide reflow.
-- Do not add unit tests
+- Unit tests: write none for game or engine code; rendering visuals and
+  gameplay are opinionated, with no specification to test, so such tests would
+  be rewritten alongside every code change. Change Workflow scripts have
+  specified behavior and do get tests, so tweaks and bug fixes do not break the
+  basic flow.
 - Bundled scripts: run a repository script exactly as its skill documents it —
   never wrap, reimplement, or work around one; a script that cannot be run as
   documented is a bug to report. Canonical invocation form:

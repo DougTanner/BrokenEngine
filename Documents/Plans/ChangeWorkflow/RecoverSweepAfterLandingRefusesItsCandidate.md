@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v2 {"createdUtc":"2026-11-27T01:04:42.340Z","dependsOn":[]} -->
+<!-- broken-engine-plan/v2 {"createdUtc":"2026-11-27T01:04:42.340Z","dependsOn":[],"agentCli":"claude"} -->
 # Recover a sweep whose landing refuses its rebased candidate
 
 ## Context
@@ -17,7 +17,7 @@ rebase changes the candidate's bytes. The landing check
 then owes `/coherence-review` from the sweep snapshot to the rebased candidate
 and refuses with `inventory.review-round-unfinished`;
 `Invoke-FinalizeLanding.ps1` `Assert-LandingReviewRoundCoverage` restores the
-branch to the approved commit and returns disposition `recovery`. No round
+branch to the approved commit and returns disposition `review-round`. No round
 can cover the rebased bytes: the sweep has no further round, and
 `-ReviewRound` refuses the recovered HEAD. Today main reports that refusal to
 the user as a blocker (`.agents/skills/sweep/SKILL.md` step 11 and
@@ -95,8 +95,8 @@ live-verification exposure.
 
 - The review-round rules for ordinary Change Workflow rounds.
 - `Invoke-FinalizeLanding.ps1` and `Invoke-FinalizeCoretide.ps1` result
-  shapes, owned by
-  `Documents/Plans/ChangeWorkflow/StateReviewRoundRequirementInLandingResult.md`.
+  shapes (`.agents/skills/finalize-changes/references/scripts.md`
+  `### Landing and recovery`).
 - Sweep batches, close, and the Codex dispatch.
 
 ## Acceptance criteria
@@ -112,8 +112,3 @@ live-verification exposure.
   than the sweep baseline, and `-ReviewRound` refuses a HEAD that does not
   descend from it.
 - The static-checks runner passes for the changed files.
-
-## Notes
-
-- `Documents/Plans/ChangeWorkflow/KeepReviewRoundScenarioScripts.md` carries
-  the same scripts in its own support folder; the two Plans are independent.

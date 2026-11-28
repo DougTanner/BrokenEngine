@@ -194,10 +194,11 @@ unacknowledged `(e)` pause warning, where main asks and waits.
 
 Confirmation binds the reviewed diff, not commit hashes. A clean byte-identical
 post-confirmation rebase lands with no re-asking, re-review, or rebuild unless
-landing refuses it with an `inventory.review-round-*` code: recovery reproduces
-the rebased bytes on the session branch and returns before the acceptance
-table; main reruns the step script so a round covers them (a `/sweep` run:
-[`/sweep`](../sweep/SKILL.md) step 11), then redispatches the finalizer.
+landing refuses it with the `review-round` `disposition`: recovery reproduces
+the rebased bytes on the session branch and returns at the acceptance-table step
+(`references/worker.md` step 3); main reruns the step script so a round covers
+them (a `/sweep` run: [`/sweep`](../sweep/SKILL.md) step 11), then redispatches
+the finalizer.
 Pre-summary rebuilds belong to `references/worker.md` step 5. After that build,
 main adds every `builder` `Changed files` path since that meaning-change handoff
 ([`/compile`](../compile/SKILL.md) `## Handoff`) and passes

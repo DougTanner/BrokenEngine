@@ -63,12 +63,15 @@ The `argument-hint` value selects the Plan:
    [claim-results.md](references/claim-results.md) `## nextAction` (`prepare`
    needs no read).
    Done when the result reports `nextAction: prepare`.
-4. Dispatch one preparation `planner` to verify the Plan against current code
-   per [subagent-reporting.md](../../references/subagent-reporting.md)
-   `## Task brief`.
+4. Dispatch one preparation `planner` to verify the Plan against current code.
 
    Pass `Skill: /prepare-change`, `mode: claimed-plan`, `Return:` by citation,
-   and [prepare-change/SKILL.md](../prepare-change/SKILL.md) `## Inputs`.
+   and [prepare-change/SKILL.md](../prepare-change/SKILL.md) `## Inputs` in the
+   [subagent-reporting.md](../../references/subagent-reporting.md)
+   `## Task brief` form, reading for workflow references only those two
+   sections and, when any claim result of this run carried `sync`,
+   [claim-results.md](references/claim-results.md)
+   `## Session baseline and the sync object` (to its first `###`).
 
    The Plan is immutable, current code wins, and every delegation states that
    Plan and card statements are hypotheses, so every contradiction returns to
@@ -78,9 +81,8 @@ The `argument-hint` value selects the Plan:
    cause in `Residuals`:
 
    - main dispatches one `implementer` for `/external-diagnose-bug`, on a
-     brief citing the recorded baseline and, from the heading lookup
-     `/prepare-change` `## Inputs` uses, the line ranges of the sections
-     carrying the claimed Plan's investigation portion
+     brief citing the recorded baseline and `claim.sections` line ranges from
+     `Invoke-NextPlanClaim.ps1` for the claimed Plan's investigation portion
      (`Documents/Plans/AGENTS.md` `## Plan files`), none of which main reads;
    - a proven root cause goes to a fresh `/prepare-change`
      (`mode: claimed-plan`) `planner` whose
@@ -125,10 +127,11 @@ The `argument-hint` value selects the Plan:
    `### Post-checkpoint outcomes` row for an authoritative result that
    explicitly reports no claim is held.
 
-   On a sync range per [claim-results.md](references/claim-results.md)
-   `## Final-refresh sync brief`, never list or read the range; dispatch one
-   `researcher` on that brief, applying that section and
-   `## Session baseline and the sync object` (to its first `###`).
+   Find the sync range by reading only
+   [claim-results.md](references/claim-results.md) `## Final-refresh sync brief`
+   and `## Session baseline and the sync object` (to its first `###`), applying
+   both; when a range exists, never list or read it, and dispatch one
+   `researcher` on that brief.
 
    When any row of that `researcher`'s handoff reports a touch, return to step
    4, rerun the affected Plan review checks in step 5, and repeat this final

@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v2 {"createdUtc":"2026-11-27T03:02:07.486Z","dependsOn":[]} -->
+<!-- broken-engine-plan/v2 {"createdUtc":"2026-11-27T03:02:07.486Z","dependsOn":[],"agentCli":"claude"} -->
 # Rebase the session branch at every review round
 
 ## Context
@@ -23,7 +23,7 @@ Current mechanisms:
 - Nothing moves the session branch between the session's start and landing.
   The session baseline changes only when an authorized branch synchronization
   reports a new one (`.agents/references/subagent-reporting.md`
-  `## Task brief`, the session-baseline paragraph). The only such
+  `## Session baseline`, the session-baseline paragraph). The only such
   synchronization is the `/next-plan` claim, which fast-forwards only and
   stops with `claim.session-diverged` when the session holds a commit primary
   lacks (`.agents/skills/next-plan/references/claim-results.md`
@@ -95,7 +95,7 @@ them to the user at plan approval.
    Record which hunks each owed review reads, whether primary's own hunks in a
    session path are owed review, and whether a conflict-resolution hunk is owed
    review. Change no tracked file in this step. A ready scratch setup is at
-   commit `94fa961365e8cc97584299d4fc5b81266e5ee847` on primary, which holds
+   commit `623e25f3029e1ade0d721009c865397641d1bdc6` on primary, which holds
    `Documents/Plans/ChangeWorkflow/KeepReviewRoundScenarioScripts/lib.ps1` and
    `check13.ps1` (the scratch-repository, Coretide-clone, and closed-round
    setup) whether or not that Plan's support folder still exists: write both
@@ -133,7 +133,7 @@ live-verification exposure.
   as Design 2 allows)
 - `.agents/references/change-workflow.md` (`#### Step 6 — Review and resolve
   correctness`)
-- `.agents/references/subagent-reporting.md` (`## Task brief`,
+- `.agents/references/subagent-reporting.md` (`## Session baseline`,
   session-baseline paragraph)
 
 ## In scope
@@ -148,8 +148,9 @@ live-verification exposure.
 
 ## Out of scope
 
-- The finalizer's own landing rebase and recovery routing, owned by
-  `Documents/Plans/ChangeWorkflow/StateReviewRoundRequirementInLandingResult.md`.
+- The finalizer's own landing rebase and recovery routing
+  (`.agents/skills/finalize-changes/references/worker.md` step 3 and
+  `## Recovery`).
 - The review-round chain's lifetime across tasks, owned by
   `Documents/Plans/ChangeWorkflow/EndReviewRoundChainWithItsTask.md`.
 - The `/next-plan` claim's fast-forward, except where decision 2 (i) needs it

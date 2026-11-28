@@ -15,6 +15,10 @@ self-check, tool restrictions a skill body states are prose boundaries rather
 than host enforcement, and a worker reads a Coretide inventory entry's diff in
 the form below.
 
+Workers verify supplied hints against the tree, stay within ownership, and
+expand only for a concrete dependency, decision, or failure. They never route
+work to another worker.
+
 A worker reads the diff of a changed-file inventory entry under
 `Projects/Coretide/` (origin: `.agents/scripts/Get-SessionChangeInventory.ps1`
 header) with
@@ -47,7 +51,33 @@ Return: <the shared handoff plus the named skill's declared extension fields, or
 
 `Required sections` names skill-specific sections to return; skip the rest.
 Always return the full shared handoff. Cite readable review outputs per
-[`change-workflow.md`](change-workflow.md#subagents) `### Subagents`.
+[`change-workflow.md`](change-workflow.md#subagents) `### Subagents`. In an
+implementation or fix brief, `Objective`, `Scope`, and `Fixed decisions` state
+the behavior the change must produce and its evidence, and leave its code
+(conditions, guards, helper bodies) to the worker; a code shape enters
+`Fixed decisions` only when the user chose it, directly or through a plan
+choice that binds under [`authority-order.md`](authority-order.md).
+
+Inside a `/next-plan` run, copy these values from the `Get-NextPlanContext`
+output already in context: `SessionBranch` is `Branch`, `Session` is
+`SessionId`, `Primary` is `PrimaryRoot`, and `TargetBranch` is `PrimaryBranch`;
+`Worktree` and `PrimaryTip` keep their names. Use the recorded `Baseline`
+governed by `.agents/skills/next-plan/references/claim-results.md`,
+`## Session baseline and the sync object`. Do not run
+`Get-AgentWorktreeSessionContext` separately.
+
+Use `none` for empty fields; add only skill-required fields. Cite paths; for a
+plan snapshot or execution card, cite its worktree-relative path plus only
+needed `##` selectors (e.g., `## Execution card` alone), never repeating planned
+mechanism or check/fixture text; keep assigned items (section/label), scope,
+post-plan deltas, and required fields inline. Get `AGENTS.md` chains via
+`.agents/skills/update-claude-docs/scripts/Get-AffectedAgentsDocs.ps1 <path>
+[<path> ...]` (positional paths, per `AGENTS.md` `## Directives` Bundled
+scripts; omit `Temp/` and reparse points, including hookless Codex runs). Never
+paste root docs, skill bodies, full Plans, transcripts, unrelated handoffs, or
+raw XML/logs (deleted Plan: approved text or Git-history path).
+
+## Session baseline
 
 The session baseline is the attribution and delegation fork point for the
 session's work. It begins as the commit reported by
@@ -67,14 +97,6 @@ Import-Module ./.agents/scripts/AgentWorktreeSession.psm1
 Get-AgentWorktreeSessionContext
 ```
 
-Inside a `/next-plan` run, copy these values from the `Get-NextPlanContext`
-output already in context: `SessionBranch` is `Branch`, `Session` is
-`SessionId`, `Primary` is `PrimaryRoot`, and `TargetBranch` is `PrimaryBranch`;
-`Worktree` and `PrimaryTip` keep their names. Use the recorded `Baseline`
-governed by `.agents/skills/next-plan/references/claim-results.md`,
-`## Session baseline and the sync object`. Do not run
-`Get-AgentWorktreeSessionContext` separately.
-
 The leading `./` is required — without it PowerShell treats the path as a
 module name and searches `PSModulePath` instead of the worktree.
 
@@ -83,6 +105,8 @@ branch, never the conversation session ID a follow-up Plan's provenance block
 records (where that ID comes from:
 `.agents/skills/next-plan/references/follow-up-provenance.md`
 `## Conversation session ID`).
+
+## Pre-dispatch inventory and bounded reading
 
 On a direct `reviewer` dispatch, when `## Inputs` documents a pre-dispatch
 `.agents/scripts/Get-SessionChangeInventory.ps1` run, its named producer writes
@@ -101,21 +125,6 @@ worker-only references; all other cited files stay section-bounded per
 `AGENTS.md` `## Directives` Bounded reading. Each skill's `## Inputs` owns
 command form and producer (e.g.,
 `.agents/skills/adversarial-review/SKILL.md` `## Inputs`).
-
-Use `none` for empty fields; add only skill-required fields. Cite paths; for a
-plan snapshot or execution card, cite its worktree-relative path plus only
-needed `##` selectors (e.g., `## Execution card` alone), never repeating planned
-mechanism or check/fixture text; keep assigned items (section/label), scope,
-post-plan deltas, and required fields inline. Get `AGENTS.md` chains via
-`.agents/skills/update-claude-docs/scripts/Get-AffectedAgentsDocs.ps1 <path>
-[<path> ...]` (positional paths, per `AGENTS.md` `## Directives` Bundled
-scripts; omit `Temp/` and reparse points, including hookless Codex runs). Never
-paste root docs, skill bodies, full Plans, transcripts, unrelated handoffs, or
-raw XML/logs (deleted Plan: approved text or Git-history path).
-
-Workers verify supplied hints against the tree, stay within ownership, and
-expand only for a concrete dependency, decision, or failure. They never route
-work to another worker.
 
 ## Handoffs
 

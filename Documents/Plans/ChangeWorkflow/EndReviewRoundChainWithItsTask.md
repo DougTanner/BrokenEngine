@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v2 {"createdUtc":"2026-11-27T01:36:53.584Z","dependsOn":[]} -->
+<!-- broken-engine-plan/v2 {"createdUtc":"2026-11-27T01:36:53.584Z","dependsOn":[],"agentCli":"claude"} -->
 # End the review-round chain with its task
 
 ## Context
@@ -89,8 +89,9 @@ C++, shader, build, `.pack`, replay, or live-verification exposure.
 - Since points within one task.
 - Sweep recovery after a refused landing, owned by
   `Documents/Plans/ChangeWorkflow/RecoverSweepAfterLandingRefusesItsCandidate.md`.
-- The scenario suite, owned by
-  `Documents/Plans/ChangeWorkflow/KeepReviewRoundScenarioScripts.md`.
+- The scenario suite `.agents/scripts/ReviewRoundScenarios/` and the
+  `review-round-scenarios` row of `.agents/scripts/Invoke-StaticChecks.ps1`
+  that runs it.
 
 ## Acceptance criteria
 
@@ -108,6 +109,6 @@ C++, shader, build, `.pack`, replay, or live-verification exposure.
 
 ## Notes
 
-- `Documents/Plans/ChangeWorkflow/KeepReviewRoundScenarioScripts/lib.ps1` and
-  `check13.ps1` hold scratch-repository, Coretide-clone, and closed-round setup
-  to start from.
+- `.agents/scripts/ReviewRoundScenarios/ScenarioCommon.ps1` and
+  `LandingCheck.ps1` hold scratch-repository, Coretide-clone, and closed-round
+  setup to start from.

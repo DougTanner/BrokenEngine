@@ -7,19 +7,44 @@
 namespace engine
 {
 
-SegmentHit XM_CALLCONV TracePointAgainstTerrain(const CellStaticData& rStaticData, FXMVECTOR vecStartPosition, FXMVECTOR vecEndPosition)
+SegmentHit XM_CALLCONV TracePointAgainstTerrain(const CellStaticData& rStaticData, FXMVECTOR vecStartPosition, FXMVECTOR vecEndPosition, float fMaximumTime)
 {
-	CellElevationSampler sampler = gpIslandTerrain->MakeCellElevationSampler(rStaticData);
 	XMFLOAT4A f4Start {};
 	XMFLOAT4A f4End {};
 	XMStoreFloat4A(&f4Start, vecStartPosition);
 	XMStoreFloat4A(&f4End, vecEndPosition);
+	if (!std::isfinite(f4Start.x) || !std::isfinite(f4Start.y) || !std::isfinite(f4End.x) || !std::isfinite(f4End.y))
+	{
+		return {};
+	}
+
+	if (!std::isfinite(fMaximumTime))
+	{
+		return {};
+	}
+
+	CellElevationSampler sampler = gpIslandTerrain->MakeCellElevationSampler(rStaticData);
+	float fStartGridX = (f4Start.x - kfCellOriginX) / kfGridPitchX;
+	float fStartGridY = (f4Start.y - kfCellOriginY) / kfGridPitchY;
+	if (!(fStartGridX >= 0.0f && fStartGridX < static_cast<float>(kiElevationGridDimension) && fStartGridY >= 0.0f && fStartGridY < static_cast<float>(kiElevationGridDimension)))
+	{
+		if (f4Start.z <= sampler.fSeaFloor)
+		{
+			return
+			{
+				.bHit = true,
+				.fTime = 0.0f,
+				.vecPosition = XMVectorSetZ(vecStartPosition, sampler.fSeaFloor),
+			};
+		}
+		return {};
+	}
 
 	float fDeltaX = f4End.x - f4Start.x;
 	float fDeltaY = f4End.y - f4Start.y;
 	float fDeltaZ = f4End.z - f4Start.z;
-	int64_t iGridX = static_cast<int64_t>(std::floor((f4Start.x - kfCellOriginX) / kfGridPitchX));
-	int64_t iGridY = static_cast<int64_t>(std::floor((f4Start.y - kfCellOriginY) / kfGridPitchY));
+	int64_t iGridX = static_cast<int64_t>(fStartGridX);
+	int64_t iGridY = static_cast<int64_t>(fStartGridY);
 	int64_t iStepX = fDeltaX > 0.0f ? 1 : fDeltaX < 0.0f ? -1 : 0;
 	int64_t iStepY = fDeltaY > 0.0f ? 1 : fDeltaY < 0.0f ? -1 : 0;
 	int64_t iNextBoundaryX = iGridX + (iStepX > 0 ? 1 : 0);
@@ -35,12 +60,55 @@ SegmentHit XM_CALLCONV TracePointAgainstTerrain(const CellStaticData& rStaticDat
 		float fCurrentZ = f4Start.z + fDeltaZ * fCurrentPercent;
 		if (fCurrentZ <= fPointElevation)
 		{
+			if (fCurrentPercent > fMaximumTime)
+			{
+				return {};
+			}
 			return
 			{
 				.bHit = true,
 				.fTime = fCurrentPercent,
 				.vecPosition = XMVectorSetZ(vecCurrentPosition, fPointElevation),
 			};
+		}
+
+		bool bInGrid = iGridX >= 0 && iGridX < kiElevationGridDimension && iGridY >= 0 && iGridY < kiElevationGridDimension;
+		float fElevation = sampler.fSeaFloor;
+		if (sampler.pGrid != nullptr && bInGrid)
+		{
+			fElevation = sampler.pGrid->at(static_cast<size_t>(iGridY * kiElevationGridDimension + iGridX));
+		}
+		// The traversed cell owns the open interval after fCurrentPercent. If a height step rises immediately
+		// across a boundary, collision begins at the boundary even when the exact point belongs to the
+		// outgoing cell under floor ownership.
+		if (fCurrentZ <= fElevation)
+		{
+			if (fCurrentPercent > fMaximumTime)
+			{
+				return {};
+			}
+			XMVECTOR vecPosition = XMVectorSetZ(vecCurrentPosition, fElevation);
+			return
+			{
+				.bHit = true,
+				.fTime = fCurrentPercent,
+				.vecPosition = vecPosition,
+			};
+		}
+
+		if (!bInGrid)
+		{
+			// Outside the elevation grid every remaining cell is sampler.fSeaFloor; stop once no sea-floor
+			// hit can land at or before fMaximumTime.
+			if (!(fDeltaZ < 0.0f))
+			{
+				return {};
+			}
+			float fSeaFloorHitPercent = (sampler.fSeaFloor - f4Start.z) / fDeltaZ;
+			if (!(fSeaFloorHitPercent <= fMaximumTime))
+			{
+				return {};
+			}
 		}
 
 		float fDistanceX = std::numeric_limits<float>::max();
@@ -82,24 +150,6 @@ SegmentHit XM_CALLCONV TracePointAgainstTerrain(const CellStaticData& rStaticDat
 			fNextPercent = bAdvanceX ? fDistanceX / fAbsoluteDeltaX : fDistanceY / fAbsoluteDeltaY;
 			fNextPercent = std::min(1.0f, fNextPercent);
 		}
-		float fElevation = sampler.fSeaFloor;
-		if (sampler.pGrid != nullptr && iGridX >= 0 && iGridX < kiElevationGridDimension && iGridY >= 0 && iGridY < kiElevationGridDimension)
-		{
-			fElevation = sampler.pGrid->at(static_cast<size_t>(iGridY * kiElevationGridDimension + iGridX));
-		}
-		// The traversed cell owns the open interval after fCurrentPercent. If a height step rises immediately
-		// across a boundary, collision begins at the boundary even when the exact point belongs to the
-		// outgoing cell under floor ownership.
-		if (fCurrentZ <= fElevation)
-		{
-			XMVECTOR vecPosition = XMVectorSetZ(vecCurrentPosition, fElevation);
-			return
-			{
-				.bHit = true,
-				.fTime = fCurrentPercent,
-				.vecPosition = vecPosition,
-			};
-		}
 
 		float fNextZ = f4Start.z + fDeltaZ * fNextPercent;
 		// The next boundary is excluded from this cell. Equality is resolved below by Sample(), whose
@@ -107,6 +157,10 @@ SegmentHit XM_CALLCONV TracePointAgainstTerrain(const CellStaticData& rStaticDat
 		if (fNextZ < fElevation)
 		{
 			float fHitPercent = (fElevation - f4Start.z) / fDeltaZ;
+			if (fHitPercent > fMaximumTime)
+			{
+				return {};
+			}
 			XMVECTOR vecPosition = XMVectorSetZ(XMVectorLerp(vecStartPosition, vecEndPosition, fHitPercent), fElevation);
 			return
 			{
@@ -118,6 +172,10 @@ SegmentHit XM_CALLCONV TracePointAgainstTerrain(const CellStaticData& rStaticDat
 
 		if (fNextPercent >= 1.0f)
 		{
+			if (fMaximumTime < 1.0f)
+			{
+				return {};
+			}
 			float fEndElevation = sampler.Sample(vecEndPosition);
 			if (f4End.z <= fEndElevation)
 			{
@@ -129,6 +187,28 @@ SegmentHit XM_CALLCONV TracePointAgainstTerrain(const CellStaticData& rStaticDat
 				};
 			}
 			return {};
+		}
+
+		if (fNextPercent > fMaximumTime)
+		{
+			// A descending trace can round fNextZ above a cell's elevation while (fElevation - f4Start.z) / fDeltaZ
+			// still rounds to <= fMaximumTime in the next cell. Any later cell that misses the boundary check has
+			// fElevation < fNextZ, so this lower bound stops once no later cell can hit at or before fMaximumTime.
+			if (fMaximumTime <= 0.0f)
+			{
+				return {};
+			}
+
+			if (!(fDeltaZ < 0.0f))
+			{
+				return {};
+			}
+			float fMaximumFutureElevation = fNextZ == 0.0f ? -std::numeric_limits<float>::min() : fNextZ == std::numeric_limits<float>::min() ? 0.0f : std::nextafter(fNextZ, -std::numeric_limits<float>::infinity());
+			float fMinimumFutureHitPercent = (fMaximumFutureElevation - f4Start.z) / fDeltaZ;
+			if (!(fMinimumFutureHitPercent <= fMaximumTime))
+			{
+				return {};
+			}
 		}
 
 		if (bAdvanceX)
